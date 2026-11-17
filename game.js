@@ -52,7 +52,7 @@
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
-  var chamberSleepImg = loadImg("assets/under-the-covers.gif");
+  var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
   var subwayImg = loadImg("assets/bg-subway.jpg");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
@@ -158,7 +158,7 @@
     g.sleeping = true;
     g.attack.active = false; g.talk.open = false;
   }
-  function wakeUp() { g.sleeping = false; }
+  function wakeUp() { g.sleeping = false; g.ray.inBed = false; }
   function tryEnter() {
     if (g.embrace.active) return;
     if (g.sleeping) { wakeUp(); return; }
@@ -204,10 +204,14 @@
   function drawBg() {
     var frames = room().frames;
     var frame = frames.length > 1 ? frames[Math.floor(g.time / 30) % frames.length] : frames[0];
-    // Asleep in the chamber: the room shows her gif, under the
-    // covers with the hearts above the bed. Awake: the normal room.
-    if (g.room === "chamber" && g.sleeping && chamberSleepImg.complete && chamberSleepImg.naturalWidth !== 0) {
-      frame = chamberSleepImg;
+    // Asleep in the chamber: the two night frames play, the
+    // blanket shifting subtly while they both sleep under it.
+    // Awake: the normal room.
+    if (g.room === "chamber" && g.sleeping) {
+      var s0 = sleepImgs[0], s1 = sleepImgs[1];
+      if (s0.complete && s0.naturalWidth !== 0 && s1.complete && s1.naturalWidth !== 0) {
+        frame = sleepImgs[Math.floor(g.time / 60) % sleepImgs.length];
+      }
     }
     ctx.fillStyle = "#0b0a18";
     ctx.fillRect(0, 0, g.w, g.h);
@@ -291,6 +295,7 @@
 
   function drawRay() {
     var r = g.ray;
+    if (r.inBed) return; // under the covers with her
     var walking = r.pause <= 0;
     var img;
     if (r.fight.active) {
@@ -537,7 +542,19 @@
     // Ray: fights with Sylvia when she attacks, follows her when she
     // gets far away (or into another room), wanders when they are close.
     var r = g.ray;
-    if (r.fight.active) {
+    if (g.sleeping) {
+      // He comes to bed too: walks over to her side of the bed,
+      // then slips under the covers with her.
+      var bedSide = BED_X + 30;
+      var bdx = bedSide - r.x;
+      if (Math.abs(bdx) > 40) {
+        r.dir = bdx > 0 ? 1 : -1;
+        r.x += r.dir * 3.2;
+        r.walk += 1;
+      } else {
+        r.inBed = true;
+      }
+    } else if (r.fight.active) {
       r.fight.t += 1;
       var tx = fightTargetX();
       var dx = tx - r.x;
