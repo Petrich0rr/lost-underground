@@ -11,7 +11,7 @@
   // Each is shown at full height, cropped only on the sides.
   var ROOMS = {
     bar: { w: 1179, h: 503, viewW: 1179 * 0.60, frames: null },
-    chamber: { w: 1752, h: 897, viewW: 1752 * 0.60, frames: null }
+    chamber: { w: 1024, h: 980, viewW: 1024 * 0.75, frames: null }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -113,9 +113,10 @@
   function worldW() { return room().w * scale(); }
   function groundY() { return g.h - g.h * 0.10; }
   function depthRange() { return g.h * 0.08; }
-  // The chamber furniture is drawn big, so Sylvia and Ray are
-  // bigger in there too, or the bed headboard towers over Ray.
-  function sylviaH() { return g.h * (g.room === "chamber" ? 0.52 : 0.36); }
+  // The new chamber is a taller room, so they are a touch bigger
+  // in there than in the bar (0.44 vs 0.36), but not as big as
+  // the 0.52 that was too much before.
+  function sylviaH() { return g.h * (g.room === "chamber" ? 0.44 : 0.36); }
   function rayH() { return sylviaH() * 172 / 148; }
 
   function resize() {
