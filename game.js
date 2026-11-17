@@ -64,10 +64,11 @@
 
   var keys = { up: false, down: false, left: false, right: false };
   var g = {
-    w: 0, h: 340, time: 0, camX: 0, room: "bar",
-    // Sylvia, in bar-world pixels (bar is 1179 wide, 503 tall).
-    px: 220, depth: 0, facing: 1, walk: 0,
-    ray: { x: 700, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
+    w: 0, h: 340, time: 0, camX: 0, room: "chamber",
+    // Sylvia, in chamber-world pixels (chamber is 1672 wide, 941 tall).
+    // She starts in her own room, by the bed, with Ray beside her.
+    px: 950, depth: 0, facing: -1, walk: 0,
+    ray: { x: 1020, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -253,6 +254,8 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   resize();
+  // Start in the chamber, with the camera already on Sylvia.
+  g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
   window.addEventListener("resize", resize);
 
   function drawBg() {
