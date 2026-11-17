@@ -152,6 +152,25 @@
     resize();
     g.camX = 0;
   }
+  // The bar door in the Shopping District (world x, in the 2172-wide
+  // street). The beer mug over the double doors marks the tavern, and
+  // the bar already exists, so this door just leads there.
+  var BEER_DOOR_X = 1558, BEER_DOOR_RANGE = 110;
+  function beerDoorNear() {
+    return g.room === "shopping" && Math.abs(g.px - BEER_DOOR_X) < BEER_DOOR_RANGE;
+  }
+  function enterBarFromBeerDoor() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.embrace.active) return;
+    g.talk.open = false;
+    g.room = "bar";
+    g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    // You walk in through the bar door, on the right side of the room,
+    // facing the bar and Vicky. Ray comes in just behind you.
+    g.px = 850; g.facing = -1;
+    g.ray.x = 900; g.ray.dir = -1;
+    resize();
+    g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
+  }
   function switchRoom() {
     if (g.kiss.active || g.talk.open || g.embrace.active) return;
     var side = doorSide();
@@ -197,6 +216,7 @@
     if (g.sleeping) { wakeUp(); return; }
     if (bedNear()) { goToBed(); return; }
     if (windowNear()) { climbOutWindow(); return; }
+    if (beerDoorNear()) { enterBarFromBeerDoor(); return; }
     if (atDoor()) switchRoom();
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
@@ -497,6 +517,25 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
+  function drawBeerDoorPrompt() {
+    if (g.kiss.active || g.talk.open) return;
+    if (!beerDoorNear()) return;
+    var x = BEER_DOOR_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to go to the bar";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
   function drawBedPrompt() {
     if (g.kiss.active || g.talk.open) return;
     if (!g.sleeping && !bedNear()) return;
@@ -523,6 +562,7 @@
     drawDoorPrompt();
     drawBedPrompt();
     drawWindowPrompt();
+    drawBeerDoorPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); return; }
     drawRay();
@@ -544,6 +584,7 @@
       if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
       else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
+      else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
     }
