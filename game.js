@@ -12,7 +12,7 @@
   // Each is shown at full height, cropped only on the sides.
   var ROOMS = {
     bar: { w: 1179, h: 503, viewW: 1179 * 0.60, frames: null, floor: 0.90 },
-    chamber: { w: 1024, h: 980, viewW: 1024 * 0.75, frames: null, floor: 0.90 },
+    chamber: { w: 1672, h: 941, viewW: 1672 * 0.75, frames: null, floor: 0.90 },
     subway: { w: 2172, h: 724, viewW: 2172 * 0.60, frames: null, floor: 0.80, depth: 0.05 }
   };
   function room() { return ROOMS[g.room]; }
@@ -146,7 +146,10 @@
   // The new chamber is a taller room, so they are a touch bigger
   // in there than in the bar (0.44 vs 0.36), but not as big as
   // the 0.52 that was too much before.
-  function sylviaH() { return g.h * (g.room === "chamber" ? 0.44 : 0.36); }
+  // Chamber scale 0.40: the new brick bedroom's furniture is drawn
+  // closer to true size than the old amber room, so they stand a
+  // little shorter here than the 0.44 that room needed.
+  function sylviaH() { return g.h * (g.room === "chamber" ? 0.40 : 0.36); }
   function rayH() { return sylviaH() * 172 / 148; }
 
   function resize() {
