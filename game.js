@@ -201,22 +201,6 @@
     else if (walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
-    if (kissNear()) {
-      var px = r.x * scale() - g.camX;
-      ctx.save();
-      ctx.font = "700 13px 'Open Sans', sans-serif";
-      ctx.textAlign = "center";
-      var label = "Press K";
-      var tw = ctx.measureText(label).width;
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(px - tw / 2 - 10, groundY() - rayH() - 34, tw + 20, 24, 12);
-      else ctx.rect(px - tw / 2 - 10, groundY() - rayH() - 34, tw + 20, 24);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(label, px, groundY() - rayH() - 17);
-      ctx.restore();
-    }
   }
 
   function wrapText(text, maxW) {
