@@ -205,27 +205,47 @@
     return lines;
   }
   function drawTalk() {
+    // Speech bubble above Vicky, tail pointing down to her.
     if (!g.talk.open) return;
-    var bx = 16, bw = g.w - 32, bh = 84, by = g.h - bh - 12;
+    var vx = VICKY_X * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
     ctx.save();
-    ctx.fillStyle = "rgba(10,8,24,0.92)";
-    ctx.strokeStyle = "#0201a7"; ctx.lineWidth = 2;
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(VICKY_LINES[g.talk.idx], maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText("VICKY").width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, vx - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, vx));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
     else ctx.rect(bx, by, bw, bh);
     ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#7aa2ff";
-    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText("VICKY", bx + 16, by + 22);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillText("VICKY", bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
     ctx.font = "400 14px 'Open Sans', sans-serif";
-    var lines = wrapText(VICKY_LINES[g.talk.idx], bw - 32);
-    for (var i = 0; i < lines.length; i++) ctx.fillText(lines[i], bx + 16, by + 44 + i * 18);
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.font = "600 11px 'Open Sans', sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText("T for more, walk away to leave", bx + bw - 14, by + bh - 10);
+    ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
     ctx.restore();
   }
   function drawVickyPrompt() {
