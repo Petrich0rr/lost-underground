@@ -60,6 +60,8 @@
   var charIdleImg = loadImg("assets/owner-idle.png");
   var mikeyWalkImgs = ["assets/mikey-walk-01.png", "assets/mikey-walk-02.png", "assets/mikey-walk-03.png", "assets/mikey-walk-04.png"].map(loadImg);
   var mikeyIdleImg = loadImg("assets/mikey-idle.png");
+  var gunnerWalkImgs = ["assets/gunner-walk-01.png", "assets/gunner-walk-02.png", "assets/gunner-walk-03.png", "assets/gunner-walk-04.png"].map(loadImg);
+  var gunnerIdleImg = loadImg("assets/gunner-idle.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
   var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
@@ -91,6 +93,9 @@
     // Mikey, the salon owner. He only ever stands and walks in the
     // salon (the Style Studio), never anywhere else.
     mikey: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
+    // Gunner, the repair shop owner. He only ever stands and walks in
+    // the repair shop, never anywhere else.
+    gunner: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -496,6 +501,31 @@
     ctx.restore();
   }
 
+  // Gunner, the repair shop owner. He only appears in the repair shop,
+  // standing still or walking around it. He never leaves it.
+  function drawGunner() {
+    if (g.room !== "repair") return;
+    var n = g.gunner;
+    var walking = n.pause <= 0;
+    var img = walking ? gunnerWalkImgs[Math.floor(n.walk / 6) % gunnerWalkImgs.length] : gunnerIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = gunnerIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (n.depth + depthRange()) / depthRange(); // 0 back, 1 front
+    var h = rayH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + n.depth - 6;
+    var x = n.x * scale() - g.camX;
+    if (x < -w || x > g.w + w) return;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    // His walk frames face right, so flip them when he walks left.
+    // The idle is a three-quarter front view, never flipped.
+    if (walking && n.dir === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
   function drawEmbrace() {
     if (!embraceImg || !embraceImg.complete || embraceImg.naturalWidth === 0) {
       drawRay();
@@ -707,6 +737,7 @@
     drawRay();
     drawChar();
     drawMikey();
+    drawGunner();
     if (!g.sleeping) drawSylvia();
     drawTalk();
   }
@@ -825,6 +856,19 @@
         m.walk += 0.3;
         if (m.x < 150 || m.x > room().w - 150) { m.dir *= -1; m.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { m.pause = 90 + Math.random() * 150; }
+      }
+    }
+    // Gunner, the repair shop owner: he only stands and walks in the
+    // repair shop, never anywhere else. He wanders it slowly, pausing
+    // by the workbench, and turns at the walls.
+    var n = g.gunner;
+    if (g.room === "repair") {
+      if (n.pause > 0) { n.pause -= 1; }
+      else {
+        n.x += n.dir * 0.8;
+        n.walk += 0.3;
+        if (n.x < 150 || n.x > room().w - 150) { n.dir *= -1; n.pause = 60 + Math.random() * 120; }
+        else if (Math.random() < 0.002) { n.pause = 90 + Math.random() * 150; }
       }
     }
     // When she is standing still and he wanders up right behind
