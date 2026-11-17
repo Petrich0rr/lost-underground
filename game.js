@@ -1,6 +1,6 @@
 // Lost Underground — a walk-around game, not a jump game.
-// Sylvia walks left and right with A and D or the arrow keys, on the
-// floor only. Her boyfriend Ray
+// Sylvia walks left and right with A and D or the arrow keys, and
+// forward and back on the floor with W and S. Her boyfriend Ray
 // just wanders the bar. No obstacles, no jumping, no score.
 // Three rooms: the bar, their chamber (far left edge of the bar),
 // and the Forgotten subway, up the stairs on the bar's right edge.
@@ -15,9 +15,9 @@
   // window never changes size when she walks into another room.
   var CANVAS_ASPECT = 4 / 3;
   var ROOMS = {
-    bar: { w: 1179, h: 503, frames: null, floor: 0.90 },
-    chamber: { w: 1672, h: 941, frames: null, floor: 0.90 },
-    subway: { w: 2172, h: 724, frames: null, floor: 0.80 }
+    bar: { w: 1179, h: 503, frames: null, floor: 0.90, depth: 0.08 },
+    chamber: { w: 1672, h: 941, frames: null, floor: 0.90, depth: 0.06 },
+    subway: { w: 2172, h: 724, frames: null, floor: 0.80, depth: 0.05 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -56,7 +56,7 @@
   var g = {
     w: 0, h: 340, time: 0, camX: 0, room: "bar",
     // Sylvia, in bar-world pixels (bar is 1179 wide, 503 tall).
-    px: 220, facing: 1, walk: 0,
+    px: 220, depth: 0, facing: 1, walk: 0,
     ray: { x: 700, dir: -1, pause: 0, walk: 0, fight: { active: false, t: 0 } },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
@@ -126,7 +126,7 @@
     var to = EXITS[g.room][side];
     g.talk.open = false;
     g.room = to;
-    g.ray.pause = 0; g.ray.fight.active = false;
+    g.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
     var enterRight = side === "left";
     if (enterRight) {
@@ -149,6 +149,7 @@
   function scale() { return g.h / room().h; }
   function worldW() { return room().w * scale(); }
   function groundY() { return g.h * room().floor; }
+  function depthRange() { return g.h * room().depth; }
   // The new chamber is a taller room, so they are a touch bigger
   // in there than in the bar (0.44 vs 0.36), but not as big as
   // the 0.52 that was too much before.
@@ -198,7 +199,7 @@
   }
 
   function drawSylvia() {
-    var moving = keys.left || keys.right;
+    var moving = keys.left || keys.right || keys.up || keys.down;
     var img;
     if (g.attack.active) {
       // Stance, then the high kick, then back to stance.
@@ -208,9 +209,10 @@
     }
     if (!img || !img.complete || img.naturalWidth === 0) img = sylviaIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
-    var h = sylviaH();
+    var t = (g.depth + depthRange()) / depthRange(); // 0 back, 1 front
+    var h = sylviaH() * (0.92 + 0.08 * t);
     var w = h * (img.naturalWidth / img.naturalHeight);
-    var feetY = groundY();
+    var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
     shadow(x, feetY, w);
     ctx.save();
@@ -410,9 +412,13 @@
     var speed = 2.2;
     if (keys.left) { g.px -= speed; g.facing = -1; }
     if (keys.right) { g.px += speed; g.facing = 1; }
+    if (keys.up) { g.depth -= speed * 0.5; }
+    if (keys.down) { g.depth += speed * 0.5; }
     if (g.px < 60) g.px = 60;
     if (g.px > room().w - 60) g.px = room().w - 60;
-    if (keys.left || keys.right) g.walk += 0.3;
+    if (g.depth < -depthRange()) g.depth = -depthRange();
+    if (g.depth > 0) g.depth = 0;
+    if (keys.left || keys.right || keys.up || keys.down) g.walk += 0.3;
     // Camera follows Sylvia across the bar.
     var target = g.px * scale() - g.w * 0.38;
     if (target < 0) target = 0;
