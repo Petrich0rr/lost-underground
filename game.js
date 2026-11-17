@@ -24,6 +24,11 @@
   var rayWalkImgs = RAY_WALK.map(loadImg);
   var rayIdleImg = loadImg(RAY_IDLE_SRC);
   var kissImg = loadImg("assets/kiss.png");
+  var sylviaStanceImg = loadImg("assets/sylvia-stance.png");
+  var sylviaKickImg = loadImg("assets/sylvia-kick.png");
+  var sylviaCrouchImg = loadImg("assets/sylvia-crouch.png");
+  var rayStanceImg = loadImg("assets/ray-stance.png");
+  var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
 
   var keys = { up: false, down: false, left: false, right: false };
@@ -31,8 +36,9 @@
     w: 0, h: 340, time: 0, camX: 0,
     // Sylvia, in bar-world pixels (bar is 1179 wide, 503 tall).
     px: 220, depth: 0, facing: 1, walk: 0,
-    ray: { x: 700, dir: -1, pause: 0, walk: 0 },
+    ray: { x: 700, dir: -1, pause: 0, walk: 0, fight: { active: false, t: 0 } },
     kiss: { active: false, t: 0 },
+    attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 }
   };
   var VICKY_X = 560; // the bartender in the background, behind the bar
@@ -60,6 +66,12 @@
     if (g.talk.open) { talkLine(); return; }
     if (vickyNear()) talkLine();
   }
+  function tryAttack() {
+    if (g.kiss.active || g.talk.open || g.attack.cooldown > 0) return;
+    g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
+    g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
+  }
+  function fightTargetX() { return g.px + g.facing * 70; }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
     if (g.kiss.active || !kissNear()) return;
@@ -112,7 +124,13 @@
 
   function drawSylvia() {
     var moving = keys.left || keys.right || keys.up || keys.down;
-    var img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
+    var img;
+    if (g.attack.active) {
+      // Stance, then the high kick, then back to stance.
+      img = (g.attack.t >= 8 && g.attack.t < 22) ? sylviaKickImg : sylviaStanceImg;
+    } else {
+      img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
+    }
     if (!img || !img.complete || img.naturalWidth === 0) img = sylviaIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (g.depth + depthRange()) / depthRange(); // 0 back, 1 front
@@ -160,7 +178,14 @@
   function drawRay() {
     var r = g.ray;
     var walking = r.pause <= 0;
-    var img = walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length] : rayIdleImg;
+    var img;
+    if (r.fight.active) {
+      var nearTarget = Math.abs(r.x - fightTargetX()) < 30;
+      img = nearTarget ? rayPunchImg
+        : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length];
+    } else {
+      img = walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length] : rayIdleImg;
+    }
     if (!img || !img.complete || img.naturalWidth === 0) img = rayIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var h = rayH();
@@ -171,8 +196,9 @@
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
-    // Ray's walk frames face right, so flip them when he walks left.
-    if (walking && r.dir === -1) ctx.scale(-1, 1);
+    // Ray's frames face right, so flip them when he faces left.
+    if (r.fight.active) { if (g.px < r.x) ctx.scale(-1, 1); }
+    else if (walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
     if (kissNear()) {
@@ -312,9 +338,30 @@
     if (target < 0) target = 0;
     if (target > worldW() - g.w) target = worldW() - g.w;
     g.camX += (target - g.camX) * 0.12;
-    // Ray just wanders the bar.
+    if (g.attack.cooldown > 0) g.attack.cooldown -= 1;
+    if (g.attack.active) {
+      g.attack.t += 1;
+      if (g.attack.t >= 30) g.attack.active = false;
+    }
+    // Ray: fights with Sylvia when she attacks, follows her when she
+    // gets far away (or into another room), wanders when they are close.
     var r = g.ray;
-    if (r.pause > 0) { r.pause -= 1; }
+    if (r.fight.active) {
+      r.fight.t += 1;
+      var tx = fightTargetX();
+      var dx = tx - r.x;
+      if (Math.abs(dx) > 25) {
+        r.dir = dx > 0 ? 1 : -1;
+        r.x += r.dir * 2.6;
+        r.walk += 1;
+      }
+      if (r.fight.t >= 90) { r.fight.active = false; r.pause = 40; }
+    } else if (Math.abs(r.x - g.px) > 320) {
+      r.dir = r.x < g.px ? 1 : -1;
+      r.x += r.dir * 2.6;
+      r.walk += 1;
+      r.pause = 0;
+    } else if (r.pause > 0) { r.pause -= 1; }
     else {
       r.x += r.dir * 0.9;
       r.walk += 0.3;
@@ -335,6 +382,7 @@
   }
   window.addEventListener("keydown", function (e) {
     if (e.code === "KeyK") { tryKiss(); return; }
+    if (e.code === "KeyH") { tryAttack(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "Escape") { g.talk.open = false; return; }
     if (setKey(e.code, true)) {
@@ -359,6 +407,8 @@
   canvas.addEventListener("pointerup", pointerEnd);
   var talkBtn = document.getElementById("talkBtn");
   if (talkBtn) talkBtn.addEventListener("click", function (e) { e.stopPropagation(); pressT(); });
+  var attackBtn = document.getElementById("attackBtn");
+  if (attackBtn) attackBtn.addEventListener("click", function (e) { e.stopPropagation(); tryAttack(); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
