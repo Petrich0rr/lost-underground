@@ -13,7 +13,7 @@
   var ROOMS = {
     bar: { w: 1179, h: 503, viewW: 1179 * 0.60, frames: null, floor: 0.90 },
     chamber: { w: 1024, h: 980, viewW: 1024 * 0.75, frames: null, floor: 0.90 },
-    subway: { w: 2172, h: 724, viewW: 2172 * 0.60, frames: null, floor: 0.84 }
+    subway: { w: 2172, h: 724, viewW: 2172 * 0.60, frames: null, floor: 0.80, depth: 0.05 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -142,7 +142,7 @@
   function scale() { return g.h / room().h; }
   function worldW() { return room().w * scale(); }
   function groundY() { return g.h * room().floor; }
-  function depthRange() { return g.h * 0.08; }
+  function depthRange() { return g.h * (room().depth || 0.08); }
   // The new chamber is a taller room, so they are a touch bigger
   // in there than in the bar (0.44 vs 0.36), but not as big as
   // the 0.52 that was too much before.
@@ -262,7 +262,9 @@
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Ray's frames face right, so flip them when he faces left.
-    if (r.fight.active) { if (g.px < r.x) ctx.scale(-1, 1); }
+    // When fighting he faces the same way Sylvia does, so his punch
+    // goes the same direction as her kick, not back toward her.
+    if (r.fight.active) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
