@@ -23,6 +23,7 @@
   var sylviaIdleImg = loadImg(SYLVIA_IDLE_SRC);
   var rayWalkImgs = RAY_WALK.map(loadImg);
   var rayIdleImg = loadImg(RAY_IDLE_SRC);
+  var kissImg = loadImg("assets/kiss.png");
   var bgImgs = BG_SRCS.map(loadImg);
 
   var keys = { up: false, down: false, left: false, right: false };
@@ -85,16 +86,11 @@
 
   function drawSylvia() {
     var moving = keys.left || keys.right || keys.up || keys.down;
-    var kissing = g.kiss.active;
-    var img = kissing ? sylviaWalkImgs[0]
-      : moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length]
-      : sylviaIdleImg;
+    var img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = sylviaIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (g.depth + depthRange()) / depthRange(); // 0 back, 1 front
     var h = sylviaH() * (0.92 + 0.08 * t);
-    // A tad smaller while walking, so her face does not look huge.
-    if (moving || kissing) h *= 0.94;
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
@@ -103,7 +99,6 @@
     ctx.translate(x, feetY - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
     if (g.facing === -1 && img !== sylviaIdleImg) ctx.scale(-1, 1);
-    if (kissing) ctx.rotate(g.facing === 1 ? 0.08 : -0.08);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -117,13 +112,29 @@
     ctx.fill();
   }
 
+  function drawKiss() {
+    // Erika's kiss artwork replaces both characters for the kiss.
+    // In the image Sylvia is on the left and Ray on the right, so
+    // flip it when Sylvia is on the right of Ray.
+    if (!kissImg || !kissImg.complete || kissImg.naturalWidth === 0) return;
+    var h = rayH();
+    var w = h * (kissImg.naturalWidth / kissImg.naturalHeight);
+    var feetY = groundY() - 6;
+    var mx = (g.px + g.ray.x) / 2 * scale() - g.camX;
+    shadow(mx, feetY, w);
+    ctx.save();
+    ctx.translate(mx, feetY - h / 2);
+    if (g.px > g.ray.x) ctx.scale(-1, 1);
+    ctx.drawImage(kissImg, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    var my = feetY - h - 22 + Math.sin(g.kiss.t * 0.12) * 4;
+    drawHeart(mx, my, 11 + Math.sin(g.kiss.t * 0.2) * 2, "#ff5c8a");
+  }
+
   function drawRay() {
     var r = g.ray;
-    var kissing = g.kiss.active;
-    var walking = !kissing && r.pause <= 0;
-    var img = kissing ? rayWalkImgs[0]
-      : walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length]
-      : rayIdleImg;
+    var walking = r.pause <= 0;
+    var img = walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length] : rayIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = rayIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var h = rayH();
@@ -134,17 +145,11 @@
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
-    // Ray's walk frames face right, so flip them when he faces left.
-    var facingLeft = kissing ? g.px < r.x : r.dir === -1;
-    if (facingLeft) ctx.scale(-1, 1);
-    if (kissing) ctx.rotate(g.px < r.x ? -0.08 : 0.08);
+    // Ray's walk frames face right, so flip them when he walks left.
+    if (walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
-    if (kissing) {
-      var mx = (g.px + r.x) / 2 * scale() - g.camX;
-      var my = groundY() - Math.max(sylviaH(), rayH()) - 26 + Math.sin(g.kiss.t * 0.12) * 4;
-      drawHeart(mx, my, 11 + Math.sin(g.kiss.t * 0.2) * 2, "#ff5c8a");
-    } else if (kissNear()) {
+    if (kissNear()) {
       var px = r.x * scale() - g.camX;
       ctx.save();
       ctx.font = "700 13px 'Open Sans', sans-serif";
@@ -164,6 +169,7 @@
 
   function draw() {
     drawBg();
+    if (g.kiss.active) { drawKiss(); return; }
     drawRay();
     drawSylvia();
   }
