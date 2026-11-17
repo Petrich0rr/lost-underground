@@ -23,7 +23,8 @@
     repair: { w: 1774, h: 887, frames: null, floor: 0.79, depth: 0.05 },
     clothing: { w: 1983, h: 793, frames: null, floor: 0.80, depth: 0.05 },
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
-    arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 }
+    arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
+    garden: { w: 1179, h: 393, frames: null, floor: 0.77, depth: 0.05 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -74,6 +75,7 @@
   var clothingImg = loadImg("assets/shop-clothing.jpg");
   var salonImg = loadImg("assets/shop-salon.jpg");
   var arcadeImg = loadImg("assets/shop-arcade.jpg");
+  var gardenImg = loadImg("assets/bg-garden.jpg");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
   ROOMS.subway.frames = [subwayImg];
@@ -82,6 +84,7 @@
   ROOMS.clothing.frames = [clothingImg];
   ROOMS.salon.frames = [salonImg];
   ROOMS.arcade.frames = [arcadeImg];
+  ROOMS.garden.frames = [gardenImg];
 
   var keys = { up: false, down: false, left: false, right: false };
   var g = {
@@ -165,12 +168,13 @@
   var EXITS = {
     bar: { left: "chamber", right: "subway" },
     chamber: { right: "bar" },
-    subway: { left: "bar" },
+    subway: { left: "bar", right: "garden" },
     shopping: { left: "chamber" },
     repair: { left: "shopping" },
     clothing: { left: "shopping" },
     salon: { left: "shopping" },
-    arcade: { left: "shopping" }
+    arcade: { left: "shopping" },
+    garden: { left: "subway" }
   };
   function doorSide() {
     var exits = EXITS[g.room];
@@ -182,8 +186,10 @@
   function doorLabel() {
     var to = EXITS[g.room][doorSide()];
     if (g.room === "shopping" && to === "chamber") return "Climb back in the window";
+    if (g.room === "garden" && to === "subway") return "Go back down to the subway";
     if (to === "chamber") return "Enter your chamber";
     if (to === "subway") return "Go up to the Forgotten subway";
+    if (to === "garden") return "Go up to the garden";
     if (to === "shopping") return "Back to the street";
     return "Back to the bar";
   }
