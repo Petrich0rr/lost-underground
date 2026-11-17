@@ -44,6 +44,10 @@
   var sylviaKickImg = loadImg("assets/sylvia-kick.png");
   var sylviaCrouchImg = loadImg("assets/sylvia-crouch.png");
   var rayStanceImg = loadImg("assets/ray-stance.png");
+  var sylviaFrontImg = loadImg("assets/sylvia-front.png");
+  var sylviaBackImg = loadImg("assets/sylvia-back.png");
+  var rayFrontImg = loadImg("assets/ray-front.png");
+  var rayBackImg = loadImg("assets/ray-back.png");
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
@@ -57,7 +61,7 @@
     w: 0, h: 340, time: 0, camX: 0, room: "bar",
     // Sylvia, in bar-world pixels (bar is 1179 wide, 503 tall).
     px: 220, depth: 0, facing: 1, walk: 0,
-    ray: { x: 700, dir: -1, pause: 0, walk: 0, fight: { active: false, t: 0 } },
+    ray: { x: 700, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 }
@@ -126,7 +130,7 @@
     var to = EXITS[g.room][side];
     g.talk.open = false;
     g.room = to;
-    g.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
     var enterRight = side === "left";
     if (enterRight) {
@@ -204,7 +208,9 @@
     if (g.attack.active) {
       // Stance, then the high kick, then back to stance.
       img = (g.attack.t >= 8 && g.attack.t < 22) ? sylviaKickImg : sylviaStanceImg;
-    } else {
+    } else if (keys.up) { img = sylviaBackImg; }
+    else if (keys.down) { img = sylviaFrontImg; }
+    else {
       img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
     }
     if (!img || !img.complete || img.naturalWidth === 0) img = sylviaIdleImg;
@@ -213,12 +219,18 @@
     var h = sylviaH() * (0.92 + 0.08 * t);
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + g.depth;
+    // A small bob while walking forward or back, so the still
+    // turnaround pose reads as walking instead of gliding.
+    if (img === sylviaFrontImg || img === sylviaBackImg) {
+      feetY += Math.sin(g.walk * 0.262) * 2;
+    }
     var x = g.px * scale() - g.camX;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
-    if (g.facing === -1 && img !== sylviaIdleImg) ctx.scale(-1, 1);
+    // Front and back views are never flipped.
+    if (g.facing === -1 && img !== sylviaIdleImg && img !== sylviaFrontImg && img !== sylviaBackImg) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -259,14 +271,20 @@
       var nearTarget = Math.abs(r.x - fightTargetX()) < 30;
       img = nearTarget ? rayPunchImg
         : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length];
-    } else {
+    } else if (r.vdir === -1) { img = rayBackImg; }
+    else if (r.vdir === 1) { img = rayFrontImg; }
+    else {
       img = walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length] : rayIdleImg;
     }
     if (!img || !img.complete || img.naturalWidth === 0) img = rayIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
-    var h = rayH();
+    var t = (r.depth + depthRange()) / depthRange(); // 0 back, 1 front
+    var h = rayH() * (0.92 + 0.08 * t);
     var w = h * (img.naturalWidth / img.naturalHeight);
-    var feetY = groundY() - 6;
+    var feetY = groundY() + r.depth - 6;
+    if (img === rayFrontImg || img === rayBackImg) {
+      feetY += Math.sin(r.walk * 0.262) * 2;
+    }
     var x = r.x * scale() - g.camX;
     if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
@@ -275,8 +293,10 @@
     // Ray's frames face right, so flip them when he faces left.
     // When fighting he faces the same way Sylvia does, so his punch
     // goes the same direction as her kick, not back toward her.
-    if (r.fight.active) { if (g.facing === -1) ctx.scale(-1, 1); }
-    else if (walking && r.dir === -1) ctx.scale(-1, 1);
+    // Front and back views are never flipped.
+    var sideView = img !== rayFrontImg && img !== rayBackImg;
+    if (sideView && r.fight.active) { if (g.facing === -1) ctx.scale(-1, 1); }
+    else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -454,6 +474,11 @@
       if (r.x < 120 || r.x > room().w - 120) { r.dir *= -1; r.pause = 60 + Math.random() * 120; }
       else if (Math.random() < 0.002) { r.pause = 90 + Math.random() * 150; }
     }
+    // Ray walks forward and back with her, staying at her depth.
+    var dd = g.depth - r.depth;
+    var step = Math.max(-1.2, Math.min(1.2, dd));
+    r.depth += step;
+    r.vdir = step < -0.05 ? -1 : step > 0.05 ? 1 : 0;
     draw();
   }
   requestAnimationFrame(tick);
