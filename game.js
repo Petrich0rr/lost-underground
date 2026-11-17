@@ -157,6 +157,10 @@
   function goToBed() {
     g.sleeping = true;
     g.attack.active = false; g.talk.open = false;
+    // He gets in at the same time, wherever he is: no walking
+    // over. He is at her side of the bed, under the covers.
+    g.ray.fight.active = false; g.ray.pause = 0;
+    g.ray.x = BED_X + 30; g.ray.depth = g.depth; g.ray.inBed = true;
   }
   function wakeUp() { g.sleeping = false; g.ray.inBed = false; }
   function tryEnter() {
@@ -204,10 +208,10 @@
   function drawBg() {
     var frames = room().frames;
     var frame = frames.length > 1 ? frames[Math.floor(g.time / 30) % frames.length] : frames[0];
-    // Asleep in the chamber: the two night frames play, the
-    // blanket shifting subtly while they both sleep under it.
-    // Awake: the normal room.
-    if (g.room === "chamber" && g.sleeping) {
+    // Asleep in the chamber, both of them in bed: the two night
+    // frames play, the blanket shifting subtly while they sleep
+    // under it. Awake: the normal room.
+    if (g.room === "chamber" && g.sleeping && g.ray.inBed) {
       var s0 = sleepImgs[0], s1 = sleepImgs[1];
       if (s0.complete && s0.naturalWidth !== 0 && s1.complete && s1.naturalWidth !== 0) {
         frame = sleepImgs[Math.floor(g.time / 60) % sleepImgs.length];
@@ -535,17 +539,7 @@
     // gets far away (or into another room), wanders when they are close.
     var r = g.ray;
     if (g.sleeping) {
-      // He comes to bed too: walks over to her side of the bed,
-      // then slips under the covers with her.
-      var bedSide = BED_X + 30;
-      var bdx = bedSide - r.x;
-      if (Math.abs(bdx) > 40) {
-        r.dir = bdx > 0 ? 1 : -1;
-        r.x += r.dir * 3.2;
-        r.walk += 1;
-      } else {
-        r.inBed = true;
-      }
+      // He is in bed with her; he does not move, fight, or wander.
     } else if (r.fight.active) {
       r.fight.t += 1;
       var tx = fightTargetX();
