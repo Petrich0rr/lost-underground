@@ -1,21 +1,25 @@
-// Lost Underground — standalone vanilla JS runner.
-// Same avatar, physics and obstacles as the React version:
-// gravity 0.5, jump -13.5, forgiving hitboxes, all obstacles clearable.
+// Lost Underground — standalone vanilla JS game.
+// Main character Sylvia, her boyfriend Ray (a head taller) wandering the bar.
+// Sylvia moves with arrow keys / A and D and jumps with space; gravity 0.5,
+// jump -13.5, forgiving hitboxes, all obstacles clearable.
 // No build step: open index.html from any static host (Cloudflare Pages, GitHub Pages).
 (function () {
   var HIGH_KEY = "erika-underground-high";
   var GRAVITY = 0.5;
   var JUMP_V = -13.5;
   var CHAR_X = 72;
-  var CHAR_H = 108;
-  var CHAR_W = 78;
+  var CHAR_H = 148;
+  var CHAR_W = 80;
+  var RAY_H = 168;
   var FLOOR_H = 52;
 
-  var RUN_SRCS = ["assets/anim-run-01.png","assets/anim-run-02.png","assets/anim-run-03.png","assets/anim-run-04.png","assets/anim-run-05.png","assets/anim-run-06.png","assets/anim-run-07.png","assets/anim-run-08.png"];
-  var JUMP_SRC = "assets/anim-special-03a.png";
-  var IDLE_SRC = "assets/anim-special-04.png";
-  var FAIL_SRC = "assets/anim-special-06b.png";
-  var AVATAR_SRC = "assets/mini-erika.png";
+  var RUN_SRCS = ["assets/sylvia-walk-01.png","assets/sylvia-walk-02.png","assets/sylvia-walk-03.png","assets/sylvia-walk-04.png","assets/sylvia-walk-05.png","assets/sylvia-walk-06.png","assets/sylvia-walk-07.png","assets/sylvia-walk-08.png"];
+  var JUMP_SRC = "assets/sylvia-run.png";
+  var IDLE_SRC = "assets/sylvia-idle.png";
+  var FAIL_SRC = "assets/sylvia-surprised.png";
+  var AVATAR_SRC = "assets/sylvia-idle.png";
+  var RAY_WALK_SRCS = ["assets/ray-walk-01.png","assets/ray-walk-02.png","assets/ray-walk-03.png","assets/ray-walk-04.png","assets/ray-walk-05.png","assets/ray-walk-06.png","assets/ray-walk-07.png","assets/ray-walk-08.png"];
+  var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
   var OBSTACLE_DEFS = [
@@ -57,11 +61,14 @@
   var jumpImg = loadImg(JUMP_SRC);
   var idleImg = loadImg(IDLE_SRC);
   var failImg = loadImg(FAIL_SRC);
+  var rayWalkImgs = RAY_WALK_SRCS.map(loadImg);
+  var rayIdleImg = loadImg(RAY_IDLE_SRC);
   var spriteImgs = new Map();
   OBSTACLE_DEFS.forEach(function (d) { if (d.kind === "sprite") spriteImgs.set(d.src, loadImg(d.src)); });
   var bgImgs = BG_SRCS.map(loadImg);
 
-  var g = { phase: "ready", y: 0, vy: 0, speed: 5.2, obstacles: [], distance: 0, score: 0, high: loadHigh(), run: 0, bgX: 0, time: 0, spawnIn: 90, w: 0, h: 340 };
+  var keys = { left: false, right: false };
+  var g = { phase: "ready", y: 0, vy: 0, speed: 5.2, obstacles: [], distance: 0, score: 0, high: loadHigh(), run: 0, bgX: 0, time: 0, spawnIn: 90, w: 0, h: 340, px: CHAR_X, facing: 1, ray: { x: 420, dir: 1, pause: 0, walk: 0 } };
   bestFootEl.textContent = String(g.high);
 
   function groundY() { return g.h - FLOOR_H; }
@@ -82,7 +89,7 @@
   window.addEventListener("resize", resize);
 
   function start() {
-    g.phase = "playing"; g.y = charTop(); g.vy = 0; g.speed = 5.2;
+    g.phase = "playing"; g.y = charTop(); g.vy = 0; g.speed = 5.2; g.px = CHAR_X;
     g.obstacles = []; g.distance = 0; g.score = 0; g.run = 0; g.spawnIn = 80;
     readyOverlay.hidden = true; overOverlay.hidden = true; fireworksEl.hidden = true;
     if (fwTimer) window.clearTimeout(fwTimer);
@@ -127,11 +134,12 @@
     var w = def.kind === "draw" ? def.w : Math.round(def.h * def.aspect);
     g.obstacles.push({ def: def, x: g.w + 20, y: groundY() - def.h, w: w, h: def.h });
   }
+  function moving() { return keys.left || keys.right; }
   function frameImg() {
     if (g.phase === "over") return failImg;
-    if (g.phase === "ready") return idleImg;
     if (g.y < charTop() - 0.5) return jumpImg;
-    return runImgs[Math.floor(g.run / 2) % runImgs.length];
+    if (moving() || g.phase === "playing") return runImgs[Math.floor(g.run / 2) % runImgs.length];
+    return idleImg;
   }
   function drawAvatar() {
     var img = frameImg();
@@ -139,10 +147,29 @@
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var w = CHAR_H * (img.naturalWidth / img.naturalHeight);
     var jumping = g.y < charTop() - 0.5;
+    var walking = img === runImgs[Math.floor(g.run / 2) % runImgs.length];
+    // Sylvia's walk frames face left, so flip them when she faces right.
+    var flip = walking && g.facing === 1;
     ctx.save();
-    ctx.translate(CHAR_X + CHAR_W / 2, g.y + CHAR_H / 2);
+    ctx.translate(g.px + CHAR_W / 2, g.y + CHAR_H / 2);
     ctx.rotate(jumping ? -0.12 : 0);
+    if (flip) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -CHAR_H / 2, w, CHAR_H);
+    ctx.restore();
+  }
+  function drawRay() {
+    var r = g.ray;
+    var walking = r.pause <= 0;
+    var img = walking ? rayWalkImgs[Math.floor(r.walk / 2) % rayWalkImgs.length] : rayIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = rayIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var w = RAY_H * (img.naturalWidth / img.naturalHeight);
+    var y = groundY() - RAY_H;
+    ctx.save();
+    ctx.translate(r.x + w / 2, y + RAY_H / 2);
+    // Ray's walk frames face right, so flip them when he walks left.
+    if (walking && r.dir === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -RAY_H / 2, w, RAY_H);
     ctx.restore();
   }
   function drawObstacle(o) {
@@ -220,6 +247,7 @@
   }
   function draw() {
     drawBg();
+    drawRay();
     g.obstacles.forEach(drawObstacle);
     drawAvatar();
     ctx.save();
@@ -233,6 +261,22 @@
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
+    // Ray just wanders the bar, whatever Sylvia is doing.
+    var r = g.ray;
+    if (r.pause > 0) { r.pause -= 1; }
+    else {
+      r.x += r.dir * 0.7;
+      r.walk += 0.12;
+      if (r.x < 160 || r.x > g.w - 260) { r.dir *= -1; r.pause = 60 + Math.random() * 120; }
+      else if (Math.random() < 0.002) { r.pause = 90 + Math.random() * 150; }
+    }
+    if ((g.phase === "ready" || g.phase === "playing") && moving()) {
+      if (keys.left) { g.px -= 4.2; g.facing = -1; }
+      if (keys.right) { g.px += 4.2; g.facing = 1; }
+      if (g.px < 16) g.px = 16;
+      if (g.px > g.w - 90) g.px = g.w - 90;
+      if (g.phase === "ready") g.run += 1;
+    }
     if (g.phase === "playing") {
       g.vy += GRAVITY; g.y += g.vy;
       if (g.y >= charTop()) { g.y = charTop(); g.vy = 0; }
@@ -243,7 +287,7 @@
       if (g.spawnIn <= 0) { spawnObstacle(); g.spawnIn = 380 + Math.random() * 420; }
       g.obstacles.forEach(function (o) { o.x -= g.speed; });
       g.obstacles = g.obstacles.filter(function (o) { return o.x + o.w > -20; });
-      var cx0 = CHAR_X + 16, cx1 = CHAR_X + 62, cy0 = g.y + 6, cy1 = g.y + CHAR_H - 2;
+      var cx0 = g.px + 16, cx1 = g.px + CHAR_W - 16, cy0 = g.y + 6, cy1 = g.y + CHAR_H - 2;
       for (var i = 0; i < g.obstacles.length; i++) {
         var o = g.obstacles[i];
         var ocx0 = o.x + o.w * 0.15, ocx1 = o.x + o.w * 0.85;
@@ -254,11 +298,17 @@
   }
   requestAnimationFrame(tick);
   window.addEventListener("keydown", function (e) {
+    if (e.code === "ArrowLeft" || e.code === "KeyA") { keys.left = true; e.preventDefault(); return; }
+    if (e.code === "ArrowRight" || e.code === "KeyD") { keys.right = true; e.preventDefault(); return; }
     var isJump = e.code === "Space" || e.code === "ArrowUp" || e.key === " " || e.key === "ArrowUp";
     if (!isJump) return;
     var r = canvas.getBoundingClientRect();
     if (r.bottom < 0 || r.top > window.innerHeight) return;
     e.preventDefault(); jump();
+  });
+  window.addEventListener("keyup", function (e) {
+    if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+    if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
   });
   canvas.addEventListener("pointerdown", jump);
   document.getElementById("readyBtn").addEventListener("click", jump);

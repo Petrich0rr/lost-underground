@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lost Underground</title>
-<meta name="description" content="Lost Underground: a little runner game. Help her jump the rubble and barrels in the ruins and dungeons below ground and find the way out and up.">
-<link rel="icon" href="assets/mini-erika.png">
+<meta name="description" content="Lost Underground: a little game. Sylvia is lost below ground with her boyfriend Ray. Walk the bar, jump the rubble and barrels, and find the way out and up.">
+<link rel="icon" href="assets/sylvia-idle.png">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #0b0a18; color: #fff; font-family: "Open Sans", system-ui, -apple-system, sans-serif; }
@@ -32,6 +32,11 @@
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
   .bar { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding: 12px 20px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
   .grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 32px; }
+  .cast { display: flex; align-items: flex-end; gap: 28px; margin-top: 28px; }
+  .cast figure { margin: 0; text-align: center; }
+  .cast img { display: block; height: 120px; width: auto; }
+  .cast img.ray { height: 140px; }
+  .cast figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-top: 8px; }
   @media (min-width: 720px) { .grid { grid-template-columns: repeat(3, 1fr); } }
   .tile { border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); border-radius: 24px; padding: 20px 24px; }
   .tile h2 { font-family: Georgia, serif; font-size: 20px; margin: 0; }
@@ -43,14 +48,18 @@
 <main class="page">
   <span class="eyebrow">A standalone game</span>
   <h1>Lost Underground</h1>
-  <p class="lede">She is lost in the ruins and dungeons below ground, in old cellars and underground bars. Help her jump the rubble and barrels and find the way out and up.</p>
+  <p class="lede">Sylvia is lost in the ruins and dungeons below ground, in old cellars and underground bars. Her boyfriend Ray is wandering the bar with her. Help her jump the rubble and barrels and find the way out and up.</p>
+  <div class="cast">
+    <figure><img src="assets/sylvia-portrait.png" alt="Sylvia in a blue dress"><figcaption>Sylvia</figcaption></figure>
+    <figure><img class="ray" src="assets/ray-portrait.png" alt="Ray, a head taller than Sylvia"><figcaption>Ray</figcaption></figure>
+  </div>
 
   <section class="game" id="gameWrap" aria-label="Lost Underground game">
-    <canvas id="game" height="340" role="img" aria-label="Lost Underground game. Press space, click or tap to jump over rubble and barrels and find the way out."></canvas>
+    <canvas id="game" height="340" role="img" aria-label="Lost Underground game. Move Sylvia with the arrow keys or A and D, press space, click or tap to jump over rubble and barrels and find the way out."></canvas>
     <img id="fireworks" src="assets/fireworks.webp" alt="" aria-hidden="true" hidden>
     <div class="overlay" id="readyOverlay">
       <button class="pill" id="readyBtn" type="button">Press space or tap to run</button>
-      <span class="hint">Jump the rubble and barrels to find the way out and up!</span>
+      <span class="hint">Arrow keys or A and D to walk, space to jump. Ray just wanders the bar.</span>
     </div>
     <div class="overlay" id="overOverlay" hidden>
       <div class="card">
@@ -61,12 +70,12 @@
         <p class="small">or press space, or tap anywhere</p>
       </div>
     </div>
-    <div class="bar"><span>SPACE · CLICK · TAP to jump</span><span>Best: <span id="bestFoot">0</span></span></div>
+    <div class="bar"><span>ARROWS / A D to walk · SPACE to jump</span><span>Best: <span id="bestFoot">0</span></span></div>
   </section>
 
   <section class="grid">
-    <div class="tile"><h2>How to play</h2><p>Press space, click or tap to jump. Jump the stalagmites, fallen pillars, rubble and barrels.</p></div>
-    <div class="tile"><h2>Find the exit</h2><p>Follow the torches and the green EXIT signs. Every step takes her closer to the surface.</p></div>
+    <div class="tile"><h2>How to play</h2><p>Move Sylvia with the arrow keys or A and D, press space, click or tap to jump. Jump the stalagmites, fallen pillars, rubble and barrels.</p></div>
+    <div class="tile"><h2>Meet Sylvia and Ray</h2><p>Sylvia is the main character. Ray is a head taller than her and just wanders the bar while she finds the way out.</p></div>
     <div class="tile"><h2>Beat your best</h2><p>Your best score for Lost Underground is saved in this browser.</p></div>
   </section>
 
