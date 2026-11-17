@@ -1,8 +1,9 @@
 // Lost Underground — a walk-around game, not a jump game.
 // Sylvia walks the bar with WASD or arrow keys. Her boyfriend Ray
 // just wanders the bar. No obstacles, no jumping, no score.
-// Two rooms: the bar, and their chamber, reached from the far left
-// edge of the bar. Ray follows Sylvia between rooms.
+// Three rooms: the bar, their chamber (far left edge of the bar),
+// and the Forgotten subway, up the stairs on the bar's right edge.
+// Ray follows Sylvia between rooms.
 // The bar background is shown at full height, cropped only on the
 // sides: the camera follows Sylvia across it, so it moves as she walks.
 // No build step: open index.html from any static host.
@@ -10,8 +11,9 @@
   // Rooms: the bar (3 looping frames) and their chamber (one image).
   // Each is shown at full height, cropped only on the sides.
   var ROOMS = {
-    bar: { w: 1179, h: 503, viewW: 1179 * 0.60, frames: null },
-    chamber: { w: 1024, h: 980, viewW: 1024 * 0.75, frames: null }
+    bar: { w: 1179, h: 503, viewW: 1179 * 0.60, frames: null, floor: 0.90 },
+    chamber: { w: 1024, h: 980, viewW: 1024 * 0.75, frames: null, floor: 0.90 },
+    subway: { w: 2172, h: 724, viewW: 2172 * 0.60, frames: null, floor: 0.84 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -38,8 +40,10 @@
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
+  var subwayImg = loadImg("assets/bg-subway.jpg");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
+  ROOMS.subway.frames = [subwayImg];
 
   var keys = { up: false, down: false, left: false, right: false };
   var g = {
@@ -82,17 +86,43 @@
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
   function fightTargetX() { return g.px + g.facing * 70; }
-  function atDoor() {
-    return g.room === "bar" ? g.px <= 90 : g.px >= room().w - 90;
+  // Doors: the bar's left edge leads to the chamber, its right edge
+  // (the stairs) leads up to the Forgotten subway. Each room's door
+  // back to the bar is on the side you came in through.
+  var EXITS = {
+    bar: { left: "chamber", right: "subway" },
+    chamber: { right: "bar" },
+    subway: { left: "bar" }
+  };
+  function doorSide() {
+    var exits = EXITS[g.room];
+    if (exits.left && g.px <= 90) return "left";
+    if (exits.right && g.px >= room().w - 90) return "right";
+    return null;
   }
-  function doorLabel() { return g.room === "bar" ? "Enter your chamber" : "Back to the bar"; }
+  function atDoor() { return doorSide() !== null; }
+  function doorLabel() {
+    var to = EXITS[g.room][doorSide()];
+    if (to === "chamber") return "Enter your chamber";
+    if (to === "subway") return "Go up to the Forgotten subway";
+    return "Back to the bar";
+  }
+  function doorPrompt() {
+    var to = EXITS[g.room][doorSide()];
+    if (to === "bar") return "Press E to go back to the bar";
+    return "Press E to " + doorLabel().charAt(0).toLowerCase() + doorLabel().slice(1);
+  }
   function switchRoom() {
     if (g.kiss.active || g.talk.open) return;
+    var side = doorSide();
+    if (!side) return;
+    var to = EXITS[g.room][side];
     g.talk.open = false;
-    g.room = g.room === "bar" ? "chamber" : "bar";
+    g.room = to;
     g.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
-    if (g.room === "chamber") {
-      // She walks in from the right side of the chamber; Ray follows.
+    // You come in through the opposite side of the door you left by.
+    var enterRight = side === "left";
+    if (enterRight) {
       g.px = room().w - 110; g.facing = -1;
       g.ray.x = room().w - 60; g.ray.dir = -1;
     } else {
@@ -100,7 +130,7 @@
       g.ray.x = 60; g.ray.dir = 1;
     }
     resize();
-    g.camX = g.room === "chamber" ? Math.max(0, worldW() - g.w) : 0;
+    g.camX = enterRight ? Math.max(0, worldW() - g.w) : 0;
   }
   function tryEnter() { if (atDoor()) switchRoom(); }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
@@ -111,7 +141,7 @@
 
   function scale() { return g.h / room().h; }
   function worldW() { return room().w * scale(); }
-  function groundY() { return g.h - g.h * 0.10; }
+  function groundY() { return g.h * room().floor; }
   function depthRange() { return g.h * 0.08; }
   // The new chamber is a taller room, so they are a touch bigger
   // in there than in the bar (0.44 vs 0.36), but not as big as
@@ -318,7 +348,7 @@
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to " + (g.room === "bar" ? "enter your chamber" : "go back to the bar");
+    var label = doorPrompt();
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.beginPath();
