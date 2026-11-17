@@ -17,6 +17,8 @@
   canvas { display: block; width: 100%; cursor: pointer; user-select: none; touch-action: manipulation; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
   .bar { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding: 12px 20px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
+  .talkBtn { position: absolute; right: 16px; bottom: 56px; z-index: 5; background: #0201a7; color: #fff; border: 0; border-radius: 999px; padding: 12px 20px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .talkBtn[hidden] { display: none; }
   .grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 32px; }
   .cast { display: flex; align-items: flex-end; gap: 28px; margin-top: 28px; }
   .cast figure { margin: 0; text-align: center; }
@@ -42,11 +44,12 @@
 
   <section class="game" id="gameWrap" aria-label="Lost Underground game">
     <canvas id="game" height="340" role="img" aria-label="Lost Underground game. Move Sylvia with W A S D or the arrow keys. Ray wanders the bar."></canvas>
-    <div class="bar"><span>W A S D or arrow keys to walk</span><span>Ray just wanders the bar</span></div>
+    <button class="talkBtn" id="talkBtn" type="button" hidden>Talk to Vicky</button>
+    <div class="bar"><span>W A S D or arrow keys to walk · T to talk</span><span>Ray just wanders the bar</span></div>
   </section>
 
   <section class="grid">
-    <div class="tile"><h2>How to play</h2><p>Move Sylvia with W A S D or the arrow keys. A and D walk left and right, W and S move her up and down the bar. Walk up to Ray and press K for a kiss. On touch, hold the left or right side of the bar to walk that way.</p></div>
+    <div class="tile"><h2>How to play</h2><p>Move Sylvia with W A S D or the arrow keys. A and D walk left and right, W and S move her up and down the bar. Walk up to Ray and press K for a kiss. Walk up to Vicky behind the bar and press T to talk. On touch, hold the left or right side of the bar to walk that way.</p></div>
     <div class="tile"><h2>Meet Sylvia and Ray</h2><p>Sylvia is the main character. Ray is a head taller than her and just wanders the bar while she finds the way out.</p></div>
     <div class="tile"><h2>The bar</h2><p>This bar is the starting place. The stairs on the right lead up and out.</p></div>
     <div class="tile"><h2>Beat your best</h2><p>Your best score for Lost Underground is saved in this browser.</p></div>

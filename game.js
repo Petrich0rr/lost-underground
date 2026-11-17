@@ -32,8 +32,34 @@
     // Sylvia, in bar-world pixels (bar is 1179 wide, 503 tall).
     px: 220, depth: 0, facing: 1, walk: 0,
     ray: { x: 700, dir: -1, pause: 0, walk: 0 },
-    kiss: { active: false, t: 0 }
+    kiss: { active: false, t: 0 },
+    talk: { open: false, idx: -1 }
   };
+  var VICKY_X = 560; // the bartender in the background, behind the bar
+  var VICKY_LINES = [
+    "You're new. I can tell. The new ones always stare at the ceiling like it's gonna open up.",
+    "If you're looking for a way out, take the stairs on the right. They go up. Nobody ever comes back down to tell me what's up there, though.",
+    "I've been pouring drinks in this basement since I was old enough to reach the top shelf. My mom worked this bar before me. Her mom before that.",
+    "House rules: no fighting, no crying, no asking about the stairs. Okay, you can ask about the stairs.",
+    "Everybody down here is looking for the exit. Most of them just order another drink instead.",
+    "That dress? Bold choice for a basement. I respect it.",
+    "Ray's been in here three times this week looking for you. He's sweet. Don't tell him I said that.",
+    "The tunnel past the jukebox leads out. Or deeper. Honestly, I've never checked. Somebody has to stay and pour.",
+    "You two are cute. Gross, but cute.",
+    "Been here most of my life. The taps have never once run dry. Weird, right?"
+  ];
+  function vickyNear() { return Math.abs(g.px - VICKY_X) < 140; }
+  function talkLine() {
+    var idx;
+    do { idx = Math.floor(Math.random() * VICKY_LINES.length); }
+    while (VICKY_LINES.length > 1 && idx === g.talk.idx);
+    g.talk.idx = idx; g.talk.open = true;
+  }
+  function pressT() {
+    if (g.kiss.active) return;
+    if (g.talk.open) { talkLine(); return; }
+    if (vickyNear()) talkLine();
+  }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
     if (g.kiss.active || !kissNear()) return;
@@ -167,16 +193,77 @@
     }
   }
 
+  function wrapText(text, maxW) {
+    var words = text.split(" ");
+    var lines = [], line = "";
+    for (var i = 0; i < words.length; i++) {
+      var test = line ? line + " " + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = words[i]; }
+      else { line = test; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function drawTalk() {
+    if (!g.talk.open) return;
+    var bx = 16, bw = g.w - 32, bh = 84, by = g.h - bh - 12;
+    ctx.save();
+    ctx.fillStyle = "rgba(10,8,24,0.92)";
+    ctx.strokeStyle = "#0201a7"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#7aa2ff";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("VICKY", bx + 16, by + 22);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(VICKY_LINES[g.talk.idx], bw - 32);
+    for (var i = 0; i < lines.length; i++) ctx.fillText(lines[i], bx + 16, by + 44 + i * 18);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("T for more, walk away to leave", bx + bw - 14, by + bh - 10);
+    ctx.restore();
+  }
+  function drawVickyPrompt() {
+    if (g.talk.open || !vickyNear()) return;
+    var vx = VICKY_X * scale() - g.camX;
+    var vy = g.h * 0.34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press T to talk";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(vx - tw / 2 - 10, vy, tw + 20, 24, 12);
+    else ctx.rect(vx - tw / 2 - 10, vy, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, vx, vy + 17);
+    ctx.restore();
+  }
   function draw() {
     drawBg();
-    if (g.kiss.active) { drawKiss(); return; }
+    drawVickyPrompt();
+    if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     drawRay();
     drawSylvia();
+    drawTalk();
   }
 
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
+    if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
+    var talkBtn = document.getElementById("talkBtn");
+    if (talkBtn) {
+      if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
+      else talkBtn.hidden = true;
+    }
     if (g.kiss.active) {
       g.kiss.t += 1;
       // Face each other and lean in until cheek to cheek.
@@ -228,6 +315,8 @@
   }
   window.addEventListener("keydown", function (e) {
     if (e.code === "KeyK") { tryKiss(); return; }
+    if (e.code === "KeyT") { pressT(); return; }
+    if (e.code === "Escape") { g.talk.open = false; return; }
     if (setKey(e.code, true)) {
       var r = canvas.getBoundingClientRect();
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
@@ -248,6 +337,8 @@
   canvas.addEventListener("pointermove", function (e) { if (e.buttons) pointerMove(e); });
   function pointerEnd() { pointerDir = 0; keys.left = false; keys.right = false; }
   canvas.addEventListener("pointerup", pointerEnd);
+  var talkBtn = document.getElementById("talkBtn");
+  if (talkBtn) talkBtn.addEventListener("click", function (e) { e.stopPropagation(); pressT(); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
