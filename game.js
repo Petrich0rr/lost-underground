@@ -1,12 +1,19 @@
 // Lost Underground — a walk-around game, not a jump game.
 // Sylvia walks the bar with WASD or arrow keys. Her boyfriend Ray
 // just wanders the bar. No obstacles, no jumping, no score.
+// Two rooms: the bar, and their chamber, reached from the far left
+// edge of the bar. Ray follows Sylvia between rooms.
 // The bar background is shown at full height, cropped only on the
 // sides: the camera follows Sylvia across it, so it moves as she walks.
 // No build step: open index.html from any static host.
 (function () {
-  var BG_W = 1179, BG_H = 503;
-  var VIEW_W = BG_W * 0.60; // cropped window, full height, sides only
+  // Rooms: the bar (3 looping frames) and their chamber (one image).
+  // Each is shown at full height, cropped only on the sides.
+  var ROOMS = {
+    bar: { w: 1179, h: 503, viewW: 1179 * 0.60, frames: null },
+    chamber: { w: 1752, h: 897, viewW: 1752 * 0.60, frames: null }
+  };
+  function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
   var SYLVIA_IDLE_SRC = "assets/sylvia-idle.png";
   var RAY_WALK = ["assets/ray-walk-01.png", "assets/ray-walk-02.png", "assets/ray-walk-03.png", "assets/ray-walk-04.png", "assets/ray-walk-05.png", "assets/ray-walk-06.png", "assets/ray-walk-07.png", "assets/ray-walk-08.png"];
@@ -30,10 +37,13 @@
   var rayStanceImg = loadImg("assets/ray-stance.png");
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
+  var chamberImg = loadImg("assets/bg-chamber.jpg");
+  ROOMS.bar.frames = bgImgs;
+  ROOMS.chamber.frames = [chamberImg];
 
   var keys = { up: false, down: false, left: false, right: false };
   var g = {
-    w: 0, h: 340, time: 0, camX: 0,
+    w: 0, h: 340, time: 0, camX: 0, room: "bar",
     // Sylvia, in bar-world pixels (bar is 1179 wide, 503 tall).
     px: 220, depth: 0, facing: 1, walk: 0,
     ray: { x: 700, dir: -1, pause: 0, walk: 0, fight: { active: false, t: 0 } },
@@ -54,7 +64,7 @@
     "You two are cute. Gross, but cute.",
     "Been here most of my life. The taps have never once run dry. Weird, right?"
   ];
-  function vickyNear() { return Math.abs(g.px - VICKY_X) < 140; }
+  function vickyNear() { return g.room === "bar" && Math.abs(g.px - VICKY_X) < 140; }
   function talkLine() {
     var idx;
     do { idx = Math.floor(Math.random() * VICKY_LINES.length); }
@@ -72,14 +82,26 @@
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
   function fightTargetX() { return g.px + g.facing * 70; }
+  function atDoor() { return g.px <= 90; }
+  function doorLabel() { return g.room === "bar" ? "Enter your chamber" : "Back to the bar"; }
+  function switchRoom() {
+    if (g.kiss.active || g.talk.open) return;
+    g.talk.open = false;
+    g.room = g.room === "bar" ? "chamber" : "bar";
+    // She comes in through the left edge; Ray follows her in.
+    g.px = 110; g.depth = 0; g.facing = 1; g.camX = 0;
+    g.ray.x = 60; g.ray.dir = 1; g.ray.pause = 0; g.ray.fight.active = false;
+    resize();
+  }
+  function tryEnter() { if (atDoor()) switchRoom(); }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
     if (g.kiss.active || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
   }
 
-  function scale() { return g.h / BG_H; }
-  function worldW() { return BG_W * scale(); }
+  function scale() { return g.h / room().h; }
+  function worldW() { return room().w * scale(); }
   function groundY() { return g.h - g.h * 0.10; }
   function depthRange() { return g.h * 0.08; }
   function sylviaH() { return g.h * 0.36; }
@@ -91,7 +113,7 @@
     // Full bar height, cropped on the sides only: the canvas aspect
     // matches the cropped window (707 x 503), so nothing zooms
     // vertically and nothing stretches.
-    var h = Math.round(w * BG_H / VIEW_W);
+    var h = Math.round(w * room().h / room().viewW);
     g.w = w; g.h = h;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
@@ -102,7 +124,8 @@
   window.addEventListener("resize", resize);
 
   function drawBg() {
-    var frame = bgImgs[Math.floor(g.time / 30) % bgImgs.length];
+    var frames = room().frames;
+    var frame = frames.length > 1 ? frames[Math.floor(g.time / 30) % frames.length] : frames[0];
     ctx.fillStyle = "#0b0a18";
     ctx.fillRect(0, 0, g.w, g.h);
     if (!frame || !frame.complete || frame.naturalWidth === 0) return;
@@ -276,9 +299,28 @@
     ctx.fillText(label, vx, vy + 17);
     ctx.restore();
   }
+  function drawDoorPrompt() {
+    if (g.kiss.active || g.talk.open || !atDoor()) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to " + (g.room === "bar" ? "enter your chamber" : "go back to the bar");
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
   function draw() {
     drawBg();
     drawVickyPrompt();
+    drawDoorPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     drawRay();
     drawSylvia();
@@ -293,6 +335,11 @@
     if (talkBtn) {
       if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
       else talkBtn.hidden = true;
+    }
+    var enterBtn = document.getElementById("enterBtn");
+    if (enterBtn) {
+      if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
+      else enterBtn.hidden = true;
     }
     if (g.kiss.active) {
       g.kiss.t += 1;
@@ -313,7 +360,7 @@
     if (keys.up) { g.depth -= speed * 0.5; }
     if (keys.down) { g.depth += speed * 0.5; }
     if (g.px < 60) g.px = 60;
-    if (g.px > BG_W - 60) g.px = BG_W - 60;
+    if (g.px > room().w - 60) g.px = room().w - 60;
     if (g.depth < -depthRange()) g.depth = -depthRange();
     if (g.depth > 0) g.depth = 0;
     if (keys.left || keys.right || keys.up || keys.down) g.walk += 0.3;
@@ -349,7 +396,7 @@
     else {
       r.x += r.dir * 0.9;
       r.walk += 0.3;
-      if (r.x < 120 || r.x > BG_W - 120) { r.dir *= -1; r.pause = 60 + Math.random() * 120; }
+      if (r.x < 120 || r.x > room().w - 120) { r.dir *= -1; r.pause = 60 + Math.random() * 120; }
       else if (Math.random() < 0.002) { r.pause = 90 + Math.random() * 150; }
     }
     draw();
@@ -367,6 +414,7 @@
   window.addEventListener("keydown", function (e) {
     if (e.code === "KeyK") { tryKiss(); return; }
     if (e.code === "KeyH") { tryAttack(); return; }
+    if (e.code === "KeyE") { tryEnter(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "Escape") { g.talk.open = false; return; }
     if (setKey(e.code, true)) {
@@ -393,6 +441,8 @@
   if (talkBtn) talkBtn.addEventListener("click", function (e) { e.stopPropagation(); pressT(); });
   var attackBtn = document.getElementById("attackBtn");
   if (attackBtn) attackBtn.addEventListener("click", function (e) { e.stopPropagation(); tryAttack(); });
+  var enterBtn = document.getElementById("enterBtn");
+  if (enterBtn) enterBtn.addEventListener("click", function (e) { e.stopPropagation(); tryEnter(); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
