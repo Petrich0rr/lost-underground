@@ -579,7 +579,7 @@
         r.pause = 30;
         r.dir = Math.random() < 0.5 ? -1 : 1;
       }
-    } else if (!g.sleeping && !g.kiss.active && !g.attack.active && !g.talk.open
+    } else if (g.room === "chamber" && !g.sleeping && !g.kiss.active && !g.attack.active && !g.talk.open
         && !r.fight.active && g.embrace.cooldown <= 0
         && !keys.left && !keys.right && !keys.up && !keys.down
         && Math.abs(r.x - g.px) < 55 && Math.abs(r.depth - g.depth) < 12) {
