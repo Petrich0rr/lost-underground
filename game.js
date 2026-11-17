@@ -64,7 +64,9 @@
     ray: { x: 700, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
-    talk: { open: false, idx: -1 }
+    talk: { open: false, idx: -1 },
+    hp: 100, hpMax: 100,
+    sleeping: false, sleepHearts: []
   };
   var VICKY_X = 560; // the bartender in the background, behind the bar
   var VICKY_LINES = [
@@ -92,7 +94,7 @@
     if (vickyNear()) talkLine();
   }
   function tryAttack() {
-    if (g.kiss.active || g.talk.open || g.attack.cooldown > 0) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -143,10 +145,25 @@
     resize();
     g.camX = enterRight ? Math.max(0, worldW() - g.w) : 0;
   }
-  function tryEnter() { if (atDoor()) switchRoom(); }
+  // The bed in the chamber (world x, in the 1672-wide room).
+  // Walking up to it offers a sleep, and sleeping recovers her HP.
+  var BED_X = 826, BED_RANGE = 180;
+  function bedNear() {
+    return g.room === "chamber" && Math.abs(g.px - BED_X) < BED_RANGE;
+  }
+  function goToBed() {
+    g.sleeping = true; g.sleepHearts = [];
+    g.attack.active = false; g.talk.open = false;
+  }
+  function wakeUp() { g.sleeping = false; g.sleepHearts = []; }
+  function tryEnter() {
+    if (g.sleeping) { wakeUp(); return; }
+    if (bedNear()) { goToBed(); return; }
+    if (atDoor()) switchRoom();
+  }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
-    if (g.kiss.active || !kissNear()) return;
+    if (g.sleeping || g.kiss.active || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
   }
 
@@ -392,13 +409,60 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
+  function drawHp() {
+    ctx.save();
+    ctx.font = "700 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillText("HP", 14, 26);
+    for (var i = 0; i < 5; i++) {
+      var full = g.hp >= (i + 1) * 20;
+      var half = !full && g.hp > i * 20;
+      var cx = 44 + i * 24, cy = 22;
+      drawHeart(cx, cy, 9, full ? "#ff5b8f" : half ? "#ff9ebb" : "rgba(255,255,255,0.25)");
+    }
+    ctx.restore();
+  }
+  function drawBedPrompt() {
+    if (g.kiss.active || g.talk.open) return;
+    if (!g.sleeping && !bedNear()) return;
+    var x = BED_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = g.sleeping ? "Press E to get up" : "Press E to go to bed";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
+  function drawSleepHearts() {
+    if (!g.sleeping) return;
+    ctx.save();
+    for (var i = 0; i < g.sleepHearts.length; i++) {
+      var ht = g.sleepHearts[i];
+      var a = 1 - ht.t / 90;
+      ctx.globalAlpha = a;
+      drawHeart(ht.x, ht.y, ht.s, "#ff8fb0");
+    }
+    ctx.restore();
+  }
   function draw() {
     drawBg();
+    drawHp();
     drawVickyPrompt();
     drawDoorPrompt();
+    drawBedPrompt();
+    drawSleepHearts();
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     drawRay();
-    drawSylvia();
+    if (!g.sleeping) drawSylvia();
     drawTalk();
   }
 
@@ -413,7 +477,9 @@
     }
     var enterBtn = document.getElementById("enterBtn");
     if (enterBtn) {
-      if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
+      if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
+      else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
+      else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
     }
     if (g.kiss.active) {
@@ -428,6 +494,24 @@
       if (g.kiss.t >= 120) { g.kiss.active = false; g.ray.pause = 60; }
       draw();
       return;
+    }
+    if (g.sleeping) {
+      // Resting recovers her HP, and little hearts float up
+      // above the bed while she sleeps.
+      if (g.hp < g.hpMax) g.hp = Math.min(g.hpMax, g.hp + 0.5);
+      if (g.time % 18 === 0 && g.sleepHearts.length < 6) {
+        g.sleepHearts.push({
+          x: (BED_X - 30 + (Math.random() * 90 - 45)) * scale() - g.camX,
+          y: g.h * 0.58, s: 8 + Math.random() * 5, t: 0
+        });
+      }
+      for (var i = g.sleepHearts.length - 1; i >= 0; i--) {
+        var ht = g.sleepHearts[i];
+        ht.t += 1; ht.y -= 0.7; ht.x += 0.2;
+        if (ht.t >= 90) g.sleepHearts.splice(i, 1);
+      }
+      // A movement key wakes her up, and then walks as normal.
+      if (keys.left || keys.right || keys.up || keys.down) wakeUp();
     }
     var speed = 2.2;
     if (keys.left) { g.px -= speed; g.facing = -1; }
