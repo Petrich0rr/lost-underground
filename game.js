@@ -56,8 +56,10 @@
   var embraceImg = loadImg("assets/embrace.png");
   var rayBackWalkImgs = ["assets/ray-back-walk-01.png", "assets/ray-back-walk-02.png"].map(loadImg);
   var rayPunchImg = loadImg("assets/ray-punch.png");
-  var ownerWalkImgs = ["assets/owner-walk-01.png", "assets/owner-walk-02.png", "assets/owner-walk-03.png", "assets/owner-walk-04.png"].map(loadImg);
-  var ownerIdleImg = loadImg("assets/owner-idle.png");
+  var charWalkImgs = ["assets/owner-walk-01.png", "assets/owner-walk-02.png", "assets/owner-walk-03.png", "assets/owner-walk-04.png"].map(loadImg);
+  var charIdleImg = loadImg("assets/owner-idle.png");
+  var mikeyWalkImgs = ["assets/mikey-walk-01.png", "assets/mikey-walk-02.png", "assets/mikey-walk-03.png", "assets/mikey-walk-04.png"].map(loadImg);
+  var mikeyIdleImg = loadImg("assets/mikey-idle.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
   var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
@@ -83,9 +85,12 @@
     // She starts in her own room, by the bed, with Ray beside her.
     px: 950, depth: 0, facing: -1, walk: 0,
     ray: { x: 1020, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
-    // The clothing store owner. She only ever stands and walks in the
-    // clothing store, never anywhere else.
-    owner: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0 },
+    // Char, the clothing store owner. She only ever stands and walks in
+    // the clothing store, never anywhere else.
+    char: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0 },
+    // Mikey, the salon owner. He only ever stands and walks in the
+    // salon (the Style Studio), never anywhere else.
+    mikey: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -441,14 +446,14 @@
     ctx.restore();
   }
 
-  // The clothing store owner. She only appears in the clothing store,
-  // standing still or walking around it. She never leaves the store.
-  function drawOwner() {
+  // Char, the clothing store owner. She only appears in the clothing
+  // store, standing still or walking around it. She never leaves the store.
+  function drawChar() {
     if (g.room !== "clothing") return;
-    var o = g.owner;
+    var o = g.char;
     var walking = o.pause <= 0;
-    var img = walking ? ownerWalkImgs[Math.floor(o.walk / 6) % ownerWalkImgs.length] : ownerIdleImg;
-    if (!img || !img.complete || img.naturalWidth === 0) img = ownerIdleImg;
+    var img = walking ? charWalkImgs[Math.floor(o.walk / 6) % charWalkImgs.length] : charIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = charIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (o.depth + depthRange()) / depthRange(); // 0 back, 1 front
     var h = sylviaH() * (0.92 + 0.08 * t);
@@ -462,6 +467,31 @@
     // Her walk frames face left, so flip them when she walks right.
     // The idle is a three-quarter front view, never flipped.
     if (walking && o.dir === 1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
+  // Mikey, the salon owner. He only appears in the salon (the Style
+  // Studio), standing still or walking around it. He never leaves it.
+  function drawMikey() {
+    if (g.room !== "salon") return;
+    var m = g.mikey;
+    var walking = m.pause <= 0;
+    var img = walking ? mikeyWalkImgs[Math.floor(m.walk / 6) % mikeyWalkImgs.length] : mikeyIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = mikeyIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (m.depth + depthRange()) / depthRange(); // 0 back, 1 front
+    var h = rayH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + m.depth - 6;
+    var x = m.x * scale() - g.camX;
+    if (x < -w || x > g.w + w) return;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    // His walk frames face right, so flip them when he walks left.
+    // The idle is a three-quarter front view, never flipped.
+    if (walking && m.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -675,7 +705,8 @@
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); return; }
     drawRay();
-    drawOwner();
+    drawChar();
+    drawMikey();
     if (!g.sleeping) drawSylvia();
     drawTalk();
   }
@@ -770,10 +801,10 @@
     var step = Math.max(-1.2, Math.min(1.2, dd));
     r.depth += step;
     r.vdir = step < -0.05 ? -1 : step > 0.05 ? 1 : 0;
-    // The clothing store owner: she only stands and walks in the
+    // Char, the clothing store owner: she only stands and walks in the
     // clothing store, never anywhere else. She wanders it slowly,
     // pausing to look at the racks, and turns at the walls.
-    var o = g.owner;
+    var o = g.char;
     if (g.room === "clothing") {
       if (o.pause > 0) { o.pause -= 1; }
       else {
@@ -781,6 +812,19 @@
         o.walk += 0.3;
         if (o.x < 150 || o.x > room().w - 150) { o.dir *= -1; o.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { o.pause = 90 + Math.random() * 150; }
+      }
+    }
+    // Mikey, the salon owner: he only stands and walks in the salon,
+    // never anywhere else. He wanders it slowly, pausing by the chairs,
+    // and turns at the walls.
+    var m = g.mikey;
+    if (g.room === "salon") {
+      if (m.pause > 0) { m.pause -= 1; }
+      else {
+        m.x += m.dir * 0.8;
+        m.walk += 0.3;
+        if (m.x < 150 || m.x > room().w - 150) { m.dir *= -1; m.pause = 60 + Math.random() * 120; }
+        else if (Math.random() < 0.002) { m.pause = 90 + Math.random() * 150; }
       }
     }
     // When she is standing still and he wanders up right behind
