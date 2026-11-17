@@ -47,6 +47,7 @@
   var sylviaFrontImg = loadImg("assets/sylvia-front.png");
   var sylviaBackImg = loadImg("assets/sylvia-back.png");
   var rayFrontImg = loadImg("assets/ray-front.png");
+  var embraceImg = loadImg("assets/embrace.png");
   var rayBackImg = loadImg("assets/ray-back.png");
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
@@ -67,7 +68,8 @@
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
     hp: 100, hpMax: 100,
-    sleeping: false
+    sleeping: false,
+    embrace: { active: false, t: 0, cooldown: 0 }
   };
   var VICKY_X = 560; // the bartender in the background, behind the bar
   var VICKY_LINES = [
@@ -95,7 +97,7 @@
     if (vickyNear()) talkLine();
   }
   function tryAttack() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -127,7 +129,7 @@
     return "Press E to " + doorLabel().charAt(0).toLowerCase() + doorLabel().slice(1);
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open) return;
+    if (g.kiss.active || g.talk.open || g.embrace.active) return;
     var side = doorSide();
     if (!side) return;
     var to = EXITS[g.room][side];
@@ -158,13 +160,14 @@
   }
   function wakeUp() { g.sleeping = false; }
   function tryEnter() {
+    if (g.embrace.active) return;
     if (g.sleeping) { wakeUp(); return; }
     if (bedNear()) { goToBed(); return; }
     if (atDoor()) switchRoom();
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
-    if (g.sleeping || g.kiss.active || !kissNear()) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
   }
 
@@ -324,6 +327,21 @@
     ctx.restore();
   }
 
+  function drawEmbrace() {
+    if (!embraceImg || !embraceImg.complete || embraceImg.naturalWidth === 0) {
+      drawRay();
+      if (!g.sleeping) drawSylvia();
+      return;
+    }
+    // He is the taller one, behind her, so the pair is drawn at his height.
+    var h = rayH();
+    var w = h * (embraceImg.naturalWidth / embraceImg.naturalHeight);
+    var feetY = groundY() + g.depth - 6;
+    var x = g.px * scale() - g.camX;
+    if (x < -w || x > g.w + w) return;
+    shadow(x, feetY, w);
+    ctx.drawImage(embraceImg, x - w / 2, feetY - h, w, h);
+  }
   function wrapText(text, maxW) {
     var words = text.split(" ");
     var lines = [], line = "";
@@ -455,6 +473,7 @@
     drawDoorPrompt();
     drawBedPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
+    if (g.embrace.active) { drawEmbrace(); drawTalk(); return; }
     drawRay();
     if (!g.sleeping) drawSylvia();
     drawTalk();
@@ -545,6 +564,25 @@
     var step = Math.max(-1.2, Math.min(1.2, dd));
     r.depth += step;
     r.vdir = step < -0.05 ? -1 : step > 0.05 ? 1 : 0;
+    // When she is standing still and he wanders up right behind
+    // her, he holds her for a few seconds, then wanders off again.
+    if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
+    if (g.embrace.active) {
+      g.embrace.t += 1;
+      var still = !keys.left && !keys.right && !keys.up && !keys.down;
+      if (!still || g.embrace.t >= 240) {
+        g.embrace.active = false;
+        g.embrace.cooldown = 600;
+        r.pause = 30;
+        r.dir = Math.random() < 0.5 ? -1 : 1;
+      }
+    } else if (!g.sleeping && !g.kiss.active && !g.attack.active && !g.talk.open
+        && !r.fight.active && g.embrace.cooldown <= 0
+        && !keys.left && !keys.right && !keys.up && !keys.down
+        && Math.abs(r.x - g.px) < 55 && Math.abs(r.depth - g.depth) < 12) {
+      g.embrace.active = true;
+      g.embrace.t = 0;
+    }
     draw();
   }
   requestAnimationFrame(tick);
