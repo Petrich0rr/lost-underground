@@ -38,7 +38,7 @@
   function groundY() { return g.h - g.h * 0.10; }
   function depthRange() { return g.h * 0.08; }
   function sylviaH() { return g.h * 0.36; }
-  function rayH() { return sylviaH() * 168 / 148; }
+  function rayH() { return sylviaH() * 172 / 148; }
 
   function resize() {
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -57,7 +57,7 @@
   window.addEventListener("resize", resize);
 
   function drawBg() {
-    var frame = bgImgs[Math.floor(g.time / 14) % bgImgs.length];
+    var frame = bgImgs[Math.floor(g.time / 30) % bgImgs.length];
     ctx.fillStyle = "#0b0a18";
     ctx.fillRect(0, 0, g.w, g.h);
     if (!frame || !frame.complete || frame.naturalWidth === 0) return;
@@ -90,8 +90,8 @@
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
-    // Sylvia's walk frames face left, so flip them when she faces right.
-    if (moving && g.facing === 1 && img !== sylviaIdleImg) ctx.scale(-1, 1);
+    // Sylvia's walk frames face right, so flip them when she walks left.
+    if (moving && g.facing === -1 && img !== sylviaIdleImg) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
