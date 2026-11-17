@@ -8,12 +8,15 @@
 // sides: the camera follows Sylvia across it, so it moves as she walks.
 // No build step: open index.html from any static host.
 (function () {
-  // Rooms: the bar (3 looping frames) and their chamber (one image).
+  // Rooms: the bar (3 looping frames), their chamber, and the subway.
   // Each is shown at full height, cropped only on the sides.
+  // One fixed canvas aspect (4:3) for every room, so the game
+  // window never changes size when she walks into another room.
+  var CANVAS_ASPECT = 4 / 3;
   var ROOMS = {
-    bar: { w: 1179, h: 503, viewW: 1179 * 0.60, frames: null, floor: 0.90 },
-    chamber: { w: 1672, h: 941, viewW: 1672 * 0.75, frames: null, floor: 0.90 },
-    subway: { w: 2172, h: 724, viewW: 2172 * 0.60, frames: null, floor: 0.80, depth: 0.05 }
+    bar: { w: 1179, h: 503, frames: null, floor: 0.90 },
+    chamber: { w: 1672, h: 941, frames: null, floor: 0.90 },
+    subway: { w: 2172, h: 724, frames: null, floor: 0.80, depth: 0.05 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -22,7 +25,9 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  function loadImg(src) { var img = new Image(); img.src = src; return img; }
+  // "?v=2" forces a fresh download after the sprite cleanup, so a
+  // browser that cached the old white-outlined sprites picks up the new ones.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=2"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -155,10 +160,11 @@
   function resize() {
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var w = wrap.clientWidth;
-    // Full bar height, cropped on the sides only: the canvas aspect
-    // matches the cropped window (707 x 503), so nothing zooms
-    // vertically and nothing stretches.
-    var h = Math.round(w * room().h / room().viewW);
+    // Fixed 4:3 canvas for every room, so the window never jumps
+    // when she changes rooms. The background is still drawn at full
+    // height with no vertical zoom; each room just shows a wider or
+    // narrower window of itself, and nothing stretches.
+    var h = Math.round(w / CANVAS_ASPECT);
     g.w = w; g.h = h;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
