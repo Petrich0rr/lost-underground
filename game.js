@@ -44,11 +44,11 @@
   var sylviaKickImg = loadImg("assets/sylvia-kick.png");
   var sylviaCrouchImg = loadImg("assets/sylvia-crouch.png");
   var rayStanceImg = loadImg("assets/ray-stance.png");
-  var sylviaFrontImg = loadImg("assets/sylvia-front.png");
-  var sylviaBackImg = loadImg("assets/sylvia-back.png");
-  var rayFrontImg = loadImg("assets/ray-front.png");
+  var sylviaFrontWalkImgs = ["assets/sylvia-front-walk-01.png", "assets/sylvia-front-walk-02.png"].map(loadImg);
+  var sylviaBackWalkImgs = ["assets/sylvia-back-walk-01.png", "assets/sylvia-back-walk-02.png"].map(loadImg);
+  var rayFrontWalkImgs = ["assets/ray-front-walk-01.png", "assets/ray-front-walk-02.png"].map(loadImg);
   var embraceImg = loadImg("assets/embrace.png");
-  var rayBackImg = loadImg("assets/ray-back.png");
+  var rayBackWalkImgs = ["assets/ray-back-walk-01.png", "assets/ray-back-walk-02.png"].map(loadImg);
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
@@ -238,8 +238,8 @@
     if (g.attack.active) {
       // Stance, then the high kick, then back to stance.
       img = (g.attack.t >= 8 && g.attack.t < 22) ? sylviaKickImg : sylviaStanceImg;
-    } else if (keys.up) { img = sylviaBackImg; }
-    else if (keys.down) { img = sylviaFrontImg; }
+    } else if (keys.up) { img = sylviaBackWalkImgs[Math.floor(g.walk / 6) % sylviaBackWalkImgs.length]; }
+    else if (keys.down) { img = sylviaFrontWalkImgs[Math.floor(g.walk / 6) % sylviaFrontWalkImgs.length]; }
     else {
       img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
     }
@@ -249,18 +249,13 @@
     var h = sylviaH() * (0.92 + 0.08 * t);
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + g.depth;
-    // A small bob while walking forward or back, so the still
-    // turnaround pose reads as walking instead of gliding.
-    if (img === sylviaFrontImg || img === sylviaBackImg) {
-      feetY += Math.sin(g.walk * 0.262) * 2;
-    }
     var x = g.px * scale() - g.camX;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
     // Front and back views are never flipped.
-    if (g.facing === -1 && img !== sylviaIdleImg && img !== sylviaFrontImg && img !== sylviaBackImg) ctx.scale(-1, 1);
+    if (g.facing === -1 && img !== sylviaIdleImg && !g.attack.active && !keys.up && !keys.down) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -302,8 +297,8 @@
       var nearTarget = Math.abs(r.x - fightTargetX()) < 30;
       img = nearTarget ? rayPunchImg
         : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length];
-    } else if (r.vdir === -1) { img = rayBackImg; }
-    else if (r.vdir === 1) { img = rayFrontImg; }
+    } else if (r.vdir === -1) { img = rayBackWalkImgs[Math.floor(r.walk / 6) % rayBackWalkImgs.length]; }
+    else if (r.vdir === 1) { img = rayFrontWalkImgs[Math.floor(r.walk / 6) % rayFrontWalkImgs.length]; }
     else {
       img = walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length] : rayIdleImg;
     }
@@ -313,9 +308,6 @@
     var h = rayH() * (0.92 + 0.08 * t);
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + r.depth - 6;
-    if (img === rayFrontImg || img === rayBackImg) {
-      feetY += Math.sin(r.walk * 0.262) * 2;
-    }
     var x = r.x * scale() - g.camX;
     if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
@@ -325,7 +317,7 @@
     // When fighting he faces the same way Sylvia does, so his punch
     // goes the same direction as her kick, not back toward her.
     // Front and back views are never flipped.
-    var sideView = img !== rayFrontImg && img !== rayBackImg;
+    var sideView = r.fight.active || r.vdir === 0;
     if (sideView && r.fight.active) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
