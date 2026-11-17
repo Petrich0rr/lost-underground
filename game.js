@@ -82,16 +82,25 @@
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
   function fightTargetX() { return g.px + g.facing * 70; }
-  function atDoor() { return g.px <= 90; }
+  function atDoor() {
+    return g.room === "bar" ? g.px <= 90 : g.px >= room().w - 90;
+  }
   function doorLabel() { return g.room === "bar" ? "Enter your chamber" : "Back to the bar"; }
   function switchRoom() {
     if (g.kiss.active || g.talk.open) return;
     g.talk.open = false;
     g.room = g.room === "bar" ? "chamber" : "bar";
-    // She comes in through the left edge; Ray follows her in.
-    g.px = 110; g.depth = 0; g.facing = 1; g.camX = 0;
-    g.ray.x = 60; g.ray.dir = 1; g.ray.pause = 0; g.ray.fight.active = false;
+    g.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    if (g.room === "chamber") {
+      // She walks in from the right side of the chamber; Ray follows.
+      g.px = room().w - 110; g.facing = -1;
+      g.ray.x = room().w - 60; g.ray.dir = -1;
+    } else {
+      g.px = 110; g.facing = 1;
+      g.ray.x = 60; g.ray.dir = 1;
+    }
     resize();
+    g.camX = g.room === "chamber" ? Math.max(0, worldW() - g.w) : 0;
   }
   function tryEnter() { if (atDoor()) switchRoom(); }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
