@@ -19,7 +19,7 @@
     bar: { w: 1179, h: 503, frames: null, floor: 0.90, depth: 0.08 },
     chamber: { w: 1672, h: 941, frames: null, floor: 0.90, depth: 0.06 },
     subway: { w: 2172, h: 724, frames: null, floor: 0.80, depth: 0.05 },
-    shopping: { w: 2172, h: 724, frames: null, floor: 0.76, depth: 0.06 }
+    shopping: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.05 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
