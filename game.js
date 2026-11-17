@@ -26,9 +26,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=2" forces a fresh download after the sprite cleanup, so a
-  // browser that cached the old white-outlined sprites picks up the new ones.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=2"; return img; }
+  // "?v=3" forces a fresh download after the sprite cleanup and
+  // Sylvia's new walk cycle, so a browser that cached the old
+  // sprites picks up the new ones.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=3"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
