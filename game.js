@@ -51,6 +51,7 @@
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
+  var chamberSleepImg = loadImg("assets/under-the-covers.gif");
   var subwayImg = loadImg("assets/bg-subway.jpg");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
@@ -66,7 +67,7 @@
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
     hp: 100, hpMax: 100,
-    sleeping: false, sleepHearts: []
+    sleeping: false
   };
   var VICKY_X = 560; // the bartender in the background, behind the bar
   var VICKY_LINES = [
@@ -152,10 +153,10 @@
     return g.room === "chamber" && Math.abs(g.px - BED_X) < BED_RANGE;
   }
   function goToBed() {
-    g.sleeping = true; g.sleepHearts = [];
+    g.sleeping = true;
     g.attack.active = false; g.talk.open = false;
   }
-  function wakeUp() { g.sleeping = false; g.sleepHearts = []; }
+  function wakeUp() { g.sleeping = false; }
   function tryEnter() {
     if (g.sleeping) { wakeUp(); return; }
     if (bedNear()) { goToBed(); return; }
@@ -200,6 +201,11 @@
   function drawBg() {
     var frames = room().frames;
     var frame = frames.length > 1 ? frames[Math.floor(g.time / 30) % frames.length] : frames[0];
+    // Asleep in the chamber: the room shows her gif, under the
+    // covers with the hearts above the bed. Awake: the normal room.
+    if (g.room === "chamber" && g.sleeping && chamberSleepImg.complete && chamberSleepImg.naturalWidth !== 0) {
+      frame = chamberSleepImg;
+    }
     ctx.fillStyle = "#0b0a18";
     ctx.fillRect(0, 0, g.w, g.h);
     if (!frame || !frame.complete || frame.naturalWidth === 0) return;
@@ -442,24 +448,12 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
-  function drawSleepHearts() {
-    if (!g.sleeping) return;
-    ctx.save();
-    for (var i = 0; i < g.sleepHearts.length; i++) {
-      var ht = g.sleepHearts[i];
-      var a = 1 - ht.t / 90;
-      ctx.globalAlpha = a;
-      drawHeart(ht.x, ht.y, ht.s, "#ff8fb0");
-    }
-    ctx.restore();
-  }
   function draw() {
     drawBg();
     drawHp();
     drawVickyPrompt();
     drawDoorPrompt();
     drawBedPrompt();
-    drawSleepHearts();
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     drawRay();
     if (!g.sleeping) drawSylvia();
@@ -496,20 +490,8 @@
       return;
     }
     if (g.sleeping) {
-      // Resting recovers her HP, and little hearts float up
-      // above the bed while she sleeps.
+      // Resting recovers her HP while the sleep gif plays.
       if (g.hp < g.hpMax) g.hp = Math.min(g.hpMax, g.hp + 0.5);
-      if (g.time % 18 === 0 && g.sleepHearts.length < 6) {
-        g.sleepHearts.push({
-          x: (BED_X - 30 + (Math.random() * 90 - 45)) * scale() - g.camX,
-          y: g.h * 0.58, s: 8 + Math.random() * 5, t: 0
-        });
-      }
-      for (var i = g.sleepHearts.length - 1; i >= 0; i--) {
-        var ht = g.sleepHearts[i];
-        ht.t += 1; ht.y -= 0.7; ht.x += 0.2;
-        if (ht.t >= 90) g.sleepHearts.splice(i, 1);
-      }
       // A movement key wakes her up, and then walks as normal.
       if (keys.left || keys.right || keys.up || keys.down) wakeUp();
     }
