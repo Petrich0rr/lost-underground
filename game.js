@@ -30,8 +30,14 @@
     w: 0, h: 340, time: 0, camX: 0,
     // Sylvia, in bar-world pixels (bar is 1179 wide, 503 tall).
     px: 220, depth: 0, facing: 1, walk: 0,
-    ray: { x: 700, dir: -1, pause: 0, walk: 0 }
+    ray: { x: 700, dir: -1, pause: 0, walk: 0 },
+    kiss: { active: false, t: 0 }
   };
+  function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
+  function tryKiss() {
+    if (g.kiss.active || !kissNear()) return;
+    g.kiss.active = true; g.kiss.t = 0;
+  }
 
   function scale() { return g.h / BG_H; }
   function worldW() { return BG_W * scale(); }
@@ -79,27 +85,45 @@
 
   function drawSylvia() {
     var moving = keys.left || keys.right || keys.up || keys.down;
-    var img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
+    var kissing = g.kiss.active;
+    var img = kissing ? sylviaWalkImgs[0]
+      : moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length]
+      : sylviaIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = sylviaIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (g.depth + depthRange()) / depthRange(); // 0 back, 1 front
     var h = sylviaH() * (0.92 + 0.08 * t);
+    // A tad smaller while walking, so her face does not look huge.
+    if (moving || kissing) h *= 0.94;
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
-    // Sylvia's walk frames face right, so flip them when she walks left.
-    if (moving && g.facing === -1 && img !== sylviaIdleImg) ctx.scale(-1, 1);
+    // Sylvia's walk frames face right, so flip them when she faces left.
+    if (g.facing === -1 && img !== sylviaIdleImg) ctx.scale(-1, 1);
+    if (kissing) ctx.rotate(g.facing === 1 ? 0.08 : -0.08);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
 
+  function drawHeart(x, y, s, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.35);
+    ctx.bezierCurveTo(x - s, y - s * 0.5, x - s * 0.45, y - s * 1.1, x, y - s * 0.4);
+    ctx.bezierCurveTo(x + s * 0.45, y - s * 1.1, x + s, y - s * 0.5, x, y + s * 0.35);
+    ctx.fill();
+  }
+
   function drawRay() {
     var r = g.ray;
-    var walking = r.pause <= 0;
-    var img = walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length] : rayIdleImg;
+    var kissing = g.kiss.active;
+    var walking = !kissing && r.pause <= 0;
+    var img = kissing ? rayWalkImgs[0]
+      : walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length]
+      : rayIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = rayIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var h = rayH();
@@ -110,10 +134,32 @@
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
-    // Ray's walk frames face right, so flip them when he walks left.
-    if (walking && r.dir === -1) ctx.scale(-1, 1);
+    // Ray's walk frames face right, so flip them when he faces left.
+    var facingLeft = kissing ? g.px < r.x : r.dir === -1;
+    if (facingLeft) ctx.scale(-1, 1);
+    if (kissing) ctx.rotate(g.px < r.x ? -0.08 : 0.08);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
+    if (kissing) {
+      var mx = (g.px + r.x) / 2 * scale() - g.camX;
+      var my = groundY() - Math.max(sylviaH(), rayH()) - 26 + Math.sin(g.kiss.t * 0.12) * 4;
+      drawHeart(mx, my, 11 + Math.sin(g.kiss.t * 0.2) * 2, "#ff5c8a");
+    } else if (kissNear()) {
+      var px = r.x * scale() - g.camX;
+      ctx.save();
+      ctx.font = "700 13px 'Open Sans', sans-serif";
+      ctx.textAlign = "center";
+      var label = "Press K";
+      var tw = ctx.measureText(label).width;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(px - tw / 2 - 10, groundY() - rayH() - 34, tw + 20, 24, 12);
+      else ctx.rect(px - tw / 2 - 10, groundY() - rayH() - 34, tw + 20, 24);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, px, groundY() - rayH() - 17);
+      ctx.restore();
+    }
   }
 
   function draw() {
@@ -125,6 +171,19 @@
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
+    if (g.kiss.active) {
+      g.kiss.t += 1;
+      // Face each other and lean in until cheek to cheek.
+      g.facing = g.ray.x > g.px ? 1 : -1;
+      var gap = g.ray.x - g.px;
+      if (Math.abs(gap) > 55) {
+        var step = gap > 0 ? 0.8 : -0.8;
+        g.px += step; g.ray.x -= step;
+      }
+      if (g.kiss.t >= 120) { g.kiss.active = false; g.ray.pause = 60; }
+      draw();
+      return;
+    }
     var speed = 2.2;
     if (keys.left) { g.px -= speed; g.facing = -1; }
     if (keys.right) { g.px += speed; g.facing = 1; }
@@ -162,6 +221,7 @@
     return true;
   }
   window.addEventListener("keydown", function (e) {
+    if (e.code === "KeyK") { tryKiss(); return; }
     if (setKey(e.code, true)) {
       var r = canvas.getBoundingClientRect();
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
