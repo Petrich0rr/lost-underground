@@ -2,8 +2,9 @@
 // Sylvia walks left and right with A and D or the arrow keys, and
 // forward and back on the floor with W and S. Her boyfriend Ray
 // just wanders the bar. No obstacles, no jumping, no score.
-// Three rooms: the bar, their chamber (far left edge of the bar),
-// and the Forgotten subway, up the stairs on the bar's right edge.
+// Four rooms: the bar, their chamber (far left edge of the bar),
+// the Forgotten subway, up the stairs on the bar's right edge,
+// and the Shopping District, out the chamber's canal window.
 // Ray follows Sylvia between rooms.
 // The bar background is shown at full height, cropped only on the
 // sides: the camera follows Sylvia across it, so it moves as she walks.
@@ -17,7 +18,8 @@
   var ROOMS = {
     bar: { w: 1179, h: 503, frames: null, floor: 0.90, depth: 0.08 },
     chamber: { w: 1672, h: 941, frames: null, floor: 0.90, depth: 0.06 },
-    subway: { w: 2172, h: 724, frames: null, floor: 0.80, depth: 0.05 }
+    subway: { w: 2172, h: 724, frames: null, floor: 0.80, depth: 0.05 },
+    shopping: { w: 2172, h: 724, frames: null, floor: 0.76, depth: 0.06 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -54,9 +56,11 @@
   var chamberImg = loadImg("assets/bg-chamber.jpg");
   var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
   var subwayImg = loadImg("assets/bg-subway.jpg");
+  var shoppingImg = loadImg("assets/bg-shopping.jpg");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
   ROOMS.subway.frames = [subwayImg];
+  ROOMS.shopping.frames = [shoppingImg];
 
   var keys = { up: false, down: false, left: false, right: false };
   var g = {
@@ -108,7 +112,8 @@
   var EXITS = {
     bar: { left: "chamber", right: "subway" },
     chamber: { right: "bar" },
-    subway: { left: "bar" }
+    subway: { left: "bar" },
+    shopping: { left: "chamber" }
   };
   function doorSide() {
     var exits = EXITS[g.room];
@@ -119,6 +124,7 @@
   function atDoor() { return doorSide() !== null; }
   function doorLabel() {
     var to = EXITS[g.room][doorSide()];
+    if (g.room === "shopping" && to === "chamber") return "Climb back in the window";
     if (to === "chamber") return "Enter your chamber";
     if (to === "subway") return "Go up to the Forgotten subway";
     return "Back to the bar";
@@ -128,17 +134,40 @@
     if (to === "bar") return "Press E to go back to the bar";
     return "Press E to " + doorLabel().charAt(0).toLowerCase() + doorLabel().slice(1);
   }
+  // The canal window on the right wall of the chamber (world x,
+  // in the 1672-wide room). Walking up to it offers a climb out
+  // to the Shopping District, a neon canal street under the ground.
+  var WINDOW_X = 1480, WINDOW_RANGE = 90;
+  function windowNear() {
+    return g.room === "chamber" && Math.abs(g.px - WINDOW_X) < WINDOW_RANGE;
+  }
+  function climbOutWindow() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.embrace.active) return;
+    g.talk.open = false;
+    g.room = "shopping";
+    g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    // You climb out on the left side of the street, facing the shops.
+    g.px = 110; g.facing = 1;
+    g.ray.x = 60; g.ray.dir = 1;
+    resize();
+    g.camX = 0;
+  }
   function switchRoom() {
     if (g.kiss.active || g.talk.open || g.embrace.active) return;
     var side = doorSide();
     if (!side) return;
+    var from = g.room;
     var to = EXITS[g.room][side];
     g.talk.open = false;
     g.room = to;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
+    // Climbing back in from the Shopping District lands at the window.
     var enterRight = side === "left";
-    if (enterRight) {
+    if (from === "shopping" && to === "chamber") {
+      g.px = WINDOW_X; g.facing = -1;
+      g.ray.x = WINDOW_X - 60; g.ray.dir = -1;
+    } else if (enterRight) {
       g.px = room().w - 110; g.facing = -1;
       g.ray.x = room().w - 60; g.ray.dir = -1;
     } else {
@@ -146,7 +175,7 @@
       g.ray.x = 60; g.ray.dir = 1;
     }
     resize();
-    g.camX = enterRight ? Math.max(0, worldW() - g.w) : 0;
+    g.camX = (from === "shopping" && to === "chamber") || enterRight ? Math.max(0, worldW() - g.w) : 0;
   }
   // The bed in the chamber (world x, in the 1672-wide room).
   // Walking up to it offers a sleep, and sleeping recovers her HP.
@@ -167,6 +196,7 @@
     if (g.embrace.active) return;
     if (g.sleeping) { wakeUp(); return; }
     if (bedNear()) { goToBed(); return; }
+    if (windowNear()) { climbOutWindow(); return; }
     if (atDoor()) switchRoom();
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
@@ -448,6 +478,25 @@
     }
     ctx.restore();
   }
+  function drawWindowPrompt() {
+    if (g.kiss.active || g.talk.open) return;
+    if (!windowNear()) return;
+    var x = WINDOW_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to climb out the window";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
   function drawBedPrompt() {
     if (g.kiss.active || g.talk.open) return;
     if (!g.sleeping && !bedNear()) return;
@@ -473,6 +522,7 @@
     drawVickyPrompt();
     drawDoorPrompt();
     drawBedPrompt();
+    drawWindowPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); return; }
     drawRay();
@@ -493,6 +543,7 @@
     if (enterBtn) {
       if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
+      else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
     }
