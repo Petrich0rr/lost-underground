@@ -19,7 +19,11 @@
     bar: { w: 1179, h: 503, frames: null, floor: 0.90, depth: 0.08 },
     chamber: { w: 1672, h: 941, frames: null, floor: 0.90, depth: 0.06 },
     subway: { w: 2172, h: 724, frames: null, floor: 0.80, depth: 0.05 },
-    shopping: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.05 }
+    shopping: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.05 },
+    repair: { w: 1774, h: 887, frames: null, floor: 0.79, depth: 0.05 },
+    clothing: { w: 1983, h: 793, frames: null, floor: 0.80, depth: 0.05 },
+    salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
+    arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -57,10 +61,18 @@
   var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
   var subwayImg = loadImg("assets/bg-subway.jpg");
   var shoppingImg = loadImg("assets/bg-shopping.jpg");
+  var repairImg = loadImg("assets/shop-repair.jpg");
+  var clothingImg = loadImg("assets/shop-clothing.jpg");
+  var salonImg = loadImg("assets/shop-salon.jpg");
+  var arcadeImg = loadImg("assets/shop-arcade.jpg");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
   ROOMS.subway.frames = [subwayImg];
   ROOMS.shopping.frames = [shoppingImg];
+  ROOMS.repair.frames = [repairImg];
+  ROOMS.clothing.frames = [clothingImg];
+  ROOMS.salon.frames = [salonImg];
+  ROOMS.arcade.frames = [arcadeImg];
 
   var keys = { up: false, down: false, left: false, right: false };
   var g = {
@@ -114,7 +126,11 @@
     bar: { left: "chamber", right: "subway" },
     chamber: { right: "bar" },
     subway: { left: "bar" },
-    shopping: { left: "chamber" }
+    shopping: { left: "chamber" },
+    repair: { left: "shopping" },
+    clothing: { left: "shopping" },
+    salon: { left: "shopping" },
+    arcade: { left: "shopping" }
   };
   function doorSide() {
     var exits = EXITS[g.room];
@@ -128,11 +144,13 @@
     if (g.room === "shopping" && to === "chamber") return "Climb back in the window";
     if (to === "chamber") return "Enter your chamber";
     if (to === "subway") return "Go up to the Forgotten subway";
+    if (to === "shopping") return "Back to the street";
     return "Back to the bar";
   }
   function doorPrompt() {
     var to = EXITS[g.room][doorSide()];
     if (to === "bar") return "Press E to go back to the bar";
+    if (to === "shopping") return "Press E to go back to the street";
     return "Press E to " + doorLabel().charAt(0).toLowerCase() + doorLabel().slice(1);
   }
   // The canal window on the right wall of the chamber (world x,
@@ -172,6 +190,33 @@
     resize();
     g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
   }
+  // The four shop doors on the Shopping District street (world x, in
+  // the 2172-wide street). Each leads to its own interior room.
+  var SHOPS = {
+    repair: { doorX: 390, label: "Enter the repair shop", btn: "Repair shop" },
+    clothing: { doorX: 740, label: "Enter the clothing store", btn: "Clothing store" },
+    salon: { doorX: 1090, label: "Enter the Style Studio", btn: "Style Studio" },
+    arcade: { doorX: 1950, label: "Enter the arcade", btn: "Arcade" }
+  };
+  var SHOP_RANGE = 110;
+  function shopNear() {
+    if (g.room !== "shopping") return null;
+    for (var key in SHOPS) {
+      if (Math.abs(g.px - SHOPS[key].doorX) < SHOP_RANGE) return key;
+    }
+    return null;
+  }
+  function enterShop(key) {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.embrace.active) return;
+    g.talk.open = false;
+    g.room = key;
+    g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    // You walk in the shop door, on the left side of the room, facing in.
+    g.px = 110; g.facing = 1;
+    g.ray.x = 60; g.ray.dir = 1;
+    resize();
+    g.camX = 0;
+  }
   function switchRoom() {
     if (g.kiss.active || g.talk.open || g.embrace.active) return;
     var side = doorSide();
@@ -187,6 +232,10 @@
     if (from === "shopping" && to === "chamber") {
       g.px = WINDOW_X; g.facing = -1;
       g.ray.x = WINDOW_X - 60; g.ray.dir = -1;
+    } else if (SHOPS[from] && to === "shopping") {
+      // Walking out of a shop puts you on the street in front of its door.
+      g.px = SHOPS[from].doorX; g.facing = 1;
+      g.ray.x = SHOPS[from].doorX - 60; g.ray.dir = 1;
     } else if (enterRight) {
       g.px = room().w - 110; g.facing = -1;
       g.ray.x = room().w - 60; g.ray.dir = -1;
@@ -195,7 +244,11 @@
       g.ray.x = 60; g.ray.dir = 1;
     }
     resize();
-    g.camX = (from === "shopping" && to === "chamber") || enterRight ? Math.max(0, worldW() - g.w) : 0;
+    if (SHOPS[from] && to === "shopping") {
+      g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
+    } else {
+      g.camX = (from === "shopping" && to === "chamber") || enterRight ? Math.max(0, worldW() - g.w) : 0;
+    }
   }
   // The bed in the chamber (world x, in the 1672-wide room).
   // Walking up to it offers a sleep, and sleeping recovers her HP.
@@ -218,6 +271,8 @@
     if (bedNear()) { goToBed(); return; }
     if (windowNear()) { climbOutWindow(); return; }
     if (beerDoorNear()) { enterBarFromBeerDoor(); return; }
+    var shop = shopNear();
+    if (shop) { enterShop(shop); return; }
     if (atDoor()) switchRoom();
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
@@ -539,6 +594,26 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
+  function drawShopPrompt() {
+    if (g.kiss.active || g.talk.open) return;
+    var key = shopNear();
+    if (!key) return;
+    var x = SHOPS[key].doorX * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to " + SHOPS[key].label.charAt(0).toLowerCase() + SHOPS[key].label.slice(1);
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
   function drawBedPrompt() {
     if (g.kiss.active || g.talk.open) return;
     if (!g.sleeping && !bedNear()) return;
@@ -566,6 +641,7 @@
     drawBedPrompt();
     drawWindowPrompt();
     drawBeerDoorPrompt();
+    drawShopPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); return; }
     drawRay();
@@ -588,6 +664,7 @@
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
       else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
+      else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
     }
