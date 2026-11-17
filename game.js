@@ -56,6 +56,8 @@
   var embraceImg = loadImg("assets/embrace.png");
   var rayBackWalkImgs = ["assets/ray-back-walk-01.png", "assets/ray-back-walk-02.png"].map(loadImg);
   var rayPunchImg = loadImg("assets/ray-punch.png");
+  var ownerWalkImgs = ["assets/owner-walk-01.png", "assets/owner-walk-02.png", "assets/owner-walk-03.png", "assets/owner-walk-04.png"].map(loadImg);
+  var ownerIdleImg = loadImg("assets/owner-idle.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
   var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
@@ -81,6 +83,9 @@
     // She starts in her own room, by the bed, with Ray beside her.
     px: 950, depth: 0, facing: -1, walk: 0,
     ray: { x: 1020, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
+    // The clothing store owner. She only ever stands and walks in the
+    // clothing store, never anywhere else.
+    owner: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -436,6 +441,31 @@
     ctx.restore();
   }
 
+  // The clothing store owner. She only appears in the clothing store,
+  // standing still or walking around it. She never leaves the store.
+  function drawOwner() {
+    if (g.room !== "clothing") return;
+    var o = g.owner;
+    var walking = o.pause <= 0;
+    var img = walking ? ownerWalkImgs[Math.floor(o.walk / 6) % ownerWalkImgs.length] : ownerIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = ownerIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (o.depth + depthRange()) / depthRange(); // 0 back, 1 front
+    var h = sylviaH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + o.depth - 6;
+    var x = o.x * scale() - g.camX;
+    if (x < -w || x > g.w + w) return;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    // Her walk frames face left, so flip them when she walks right.
+    // The idle is a three-quarter front view, never flipped.
+    if (walking && o.dir === 1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
   function drawEmbrace() {
     if (!embraceImg || !embraceImg.complete || embraceImg.naturalWidth === 0) {
       drawRay();
@@ -645,6 +675,7 @@
     if (g.kiss.active) { drawKiss(); drawTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); return; }
     drawRay();
+    drawOwner();
     if (!g.sleeping) drawSylvia();
     drawTalk();
   }
@@ -739,6 +770,19 @@
     var step = Math.max(-1.2, Math.min(1.2, dd));
     r.depth += step;
     r.vdir = step < -0.05 ? -1 : step > 0.05 ? 1 : 0;
+    // The clothing store owner: she only stands and walks in the
+    // clothing store, never anywhere else. She wanders it slowly,
+    // pausing to look at the racks, and turns at the walls.
+    var o = g.owner;
+    if (g.room === "clothing") {
+      if (o.pause > 0) { o.pause -= 1; }
+      else {
+        o.x += o.dir * 0.8;
+        o.walk += 0.3;
+        if (o.x < 150 || o.x > room().w - 150) { o.dir *= -1; o.pause = 60 + Math.random() * 120; }
+        else if (Math.random() < 0.002) { o.pause = 90 + Math.random() * 150; }
+      }
+    }
     // When she is standing still and he wanders up right behind
     // her, he holds her for a few seconds, then wanders off again.
     if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
