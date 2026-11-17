@@ -16,6 +16,7 @@
   var IDLE_SRC = "assets/anim-special-04.png";
   var FAIL_SRC = "assets/anim-special-06b.png";
   var AVATAR_SRC = "assets/mini-erika.png";
+  var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
   var OBSTACLE_DEFS = [
     { kind: "draw", draw: "stalagmite", h: 82, w: 52, weight: 3 },
@@ -58,6 +59,7 @@
   var failImg = loadImg(FAIL_SRC);
   var spriteImgs = new Map();
   OBSTACLE_DEFS.forEach(function (d) { if (d.kind === "sprite") spriteImgs.set(d.src, loadImg(d.src)); });
+  var bgImgs = BG_SRCS.map(loadImg);
 
   var g = { phase: "ready", y: 0, vy: 0, speed: 5.2, obstacles: [], distance: 0, score: 0, high: loadHigh(), run: 0, bgX: 0, time: 0, spawnIn: 90, w: 0, h: 340 };
   bestFootEl.textContent = String(g.high);
@@ -186,53 +188,35 @@
     }
   }
   function drawBg() {
-    var grad = ctx.createLinearGradient(0, 0, 0, g.h);
-    grad.addColorStop(0, "#171426"); grad.addColorStop(0.6, "#121022"); grad.addColorStop(1, "#0b0a18");
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, g.w, g.h);
-    var off = g.bgX % 120;
-    ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.lineWidth = 1;
-    for (var row = 0; row < 6; row++) {
-      var by = 18 + row * 42;
-      ctx.beginPath(); ctx.moveTo(0, by); ctx.lineTo(g.w, by); ctx.stroke();
-      var shift = row % 2 ? 60 : 0;
-      for (var bx = -off - 120 + shift; bx < g.w + 120; bx += 120) {
-        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by + 42); ctx.stroke();
-      }
-    }
-    var archOff = (g.bgX * 0.6) % 420;
-    ctx.strokeStyle = "rgba(255,255,255,0.09)"; ctx.lineWidth = 3;
-    for (var ax = -archOff; ax < g.w + 420; ax += 420) {
-      ctx.beginPath(); ctx.moveTo(ax, groundY()); ctx.lineTo(ax, 110); ctx.quadraticCurveTo(ax + 70, 30, ax + 140, 110); ctx.lineTo(ax + 140, groundY()); ctx.stroke();
-    }
-    var torchOff = g.bgX % 300;
-    for (var tx = -torchOff + 40; tx < g.w + 300; tx += 300) {
-      var flick = Math.sin(g.time * 0.3 + tx) * 2.5;
-      ctx.fillStyle = "rgba(245,158,11,0.18)";
-      ctx.beginPath(); ctx.arc(tx, 86, 34 + flick, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#3a3348"; ctx.fillRect(tx - 3, 96, 6, 18);
-      ctx.fillStyle = "#f59e0b";
-      ctx.beginPath(); ctx.moveTo(tx, 68 + flick); ctx.quadraticCurveTo(tx + 9, 82, tx, 96); ctx.quadraticCurveTo(tx - 9, 82, tx, 68 + flick); ctx.fill();
-      ctx.fillStyle = "#fde68a";
-      ctx.beginPath(); ctx.arc(tx, 84, 4, 0, Math.PI * 2); ctx.fill();
-    }
-    var exitOff = g.bgX % 900;
-    for (var ex = -exitOff + 620; ex < g.w + 900; ex += 900) {
-      ctx.fillStyle = "rgba(34,197,94,0.9)"; rr(ctx, ex, 44, 64, 26, 5);
-      ctx.fillStyle = "#ffffff"; ctx.font = "700 13px 'Open Sans', sans-serif"; ctx.textAlign = "center"; ctx.fillText("EXIT", ex + 32, 62); ctx.textAlign = "left";
-      ctx.fillStyle = "rgba(34,197,94,0.9)";
-      ctx.beginPath(); ctx.moveTo(ex + 74, 62); ctx.lineTo(ex + 82, 50); ctx.lineTo(ex + 90, 62); ctx.closePath(); ctx.fill();
-      ctx.fillRect(ex + 79, 62, 6, 12);
-    }
-    ctx.fillStyle = "#241f2e"; ctx.fillRect(0, groundY(), g.w, FLOOR_H);
-    ctx.fillStyle = "#2e283d"; ctx.fillRect(0, groundY(), g.w, 4);
-    ctx.strokeStyle = "rgba(255,255,255,0.07)"; ctx.lineWidth = 1;
-    var slabOff = g.bgX % 140;
-    for (var sx = -slabOff; sx < g.w + 140; sx += 140) {
-      ctx.beginPath(); ctx.moveTo(sx, groundY() + 4); ctx.lineTo(sx, g.h); ctx.stroke();
-    }
+    // The bar, the starting place. Three frames looped so the bartender
+    // and patrons move and the neon lights flicker. We never show the
+    // full panorama at once: the camera shows a cropped window and pans
+    // left across the bar as she walks, then loops back to the entrance.
+    var frame = bgImgs[Math.floor(g.time / 14) % bgImgs.length];
+    ctx.fillStyle = "#0b0a18";
+    ctx.fillRect(0, 0, g.w, g.h);
+    if (!frame || !frame.complete || frame.naturalWidth === 0) return;
+    var imgW = frame.naturalWidth;
+    var imgH = frame.naturalHeight;
+    var viewW = Math.min(imgW * 0.64, imgW);
+    var viewH = viewW * g.h / g.w;
+    if (viewH > imgH) { viewH = imgH; viewW = viewH * g.w / g.h; }
+    var panRange = Math.max(1, imgW - viewW);
+    var panX = (g.bgX * 0.18) % panRange;
+    var scale = g.w / viewW;
+    var cropY = 365 - groundY() / scale;
+    if (cropY < 0) cropY = 0;
+    if (cropY > imgH - viewH) cropY = imgH - viewH;
+    ctx.drawImage(frame, panX, cropY, viewW, viewH, 0, 0, g.w, g.h);
+    var fg = ctx.createLinearGradient(0, groundY() - 30, 0, g.h);
+    fg.addColorStop(0, "rgba(11,10,24,0)");
+    fg.addColorStop(1, "rgba(11,10,24,0.35)");
+    ctx.fillStyle = fg;
+    ctx.fillRect(0, groundY() - 30, g.w, g.h - groundY() + 30);
     var vg = ctx.createLinearGradient(0, 0, g.w, 0);
     vg.addColorStop(0, "rgba(0,0,0,0.35)"); vg.addColorStop(0.12, "rgba(0,0,0,0)"); vg.addColorStop(0.88, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.35)");
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, g.w, g.h);
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, g.w, g.h);
   }
   function draw() {
     drawBg();
