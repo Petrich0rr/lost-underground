@@ -104,7 +104,9 @@
   function worldW() { return room().w * scale(); }
   function groundY() { return g.h - g.h * 0.10; }
   function depthRange() { return g.h * 0.08; }
-  function sylviaH() { return g.h * 0.36; }
+  // The chamber furniture is drawn big, so Sylvia and Ray are
+  // bigger in there too, or the bed headboard towers over Ray.
+  function sylviaH() { return g.h * (g.room === "chamber" ? 0.52 : 0.36); }
   function rayH() { return sylviaH() * 172 / 148; }
 
   function resize() {
