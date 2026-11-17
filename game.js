@@ -58,10 +58,13 @@
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var charWalkImgs = ["assets/owner-walk-01.png", "assets/owner-walk-02.png", "assets/owner-walk-03.png", "assets/owner-walk-04.png"].map(loadImg);
   var charIdleImg = loadImg("assets/owner-idle.png");
+  var charTalkImg = loadImg("assets/owner-talk.png");
   var mikeyWalkImgs = ["assets/mikey-walk-01.png", "assets/mikey-walk-02.png", "assets/mikey-walk-03.png", "assets/mikey-walk-04.png"].map(loadImg);
   var mikeyIdleImg = loadImg("assets/mikey-idle.png");
+  var mikeyTalkImg = loadImg("assets/mikey-talk.png");
   var gunnerWalkImgs = ["assets/gunner-walk-01.png", "assets/gunner-walk-02.png", "assets/gunner-walk-03.png", "assets/gunner-walk-04.png"].map(loadImg);
   var gunnerIdleImg = loadImg("assets/gunner-idle.png");
+  var gunnerTalkImg = loadImg("assets/gunner-talk.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
   var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
@@ -89,13 +92,13 @@
     ray: { x: 1020, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
     // Char, the clothing store owner. She only ever stands and walks in
     // the clothing store, never anywhere else.
-    char: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0 },
+    char: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0, talk: 0 },
     // Mikey, the salon owner. He only ever stands and walks in the
     // salon (the Style Studio), never anywhere else.
-    mikey: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
+    mikey: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0, talk: 0 },
     // Gunner, the repair shop owner. He only ever stands and walks in
     // the repair shop, never anywhere else.
-    gunner: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
+    gunner: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0, talk: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -127,6 +130,28 @@
     if (g.kiss.active) return;
     if (g.talk.open) { talkLine(); return; }
     if (vickyNear()) talkLine();
+    var key = ownerNear();
+    if (key) talkToOwner(key);
+  }
+  // The shop owners. Walk up to one and press T to talk: they stop and
+  // show their talking pose for a few seconds. No dialogue lines yet.
+  var OWNERS = {
+    char: { room: "clothing", name: "Char" },
+    mikey: { room: "salon", name: "Mikey" },
+    gunner: { room: "repair", name: "Gunner" }
+  };
+  function ownerNear() {
+    for (var key in OWNERS) {
+      var o = OWNERS[key];
+      if (g.room === o.room && Math.abs(g.px - g[key].x) < 150) return key;
+    }
+    return null;
+  }
+  function talkToOwner(key) {
+    var o = g[key];
+    o.talk = 180; // about 3 seconds in the talking pose
+    o.pause = 180; // stay put while talking
+    o.dir = g.px < o.x ? -1 : 1; // face Sylvia
   }
   function tryAttack() {
     if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.attack.cooldown > 0) return;
@@ -457,7 +482,9 @@
     if (g.room !== "clothing") return;
     var o = g.char;
     var walking = o.pause <= 0;
-    var img = walking ? charWalkImgs[Math.floor(o.walk / 6) % charWalkImgs.length] : charIdleImg;
+    var img;
+    if (o.talk > 0) img = charTalkImg;
+    else img = walking ? charWalkImgs[Math.floor(o.walk / 6) % charWalkImgs.length] : charIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = charIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (o.depth + depthRange()) / depthRange(); // 0 back, 1 front
@@ -482,7 +509,9 @@
     if (g.room !== "salon") return;
     var m = g.mikey;
     var walking = m.pause <= 0;
-    var img = walking ? mikeyWalkImgs[Math.floor(m.walk / 6) % mikeyWalkImgs.length] : mikeyIdleImg;
+    var img;
+    if (m.talk > 0) img = mikeyTalkImg;
+    else img = walking ? mikeyWalkImgs[Math.floor(m.walk / 6) % mikeyWalkImgs.length] : mikeyIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = mikeyIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (m.depth + depthRange()) / depthRange(); // 0 back, 1 front
@@ -507,7 +536,9 @@
     if (g.room !== "repair") return;
     var n = g.gunner;
     var walking = n.pause <= 0;
-    var img = walking ? gunnerWalkImgs[Math.floor(n.walk / 6) % gunnerWalkImgs.length] : gunnerIdleImg;
+    var img;
+    if (n.talk > 0) img = gunnerTalkImg;
+    else img = walking ? gunnerWalkImgs[Math.floor(n.walk / 6) % gunnerWalkImgs.length] : gunnerIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = gunnerIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (n.depth + depthRange()) / depthRange(); // 0 back, 1 front
@@ -748,7 +779,9 @@
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
     var talkBtn = document.getElementById("talkBtn");
     if (talkBtn) {
+      var nearOwner = ownerNear();
       if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
+      else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
       else talkBtn.hidden = true;
     }
     var enterBtn = document.getElementById("enterBtn");
@@ -837,6 +870,7 @@
     // pausing to look at the racks, and turns at the walls.
     var o = g.char;
     if (g.room === "clothing") {
+      if (o.talk > 0) o.talk -= 1;
       if (o.pause > 0) { o.pause -= 1; }
       else {
         o.x += o.dir * 0.8;
@@ -850,6 +884,7 @@
     // and turns at the walls.
     var m = g.mikey;
     if (g.room === "salon") {
+      if (m.talk > 0) m.talk -= 1;
       if (m.pause > 0) { m.pause -= 1; }
       else {
         m.x += m.dir * 0.8;
@@ -863,6 +898,7 @@
     // by the workbench, and turns at the walls.
     var n = g.gunner;
     if (g.room === "repair") {
+      if (n.talk > 0) n.talk -= 1;
       if (n.pause > 0) { n.pause -= 1; }
       else {
         n.x += n.dir * 0.8;
