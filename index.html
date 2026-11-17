@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lost Underground</title>
+<meta name="description" content="Lost Underground: a little runner game. Help her jump the rubble and barrels in the ruins and dungeons below ground and find the way out and up.">
+<link rel="icon" href="assets/mini-erika.png">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0b0a18; color: #fff; font-family: "Open Sans", system-ui, -apple-system, sans-serif; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 48px 20px 64px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,0.6); }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(44px, 8vw, 72px); line-height: 0.98; margin: 16px 0 0; }
+  .lede { font-size: 18px; line-height: 1.6; color: rgba(255,255,255,0.75); max-width: 620px; margin: 24px 0 0; }
+  .game { position: relative; overflow: hidden; border-radius: 32px; border: 1px solid rgba(255,255,255,0.1); background: #121022; margin-top: 36px; box-shadow: 0 24px 70px -24px rgba(0,0,0,0.6); }
+  canvas { display: block; width: 100%; cursor: pointer; user-select: none; touch-action: manipulation; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 20px; }
+  .overlay[hidden] { display: none; }
+  #readyOverlay { background: rgba(0,0,0,0.3); }
+  #overOverlay { background: rgba(0,0,0,0.4); }
+  .pill { background: #fff; color: #0201a7; border-radius: 999px; padding: 12px 24px; font-size: 14px; font-weight: 700; border: 0; cursor: pointer; }
+  .hint { font-size: 12px; color: rgba(255,255,255,0.8); }
+  .card { position: relative; background: #fff; color: #111; border-radius: 24px; padding: 24px 32px; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.4); max-width: 320px; }
+  .card .eyebrow { color: rgba(3,0,166,0.7); }
+  .card h2 { font-family: Georgia, serif; font-size: 36px; margin: 8px 0 0; }
+  .card p { margin: 8px 0 0; font-size: 14px; color: rgba(0,0,0,0.7); }
+  .card button { margin-top: 16px; background: #0201a7; color: #fff; border: 0; border-radius: 999px; padding: 12px 24px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .card .small { font-size: 12px; color: rgba(0,0,0,0.5); }
+  #fireworks { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; z-index: 10; animation: pulse 1s ease-in-out infinite; }
+  #fireworks[hidden] { display: none; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .bar { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding: 12px 20px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 32px; }
+  @media (min-width: 720px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  .tile { border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); border-radius: 24px; padding: 20px 24px; }
+  .tile h2 { font-family: Georgia, serif; font-size: 20px; margin: 0; }
+  .tile p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7); }
+  footer { margin-top: 40px; font-size: 12px; color: rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+<main class="page">
+  <span class="eyebrow">A standalone game</span>
+  <h1>Lost Underground</h1>
+  <p class="lede">She is lost in the ruins and dungeons below ground, in old cellars and underground bars. Help her jump the rubble and barrels and find the way out and up.</p>
+
+  <section class="game" id="gameWrap" aria-label="Lost Underground game">
+    <canvas id="game" height="340" role="img" aria-label="Lost Underground game. Press space, click or tap to jump over rubble and barrels and find the way out."></canvas>
+    <img id="fireworks" src="assets/fireworks.webp" alt="" aria-hidden="true" hidden>
+    <div class="overlay" id="readyOverlay">
+      <button class="pill" id="readyBtn" type="button">Press space or tap to run</button>
+      <span class="hint">Jump the rubble and barrels to find the way out and up!</span>
+    </div>
+    <div class="overlay" id="overOverlay" hidden>
+      <div class="card">
+        <span class="eyebrow">Still lost</span>
+        <h2><span id="finalScore">0</span> <span style="font-size:18px;color:rgba(0,0,0,0.6)">pts</span></h2>
+        <p id="bestLine">Best: 0</p>
+        <button id="againBtn" type="button">Try again</button>
+        <p class="small">or press space, or tap anywhere</p>
+      </div>
+    </div>
+    <div class="bar"><span>SPACE · CLICK · TAP to jump</span><span>Best: <span id="bestFoot">0</span></span></div>
+  </section>
+
+  <section class="grid">
+    <div class="tile"><h2>How to play</h2><p>Press space, click or tap to jump. Jump the stalagmites, fallen pillars, rubble and barrels.</p></div>
+    <div class="tile"><h2>Find the exit</h2><p>Follow the torches and the green EXIT signs. Every step takes her closer to the surface.</p></div>
+    <div class="tile"><h2>Beat your best</h2><p>Your best score for Lost Underground is saved in this browser.</p></div>
+  </section>
+
+  <footer>Lost Underground is a standalone game page.</footer>
+</main>
+<script src="game.js"></script>
+</body>
+</html>
