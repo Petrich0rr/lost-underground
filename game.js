@@ -39,11 +39,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=28" forces a fresh download after Diego is added (Mexican,
-  // super flirty and popular, but bros with Ray; he is always in the
-  // bar, sometimes stepping out to the Shopping District street). A
-  // browser that cached ?v=27 picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=28"; return img; }
+  // "?v=29" forces a fresh download after Dr. Kian is added (a
+  // Persian hot doctor who cures people in the underground, a gentle
+  // man and very pure hearted; he walks around the Shopping District
+  // street but is mostly in the bar). A browser that cached ?v=28
+  // picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=29"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -120,6 +121,16 @@
   var diegoTalkImg = loadImg("assets/diego-talk.png");
   var diegoSurprisedImg = loadImg("assets/diego-surprised.png");
   var diegoLaughImg = loadImg("assets/diego-laugh.png");
+  // Dr. Kian, a Persian hot doctor who cures people in the
+  // underground. He is a gentle man and very pure hearted. He walks
+  // around the Shopping District street but is mostly in the bar.
+  // Four walk frames (facing right), a standing pose, and talk,
+  // surprised and laughing poses.
+  var kianWalkImgs = ["assets/kian-walk-01.png", "assets/kian-walk-02.png", "assets/kian-walk-03.png", "assets/kian-walk-04.png"].map(loadImg);
+  var kianIdleImg = loadImg("assets/kian-idle.png");
+  var kianTalkImg = loadImg("assets/kian-talk.png");
+  var kianSurprisedImg = loadImg("assets/kian-surprised.png");
+  var kianLaughImg = loadImg("assets/kian-laugh.png");
   // The arcade kids: three regulars who stay in the arcade. Each has
   // an idle portrait and a 4-frame side walk, all facing right.
   var arcadeGamerWalkImgs = ["assets/arcade-gamer-walk-01.png", "assets/arcade-gamer-walk-02.png", "assets/arcade-gamer-walk-03.png", "assets/arcade-gamer-walk-04.png"].map(loadImg);
@@ -294,6 +305,14 @@
     // move; laughT and surprisedT are his talk poses, like the
     // others'.
     diego: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, room: "bar", roomT: 3000, laughT: 0, surprisedT: 0 },
+    // Dr. Kian, a Persian hot doctor who cures people in the
+    // underground. He is a gentle man and very pure hearted. He
+    // walks around the Shopping District street but is mostly in the
+    // bar, so his room rotates between the two, weighted toward the
+    // bar, when Sylvia is not with him. roomT counts down to his
+    // next move; laughT and surprisedT are his talk poses, like the
+    // others'.
+    kian: { x: 850, dir: 1, pause: 120, walk: 0, depth: 0, room: "bar", roomT: 3000, laughT: 0, surprisedT: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -303,6 +322,7 @@
     alexisTalk: { open: false, idx: -1 },
     priyaTalk: { open: false, idx: -1 },
     diegoTalk: { open: false, idx: -1 },
+    kianTalk: { open: false, idx: -1 },
     // Talking to Ray: open while the conversation runs. step 0 is
     // Ray's opening line (Sylvia's turn to pick a reply), step 1 is
     // Sylvia's line showing, step 2 is Ray's reply showing.
@@ -592,6 +612,39 @@
       g.diego.surprisedT = 0;
     }
   }
+  // Dr. Kian, a Persian hot doctor who cures people in the
+  // underground. He is a gentle man and very pure hearted. He walks
+  // around the Shopping District street but is mostly in the bar.
+  var KIAN_LINES = [
+    "Hello, Sylvia. I am Dr. Kian. If you or Ray ever feel unwell, please come to me. No charge. I am a doctor, not a merchant.",
+    "The air down here is hard on the lungs. I see it every day. Breathe slowly, drink water, and rest when you can.",
+    "I became a doctor to help people. The underground needs that more than anywhere. So here I am.",
+    "Ray is strong, but even strong men get hurt. I have patched him up more times than he will admit.",
+    "If you feel dizzy or your chest hurts, do not ignore it. Come find me. I would rather check and find nothing than miss something.",
+    "I keep a small kit with me at all times. Bandages, herbs, a little of everything. You never know who will need it.",
+    "The people here are kind, even in the dark. That is what keeps me going.",
+    "Sylvia, you have a good heart. I can tell. Take care of it, and of yourself.",
+    "Sleep is the best medicine I know. Your body heals while you rest. Do not skip it.",
+    "One day we will all see the sun again. Until then, I will keep everyone healthy. That is my promise."
+  ];
+  function kianNear() { return g.room === g.kian.room && Math.abs(g.px - g.kian.x) < 150; }
+  function kianTalkLine() {
+    var first = !g.kianTalk.open;
+    var idx;
+    do { idx = Math.floor(Math.random() * KIAN_LINES.length); }
+    while (KIAN_LINES.length > 1 && idx === g.kianTalk.idx);
+    g.kianTalk.idx = idx; g.kianTalk.open = true;
+    if (first) {
+      // Greeting: he is surprised to see Sylvia, then he is all
+      // warmth and care.
+      g.kian.surprisedT = 45;
+      g.kian.laughT = 0;
+    } else {
+      // He laughs after his lines, gentle and warm.
+      g.kian.laughT = 90;
+      g.kian.surprisedT = 0;
+    }
+  }
   function kidLines(key) {
     if (key === "dino") return KUSH_LINES;
     if (key === "cup") return LIA_LINES;
@@ -614,6 +667,7 @@
     if (g.alexisTalk.open) { alexisTalkLine(); return; }
     if (g.priyaTalk.open) { priyaTalkLine(); return; }
     if (g.diegoTalk.open) { diegoTalkLine(); return; }
+    if (g.kianTalk.open) { kianTalkLine(); return; }
     if (g.rayTalk.open) { advanceRayTalk(); return; }
     // One conversation at a time: the room's own NPC wins, and Ray
     // is the fallback when nobody else is near to talk to.
@@ -626,6 +680,7 @@
     if (alexisNear()) { alexisTalkLine(); return; }
     if (priyaNear()) { priyaTalkLine(); return; }
     if (diegoNear()) { diegoTalkLine(); return; }
+    if (kianNear()) { kianTalkLine(); return; }
     if (rayNear()) rayTalkLine();
   }
   // The shop owners. Walk up to one and press T to talk: they stop and
@@ -816,7 +871,7 @@
   }
   function closeRayTalk() { g.rayTalk.open = false; g.rayTalk.step = 0; g.rayTalk.choice = -1; }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -1020,7 +1075,7 @@
   function teleportToRoom(roomKey) {
     if (!ROOMS[roomKey]) return;
     closeMap();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.rayTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.rayTalk.open = false;
     g.propRead.open = false; hidePropPanel();
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
@@ -1064,7 +1119,7 @@
   }
   function inspectNear() { return inspectArch() !== null; }
   function drawInspectPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
     // One small, quiet button down at the floor, right over the arch.
     // It stays subtle so the secret does not shout.
     var ax = g.inspect.active ? g.inspect.arch : inspectArch();
@@ -1141,7 +1196,7 @@
     return bd < PROP_RANGE ? best : null;
   }
   function readProp(p) {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x;
     // Crouch down to read it, the same as pressing I.
     g.inspect.active = true; g.inspect.phase = "look"; g.inspect.arch = null; g.inspect.t = 0;
@@ -1151,7 +1206,7 @@
   }
   function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; hidePropPanel(); }
   function drawPropPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
     // A door prompt wins over a junk prompt when Sylvia stands near
     // both, so the two texts never draw on top of each other.
     if (portalNear() || ironDoorNear()) return;
@@ -1238,7 +1293,7 @@
     if (panel) panel.hidden = true;
   }
   function startInspect() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
     // Already reading a piece of junk: I puts it back down and she
     // stands back up.
     if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; }
@@ -1254,7 +1309,7 @@
     // else there is nothing to look at, so no crouch.
     var ax = inspectArch();
     var prop = propNear();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false;
     if (ax !== null) {
       // At a secret arch: crouch down and look at it.
       g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = ax;
@@ -1312,7 +1367,7 @@
     return g.room === "tunnels" && Math.abs(g.px - IRON_DOOR_X) < IRON_DOOR_RANGE;
   }
   function drawIronDoorPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
     var x = IRON_DOOR_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1330,9 +1385,9 @@
     ctx.restore();
   }
   function enterDungeonFromIronDoor() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false;
     g.room = "dungeon";
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -1349,7 +1404,7 @@
     return g.room === "tunnels" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
   }
   function drawPortalPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     var x = PORTAL_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1367,9 +1422,9 @@
     ctx.restore();
   }
   function goThroughPortal() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false;
     // Straight back home to their room, no tunnel image, no wait.
     g.room = "chamber";
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -1519,12 +1574,12 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
     var to = EXITS[g.room][side];
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false;
     g.room = to;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
@@ -2228,6 +2283,41 @@
     ctx.restore();
   }
 
+  // Dr. Kian, a Persian hot doctor who cures people in the
+  // underground. He is a gentle man and very pure hearted. He
+  // appears in whichever room he is in right now: mostly the bar,
+  // sometimes the Shopping District street. He is a guy, so he is
+  // drawn at Ray's height. While talking he shows his surprised
+  // pose for the greeting, his talk pose for the line, and his
+  // laughing pose right after one of his lines.
+  function drawKian() {
+    if (g.room !== g.kian.room) return;
+    var kn = g.kian;
+    var talking = g.kianTalk.open;
+    var walking = !talking && kn.pause <= 0;
+    var img;
+    if (talking && kn.surprisedT > 0) img = kianSurprisedImg;
+    else if (talking && kn.laughT > 0) img = kianLaughImg;
+    else if (talking) img = kianTalkImg;
+    else img = walking ? kianWalkImgs[Math.floor(kn.walk / 6) % kianWalkImgs.length] : kianIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = kianIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (kn.depth + depthRange()) / depthRange();
+    var h = rayH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + kn.depth - 6;
+    var x = kn.x * scale() - g.camX;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    // His walk frames face right, so flip them when he walks left.
+    // The idle, talk, surprised and laugh poses are front views,
+    // never flipped.
+    if (walking && kn.dir === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
   function drawEmbrace() {
     if (!embraceImg || !embraceImg.complete || embraceImg.naturalWidth === 0) {
       drawRay();
@@ -2526,6 +2616,53 @@
     ctx.font = "700 12px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("DIEGO", bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
+  function drawKianTalk() {
+    // Speech bubble above Dr. Kian, tail pointing down to him.
+    // Mirrors Diego's bubble. He can be in the bar or the shopping
+    // street, so his position is his own room's x.
+    if (!g.kianTalk.open) return;
+    var kn = g.kian;
+    var ex = kn.x * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(KIAN_LINES[g.kianTalk.idx], maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText("DR. KIAN").width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, ex - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, ex));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("DR. KIAN", bx + 16, by + 20);
     ctx.fillStyle = "#1a1a2e";
     ctx.font = "400 14px 'Open Sans', sans-serif";
     for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
@@ -2938,8 +3075,8 @@
     drawIronDoorPrompt();
     drawPortalPrompt();
     drawScooterPrompt();
-    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); return; }
-    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); return; }
+    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); return; }
+    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); return; }
     if (g.scooter.riding) drawScooterRide();
     else drawRay();
     drawChar();
@@ -2950,6 +3087,7 @@
     drawAlexis();
     drawPriya();
     drawDiego();
+    drawKian();
     if (!g.scooter.riding && !g.sleeping) drawSylvia();
     drawTalk();
     drawOwnerTalk();
@@ -2958,6 +3096,7 @@
     drawAlexisTalk();
     drawPriyaTalk();
     drawDiegoTalk();
+    drawKianTalk();
     drawRayTalk();
     drawDebug();
   }
@@ -3058,6 +3197,9 @@
     if (g.diegoTalk.open) {
       if (g.room !== g.diego.room || Math.abs(g.px - g.diego.x) > 180) g.diegoTalk.open = false;
     }
+    if (g.kianTalk.open) {
+      if (g.room !== g.kian.room || Math.abs(g.px - g.kian.x) > 180) g.kianTalk.open = false;
+    }
     if (g.rayTalk.open && Math.abs(g.px - g.ray.x) > 180) closeRayTalk();
     if (g.propRead.open && Math.abs(g.px - g.propRead.x) > 180) closePropRead();
     // Sylvia's reply choices: four buttons around her head, only
@@ -3098,6 +3240,7 @@
       else if (g.alexisTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.priyaTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.diegoTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.kianTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
       else if (nearKid) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + KIDS[nearKid].name; }
@@ -3105,6 +3248,7 @@
       else if (alexisNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Alexis"; }
       else if (priyaNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Priya"; }
       else if (diegoNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Diego"; }
+      else if (kianNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Dr. Kian"; }
       else if (rayNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Ray"; }
       else talkBtn.hidden = true;
     }
@@ -3398,6 +3542,37 @@
       }
     }
     if (g.diegoTalk.open) dg.dir = g.px < dg.x ? -1 : 1; // face Sylvia
+    // Dr. Kian: he walks around the Shopping District street but is
+    // mostly in the bar, so his room rotates between the two,
+    // weighted toward the bar (two chances in three). He only moves
+    // rooms when his talk is closed and Sylvia is not in his room,
+    // so he never vanishes in front of Sylvia. While talking he
+    // stands still and faces Sylvia; his laugh and surprise timers
+    // count down here.
+    var kn = g.kian;
+    if (kn.laughT > 0) kn.laughT -= 1;
+    if (kn.surprisedT > 0) kn.surprisedT -= 1;
+    if (!g.kianTalk.open && g.room !== kn.room) {
+      kn.roomT -= 1;
+      if (kn.roomT <= 0) {
+        var kNext;
+        do { kNext = Math.random() < 0.67 ? "bar" : "shopping"; }
+        while (kNext === kn.room);
+        kn.room = kNext;
+        kn.x = 110; kn.dir = 1; kn.pause = 60;
+        kn.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
+      }
+    }
+    if (g.room === kn.room && !g.kianTalk.open) {
+      if (kn.pause > 0) { kn.pause -= 1; }
+      else {
+        kn.x += kn.dir * 0.8;
+        kn.walk += 0.3;
+        if (kn.x < 150 || kn.x > room().w - 150) { kn.dir *= -1; kn.pause = 60 + Math.random() * 120; }
+        else if (Math.random() < 0.002) { kn.pause = 90 + Math.random() * 150; }
+      }
+    }
+    if (g.kianTalk.open) kn.dir = g.px < kn.x ? -1 : 1; // face Sylvia
     // When she is standing still and he wanders up right behind
     // her, he holds her for a few seconds, then wanders off again.
     if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
