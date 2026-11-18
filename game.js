@@ -39,11 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=22" forces a fresh download after Gunner's pink scooter is
-  // added (his shop, the parked scooter on the street, riding
-  // together with the headlight), so a browser that cached ?v=21
-  // picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=22"; return img; }
+  // "?v=23" forces a fresh download after a debug overlay is added
+  // (?debug=1 shows the live values that decide whether the
+  // characters are drawn), so the tunnels vanish can be caught in
+  // the act. A browser that cached ?v=22 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=23"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -2352,6 +2352,34 @@
     ctx.fillText(hint, g.w / 2, 22);
     ctx.restore();
   }
+  // Debug overlay, enabled with ?debug=1 in the URL. Draws the
+  // live values that decide whether the characters are drawn, so a
+  // vanishing bug can be caught in the act instead of guessed at.
+  var DEBUG = /[?&]debug=1/.test(window.location.search);
+  function drawDebug() {
+    if (!DEBUG) return;
+    var sx = g.px * scale() - g.camX;
+    var rx = g.ray.x * scale() - g.camX;
+    var moving = keys.left || keys.right || keys.up || keys.down;
+    var wimg = sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length];
+    var lines = [
+      "px=" + Math.round(g.px) + " camX=" + Math.round(g.camX) + " scale=" + scale().toFixed(3) + " w=" + g.w + " h=" + g.h,
+      "sylX=" + Math.round(sx) + " rayX=" + Math.round(rx) + " depth=" + g.depth.toFixed(1) + " room=" + g.room,
+      "walk=" + g.walk.toFixed(1) + " moving=" + moving + " climb=" + g.climb.active + "/" + g.climb.sylHidden,
+      "walkImg ok=" + (!!wimg && wimg.complete && wimg.naturalWidth !== 0) + " idle ok=" + (!!sylviaIdleImg && sylviaIdleImg.complete && sylviaIdleImg.naturalWidth !== 0),
+      "rayWalk ok=" + (!!rayWalkImgs[0] && rayWalkImgs[0].complete && rayWalkImgs[0].naturalWidth !== 0) + " rayIdle ok=" + (!!rayIdleImg && rayIdleImg.complete && rayIdleImg.naturalWidth !== 0)
+    ];
+    ctx.save();
+    ctx.font = "700 13px monospace";
+    ctx.textAlign = "left";
+    for (var i = 0; i < lines.length; i++) {
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(8, 8 + i * 18, ctx.measureText(lines[i]).width + 8, 16);
+      ctx.fillStyle = "#ffff00";
+      ctx.fillText(lines[i], 12, 20 + i * 18);
+    }
+    ctx.restore();
+  }
   function draw() {
     if (g.mirror.active) { drawMirror(); return; }
     if (g.inspect.active && g.inspect.phase === "drop") { drawDescent(); return; }
@@ -2387,6 +2415,7 @@
     drawOwnerTalk();
     drawKidTalk();
     drawRayTalk();
+    drawDebug();
   }
 
   function tick() {
