@@ -42,13 +42,15 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=49" forces a fresh download after the proposal cutscene
-  // on the Surface: walking all the way to the right of the
-  // outside, Ray gets down on one knee and proposes. Short romantic
-  // lines, Sylvia surprised, she says yes, and it ends with a kiss.
-  // The four proposal frames are Erika's art, already transparent.
-  // A browser that cached ?v=48 picks up the new code and art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=49"; return img; }
+  // "?v=50" forces a fresh download after the white fringe
+  // cleanup, round 3: a targeted light-rim erosion on Eve,
+  // Alexis, Diego and Adler, plus Eve idle's enclosed white gap
+  // between her arm and torso. The rim is a 1px opaque light-grey
+  // edge baked into the original art that the v=33
+  // semi-transparent erosion could not touch. Eve's silver dress
+  // highlights are clothing, not background, and are untouched.
+  // A browser that cached ?v=49 picks up the new sprites.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=50"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
