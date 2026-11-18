@@ -42,12 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=41" forces a fresh download after the climb to the Earthen
-  // Tunnel becomes stairs from Upper Level 3 (no more right-edge
-  // door), and the Surface spawn moves to the top of the stone steps
-  // instead of the left edge of the screen. A browser that cached
-  // ?v=40 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=41"; return img; }
+  // "?v=42" forces a fresh download after the "Ride it together,
+  // Ray driving and you in front." line is removed from the scooter
+  // shop panel, How to play, and the pink scooter tile. A browser
+  // that cached ?v=41 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=42"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
