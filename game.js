@@ -39,11 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=15" forces a fresh download after the dungeon door stops
-  // going to the Flooded Cistern and instead takes them straight
-  // back home, with no tunnel image pop up, so a browser that
-  // cached ?v=14 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=15"; return img; }
+  // "?v=16" forces a fresh download after the go home portal moves
+  // from the dungeon door to the round blue tunnel in the Old Service
+  // Tunnels, and the subway intro line changes, so a browser that
+  // cached ?v=15 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=16"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -954,7 +954,7 @@
   var ROOM_INTRO = {
     bar: "This place reeks of cheap beer and old smoke.",
     chamber: "Our room. Small, warm, and ours.",
-    subway: "It's very dark here. And very, very quiet.",
+    subway: "Looks like an old abandoned subway...",
     shopping: "It's beautiful here, but it could be better.",
     repair: "It smells like oil and rust in here.",
     clothing: "Char's shop. It smells like perfume and big dreams.",
@@ -1111,13 +1111,15 @@
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
   }
-  // The way home in the Ancient Dungeon: the big cracked stone
-  // door on the far right, the dark tunnel mouth. Going through it
-  // takes them straight back home to their room. No tunnel image,
-  // no pop up, just the door and home.
-  var PORTAL_X = 1955, PORTAL_RANGE = 110;
+  // The way home in the Old Service Tunnels: the round blue tunnel
+  // mouth on the left side, the dark arch with the teal glow, right
+  // where you first walk in from the quarry. Going through it takes
+  // them straight back home to their room. No tunnel image, no pop
+  // up, just the door and home. The big stone door in the Ancient
+  // Dungeon is NOT this: it is for more dungeon levels later.
+  var PORTAL_X = 700, PORTAL_RANGE = 110;
   function portalNear() {
-    return g.room === "dungeon" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
+    return g.room === "tunnels" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
   }
   function drawPortalPrompt() {
     if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
