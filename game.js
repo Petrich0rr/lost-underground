@@ -167,7 +167,7 @@
     // at it, popped up over a blurred game.
     photo: { active: false },
     map: { active: false },
-    inspect: { active: false, t: 0, arch: 0 },
+    inspect: { active: false, t: 0, arch: 0, phase: "look" },
     // The portal tunnel: active while they pass through the tunnel
     // from the Ancient Dungeon up to the Flooded Cistern.
     portal: { active: false, t: 0 }
@@ -548,8 +548,9 @@
   }
   // The secret under the arcade floor: three dark arches in the
   // floor are hidden passages down to the Crystal Quarry. Walk over
-  // one and press I to inspect it. They crouch down to look, then
-  // jump down together, holding hands, and land in the quarry.
+  // one and press I to inspect it. They crouch down and look, and
+  // stay there while she decides. Press I again to jump down
+  // together, or walk away (or Esc) to stand back up.
   var INSPECT_XS = [348, 1086, 1955], INSPECT_RANGE = 90;
   function inspectArch() {
     if (g.room !== "arcade") return null;
@@ -562,33 +563,42 @@
   }
   function inspectNear() { return inspectArch() !== null; }
   function drawInspectPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.inspect.active) return;
-    var ax = inspectArch();
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.portal.active) return;
+    // One small, quiet button down at the floor, right over the arch.
+    // It stays subtle so the secret does not shout.
+    var ax = g.inspect.active ? g.inspect.arch : inspectArch();
     if (ax === null) return;
+    if (g.inspect.active && g.inspect.phase === "drop") return;
     var x = ax * scale() - g.camX;
     // The prompt sits down at the floor, right over the dark arch,
     // not up above her head, so it points at the spot to inspect.
     var y = groundY() + 30;
     ctx.save();
-    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.font = "700 11px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press I to inspect";
+    var label = g.inspect.active ? "I · Go down" : "I · Inspect";
     var tw = ctx.measureText(label).width;
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 12, y - 18, tw + 24, 26, 13);
-    else ctx.rect(x - tw / 2 - 12, y - 18, tw + 24, 26);
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 8, y - 14, tw + 16, 20, 10);
+    else ctx.rect(x - tw / 2 - 8, y - 14, tw + 16, 20);
     ctx.fill();
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.fillText(label, x, y);
     ctx.restore();
   }
   function startInspect() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.inspect.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.portal.active) return;
+    if (g.inspect.active && g.inspect.phase === "look") {
+      // She decided to go down: they jump together.
+      g.inspect.phase = "drop"; g.inspect.t = 0;
+      return;
+    }
+    if (g.inspect.active) return;
     var ax = inspectArch();
     if (ax === null) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
-    g.inspect.active = true; g.inspect.t = 0; g.inspect.arch = ax;
+    g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = ax;
     // Face the secret spot while they crouch down to look at it.
     g.facing = g.px < ax ? 1 : -1;
     g.ray.dir = g.ray.x < ax ? 1 : -1;
@@ -596,12 +606,15 @@
   function updateInspect() {
     g.inspect.t += 1;
     var t = g.inspect.t;
-    if (t < 60) {
-      // They crouch down and inspect the secret spot.
+    if (g.inspect.phase === "look") {
+      // They crouch down and look at the secret spot, deciding
+      // whether to go down. Nothing happens until she presses I
+      // again or walks away.
       g.camX = clampCam(g.inspect.arch * scale() - g.w * 0.38);
       return;
     }
-    if (t >= 150) {
+    // phase === "drop": they jump down together, holding hands.
+    if (t >= 90) {
       // They land in the Crystal Quarry.
       g.inspect.active = false;
       g.room = "quarry";
@@ -621,7 +634,7 @@
     var s = Math.min(g.w / descentImg.naturalWidth, g.h / descentImg.naturalHeight);
     var dw = descentImg.naturalWidth * s;
     var dh = descentImg.naturalHeight * s;
-    var drift = (g.inspect.t - 60) / 90 * 40;
+    var drift = g.inspect.t / 90 * 40;
     ctx.drawImage(descentImg, (g.w - dw) / 2, (g.h - dh) / 2 + drift - 20, dw, dh);
     ctx.restore();
   }
@@ -991,7 +1004,7 @@
     if (g.inspect.active) {
       // Inspecting the secret spot: she crouches down to look at it.
       // Once they jump, she is in the descent art, not on the floor.
-      if (g.inspect.t >= 60) return;
+      if (g.inspect.phase === "drop") return;
       var iimg = sylviaCrouchImg;
       if (!iimg || !iimg.complete || iimg.naturalWidth === 0) iimg = sylviaIdleImg;
       if (!iimg || !iimg.complete || iimg.naturalWidth === 0) return;
@@ -1093,7 +1106,7 @@
     if (g.inspect.active) {
       // Inspecting the secret spot: he crouches down beside her.
       // Once they jump, he is in the descent art, not on the floor.
-      if (g.inspect.t >= 60) return;
+      if (g.inspect.phase === "drop") return;
       var riimg = rayCrouchImg;
       if (!riimg || !riimg.complete || riimg.naturalWidth === 0) riimg = rayIdleImg;
       if (!riimg || !riimg.complete || riimg.naturalWidth === 0) return;
@@ -1700,7 +1713,7 @@
   }
   function draw() {
     if (g.mirror.active) { drawMirror(); return; }
-    if (g.inspect.active && g.inspect.t >= 60) { drawDescent(); return; }
+    if (g.inspect.active && g.inspect.phase === "drop") { drawDescent(); return; }
     if (g.portal.active) { drawPortal(); return; }
     drawBg();
     drawHp();
@@ -1818,7 +1831,7 @@
       else if (stairsNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = STAIRS[stairsNear()].btn; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
       else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
-      else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Inspect"; }
+      else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.inspect.active ? "Go down" : "Inspect"; }
       else if (ironDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Iron door"; }
       else if (portalNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Through the tunnel"; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
@@ -2013,10 +2026,15 @@
     if (e.code === "KeyI") { startInspect(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
+    if (g.inspect.active && g.inspect.phase === "look" && (e.code === "KeyW" || e.code === "KeyA" || e.code === "KeyS" || e.code === "KeyD" || e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+      // Walking away while looking: she stands back up and the
+      // inspect is off. The key still goes through so she walks.
+      g.inspect.active = false;
+    }
     if (g.inspect.active) return;
     if (g.portal.active) return;
     if (setKey(e.code, true)) {
