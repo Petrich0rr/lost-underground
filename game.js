@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=78" forces a fresh download: the wishing fountain gives 100
-  // coins, then offers one secret for 100 coins, one question, once
-  // ever. A browser that cached ?v=77 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=78"; return img; }
+  // "?v=79" forces a fresh download: the fountain's last answer stays
+  // vague about the levels, and the world map blurs places she has
+  // not visited yet. A browser that cached ?v=78 picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=79"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -466,6 +466,7 @@
     // hit. kissHealT is the cooldown before a kiss can heal again.
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
+    visited: { chamber: true, shopping: true },
     fountainSecret: null, secretOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
     dungeonMsg: "", dungeonMsgT: 0,
@@ -1398,9 +1399,55 @@
     earthen: "The Earthen Tunnel",
     surface: "The Surface"
   };
+  // Map fog: places she has not visited yet are blurred on the
+  // world map, so a new player cannot see the whole world at a
+  // glance. Her room and the Shopping District, with the bar and the
+  // shops on its street, are never fogged. Visiting a place clears
+  // its fog, and the fog is saved with the game.
+  var MAP_FOG = {
+    subway: { x: 0.04, y: 0.28, w: 0.28, h: 0.18 },
+    quarry: { x: 0.01, y: 0.68, w: 0.26, h: 0.22 },
+    tunnels: { x: 0.36, y: 0.72, w: 0.28, h: 0.20 },
+    dungeon: { x: 0.72, y: 0.66, w: 0.24, h: 0.20 },
+    dungeon2: { x: 0.80, y: 0.78, w: 0.16, h: 0.08 },
+    dungeon3: { x: 0.82, y: 0.84, w: 0.16, h: 0.08 },
+    dungeon4: { x: 0.84, y: 0.90, w: 0.16, h: 0.08 },
+    cistern: { x: 0.58, y: 0.50, w: 0.17, h: 0.20 },
+    garden: { x: 0.75, y: 0.36, w: 0.20, h: 0.22 },
+    upper1: { x: 0.38, y: 0.26, w: 0.20, h: 0.18 },
+    upper2: { x: 0.46, y: 0.18, w: 0.20, h: 0.14 },
+    upper3: { x: 0.54, y: 0.10, w: 0.20, h: 0.12 },
+    earthen: { x: 0.60, y: 0.06, w: 0.14, h: 0.10 },
+    surface: { x: 0.68, y: 0.02, w: 0.26, h: 0.12 }
+  };
+  var mapFogEls = {};
+  function markVisited(room) {
+    if (!room || !ROOMS[room]) return;
+    g.visited[room] = true;
+  }
+  function refreshMapFog() {
+    var wrap = document.getElementById("mapWrap");
+    if (!wrap) return;
+    Object.keys(MAP_FOG).forEach(function (room) {
+      var r = MAP_FOG[room];
+      var el = mapFogEls[room];
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "mapFog";
+        el.style.left = (r.x * 100) + "%";
+        el.style.top = (r.y * 100) + "%";
+        el.style.width = (r.w * 100) + "%";
+        el.style.height = (r.h * 100) + "%";
+        wrap.appendChild(el);
+        mapFogEls[room] = el;
+      }
+      el.hidden = !!g.visited[room];
+    });
+  }
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
     g.map.active = true;
+    refreshMapFog();
     var pin = MAP_PINS[g.room] || MAP_PINS.chamber;
     var ps = document.getElementById("pinSylvia");
     var pr = document.getElementById("pinRay");
@@ -1433,6 +1480,7 @@
     // street entrance, so it is never left riding in another room.
     if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; g.scooter.room = "shopping"; }
     g.room = roomKey;
+    markVisited(roomKey);
     if (isDungeonRoom(roomKey)) spawnMonsters();
     else clearMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -1992,6 +2040,7 @@
     }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
+    markVisited(to);
     if (g.scooter.riding) g.scooter.room = to;
     if (isDungeonRoom(to)) spawnMonsters();
     else if (isDungeonRoom(from)) clearMonsters();
@@ -2379,7 +2428,7 @@
   var SECRET_ANSWERS = {
     why: "Because the ones who tried never came back, and the ones who stayed told the story until it became a warning. The way up is long and dark, and fear is a heavier chain than any locked door.",
     rumours: "Yes. The sky is wider than any room you have ever stood in, and the sun is warmer than any lamp. It is real. I have seen it in the dreams of the water.",
-    how: "Up. Past the subway, past the three Upper Levels, through the earthen tunnel, and out onto the terrace. The way is open. It is the courage that is locked, not the door."
+    how: "Up. The way is longer than you think, and I will not count its steps for you. The door at the end is not locked. It is the courage that is locked, not the door."
   };
   function openSecret() {
     g.secretOpen = true;
@@ -2802,7 +2851,7 @@
       day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
       room: g.room, px: g.px, depth: g.depth, facing: g.facing,
       scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
-      fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, proposed: g.proposed,
+      fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, visited: Object.keys(g.visited), proposed: g.proposed,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
       fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
@@ -2891,6 +2940,9 @@
     g.scooter.x = (typeof s.scooterX === "number") ? s.scooterX : SCOOTER_X;
     g.fountainWished = !!s.fountainWished;
     g.fountainSecret = s.fountainSecret || null;
+    g.visited = { chamber: true, shopping: true };
+    (s.visited || []).forEach(function (r) { g.visited[r] = true; });
+    g.visited[g.room] = true;
     if (s.chestDay === s.day && Array.isArray(s.chestLayout)) {
       g.chestDay = s.chestDay;
       g.chestLayout = s.chestLayout.slice();
@@ -6005,6 +6057,7 @@
     if (newGameBtn) newGameBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       clearSave();
+      g.visited = { chamber: true, shopping: true };
       rollChests();
       startGame();
     });
