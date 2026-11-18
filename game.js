@@ -42,10 +42,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=61" forces a fresh download: the coin is back beside the
-  // hearts, and the half heart is a saturated pink so it can never
-  // read as gold. A browser that cached ?v=60 picks up the fix.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=61"; return img; }
+  // "?v=62" forces a fresh download: the proposal scene uses
+  // Erika's new art, one picture per beat, ending in the embrace.
+  // A browser that cached ?v=61 picks up the new scene.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=62"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -56,7 +56,10 @@
   var rayWalkImgs = RAY_WALK.map(loadImg);
   var rayIdleImg = loadImg(RAY_IDLE_SRC);
   var kissImg = loadImg("assets/kiss.png");
-  var proposeImgs = ["assets/propose-01.png", "assets/propose-02.png", "assets/propose-03.png", "assets/propose-04.png"].map(loadImg);
+  var proposeAskImg = loadImg("assets/propose-ask.png");
+  proposeSurpriseImgs = ["assets/propose-surprise-01.png", "assets/propose-surprise-02.png", "assets/propose-surprise-03.png"].map(loadImg);
+  proposeYesImg = loadImg("assets/propose-yes.png");
+  proposeEmbraceImg = loadImg("assets/propose-embrace.png");
   var sylviaStanceImg = loadImg("assets/sylvia-stance.png");
   var sylviaKickImg = loadImg("assets/sylvia-kick.png");
   var sylviaCrouchImg = loadImg("assets/sylvia-crouch.png");
@@ -2986,12 +2989,29 @@
     saveGame();
   }
   function drawProposal() {
-    // Steps 0-2: the proposal art (Ray kneeling, Sylvia surprised),
-    // cycling gently through the four frames. Step 3: the kiss.
+    // One picture per beat now: step 0 Ray kneels with the ring,
+    // step 1 Sylvia's surprised reaction cycles, step 2 they stand
+    // together happy, step 3 the embrace, with hearts above it.
     var feetY = groundY() + g.depth - 6;
     var cx = g.w / 2;
-    if (g.proposal.step < 3) {
-      var frame = proposeImgs[Math.floor(g.proposal.t / 20) % 4];
+    if (g.proposal.step === 0) {
+      var frame = proposeAskImg;
+      if (frame && frame.complete && frame.naturalWidth > 0) {
+        var h = g.h * 0.62;
+        var w = h * (frame.naturalWidth / frame.naturalHeight);
+        shadow(cx, feetY, w);
+        ctx.drawImage(frame, cx - w / 2, feetY - h, w, h);
+      }
+    } else if (g.proposal.step === 1) {
+      var frame = proposeSurpriseImgs[Math.floor(g.proposal.t / 20) % 3];
+      if (frame && frame.complete && frame.naturalWidth > 0) {
+        var h = g.h * 0.62;
+        var w = h * (frame.naturalWidth / frame.naturalHeight);
+        shadow(cx, feetY, w);
+        ctx.drawImage(frame, cx - w / 2, feetY - h, w, h);
+      }
+    } else if (g.proposal.step === 2) {
+      var frame = proposeYesImg;
       if (frame && frame.complete && frame.naturalWidth > 0) {
         var h = g.h * 0.62;
         var w = h * (frame.naturalWidth / frame.naturalHeight);
@@ -2999,11 +3019,11 @@
         ctx.drawImage(frame, cx - w / 2, feetY - h, w, h);
       }
     } else {
-      if (kissImg && kissImg.complete && kissImg.naturalWidth > 0) {
+      if (proposeEmbraceImg && proposeEmbraceImg.complete && proposeEmbraceImg.naturalWidth > 0) {
         var kh = g.h * 0.62;
-        var kw = kh * (kissImg.naturalWidth / kissImg.naturalHeight);
+        var kw = kh * (proposeEmbraceImg.naturalWidth / proposeEmbraceImg.naturalHeight);
         shadow(cx, feetY, kw);
-        ctx.drawImage(kissImg, cx - kw / 2, feetY - kh, kw, kh);
+        ctx.drawImage(proposeEmbraceImg, cx - kw / 2, feetY - kh, kw, kh);
       }
       var hy = feetY - g.h * 0.62 - 24 + Math.sin(g.proposal.t * 0.12) * 4;
       drawHeart(cx - 34, hy, 10 + Math.sin(g.proposal.t * 0.2) * 2, "#ff5c8a");
