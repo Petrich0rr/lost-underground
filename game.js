@@ -33,10 +33,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=3" forces a fresh download after the sprite cleanup and
+  // "?v=4" forces a fresh download after the climb animation and
   // Sylvia's new walk cycle, so a browser that cached the old
   // sprites picks up the new ones.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=3"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=4"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -281,7 +281,7 @@
   function updateClimb() {
     var c = g.climb;
     c.t += 1;
-    var rise = g.h * 0.30; // the window sill above the floor
+    var rise = g.h * 0.27; // the window sill above the floor
     if (c.t <= 40) {
       var k = c.t / 40;
       g.ray.dir = (WINDOW_X - 30 - c.rayStartX) >= 0 ? 1 : -1;
@@ -296,7 +296,7 @@
     } else if (c.t <= 115) {
       c.rayHidden = false;
       g.ray.x = WINDOW_X - 10; g.ray.dir = -1;
-      c.rayY = -rise * 0.95;
+      c.rayY = -rise * 0.80;
     } else if (c.t <= 145) {
       var k4 = (c.t - 115) / 30;
       g.px = c.sylStartX + (WINDOW_X - 95 - c.sylStartX) * k4;
