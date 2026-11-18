@@ -29,6 +29,9 @@
     quarry: { w: 2172, h: 724, frames: null, floor: 0.87, depth: 0.04 },
     tunnels: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
     dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 },
+    dungeon2: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
+    dungeon3: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
+    dungeon4: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
     upper1: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
     upper2: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
     upper3: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
@@ -46,12 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=65" forces a fresh download: the health hearts are redrawn
-  // clean (all pink, no outline, no gold near them), the energy bar
-  // is green so gold appears only on the coin, and the garden and
-  // the surface stop at the stairs so nobody stands on the floating
-  // ledge. A browser that cached ?v=64 picks up both fixes.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=65"; return img; }
+  // "?v=66" forces a fresh download: three deeper dungeon levels
+  // (the Crypt, the Cages, the Court) through the dungeon's stone
+  // door, and save files you can download and load back. A browser
+  // that cached ?v=65 picks up both.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=66"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -200,6 +202,9 @@
   var quarryImg = loadImg("assets/bg-quarry.jpg");
   var tunnelsImg = loadImg("assets/bg-tunnels.jpg");
   var dungeonImg = loadImg("assets/bg-dungeon.jpg");
+  var dungeon2Img = loadImg("assets/bg-dungeon2.jpg");
+  var dungeon3Img = loadImg("assets/bg-dungeon3.jpg");
+  var dungeon4Img = loadImg("assets/bg-dungeon4.jpg");
   // Dungeon monsters: four cuties who live in the Ancient Dungeon.
   // Each has 4 frames that cycle as it moves, hops, or bobs.
   var monsterKeyknightImgs = [loadImg("assets/monster-keyknight-01.png"), loadImg("assets/monster-keyknight-02.png"), loadImg("assets/monster-keyknight-03.png"), loadImg("assets/monster-keyknight-04.png")];
@@ -263,6 +268,9 @@
   ROOMS.quarry.frames = [quarryImg];
   ROOMS.tunnels.frames = [tunnelsImg];
   ROOMS.dungeon.frames = [dungeonImg];
+  ROOMS.dungeon2.frames = [dungeon2Img];
+  ROOMS.dungeon3.frames = [dungeon3Img];
+  ROOMS.dungeon4.frames = [dungeon4Img];
   ROOMS.upper1.frames = [upper1Img];
   ROOMS.upper2.frames = [upper2Img];
   ROOMS.upper3.frames = [upper3Img];
@@ -1124,6 +1132,9 @@
     quarry: { left: "arcade", right: "tunnels" },
     tunnels: { left: "quarry" },
     dungeon: { left: "tunnels" },
+    dungeon2: { left: "dungeon", right: "dungeon3" },
+    dungeon3: { left: "dungeon2", right: "dungeon4" },
+    dungeon4: { left: "dungeon3" },
     upper1: { left: "subway" },
     upper2: { left: "upper1" },
     upper3: { left: "upper2" },
@@ -1271,6 +1282,9 @@
     quarry:   { x: 0.13,  y: 0.78 },
     tunnels:  { x: 0.50,  y: 0.80 },
     dungeon:  { x: 0.86,  y: 0.76 },
+    dungeon2: { x: 0.88,  y: 0.82 },
+    dungeon3: { x: 0.90,  y: 0.88 },
+    dungeon4: { x: 0.92,  y: 0.94 },
     upper1:   { x: 0.42,  y: 0.28 },
     upper2:   { x: 0.52,  y: 0.22 },
     upper3:   { x: 0.62,  y: 0.16 },
@@ -1291,6 +1305,9 @@
     quarry: "Crystal Quarry",
     tunnels: "Old Service Tunnels",
     dungeon: "Ancient Dungeon",
+    dungeon2: "The Crypt",
+    dungeon3: "The Cages",
+    dungeon4: "The Court of Justice",
     upper1: "Upper Level 1",
     upper2: "Upper Level 2",
     upper3: "Upper Level 3",
@@ -1332,7 +1349,7 @@
     // street entrance, so it is never left riding in another room.
     if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; g.scooter.room = "shopping"; }
     g.room = roomKey;
-    if (roomKey === "dungeon") spawnMonsters();
+    if (isDungeonRoom(roomKey)) spawnMonsters();
     else clearMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -1496,6 +1513,9 @@
     quarry: "Pretty crystals. And a little bit wrong.",
     tunnels: "The tunnels smell like damp earth and old metal.",
     dungeon: "Something bad happened here. You can feel it.",
+    dungeon2: "Tombs and candles. Something is buried down here.",
+    dungeon3: "Cages hang from the ceiling. Best not to look inside.",
+    dungeon4: "A ruined courtroom. Justice is blind, but she is watching.",
     upper1: "Upper Level 1. Blue, cold, and the air feels thinner.",
     upper2: "Upper Level 2. Violet and quiet. Too quiet.",
     upper3: "Upper Level 3. White and bright. And it watches you.",
@@ -1626,8 +1646,43 @@
   // Ancient Dungeon. The dungeon is NOT reached from the tunnels'
   // right edge, only through this door.
   var IRON_DOOR_X = 1440, IRON_DOOR_RANGE = 110;
+  var STONE_DOOR_X = 1955, STONE_DOOR_RANGE = 110;
+  // The dungeon and its deeper levels all share the monsters.
+  function isDungeonRoom(r) { return r === "dungeon" || r === "dungeon2" || r === "dungeon3" || r === "dungeon4"; }
+  function stoneDoorNear() {
+    return g.room === "dungeon" && Math.abs(g.px - STONE_DOOR_X) < STONE_DOOR_RANGE;
+  }
   function ironDoorNear() {
     return g.room === "tunnels" && Math.abs(g.px - IRON_DOOR_X) < IRON_DOOR_RANGE;
+  }
+  function enterDungeon2() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (!stoneDoorNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false;
+    g.room = "dungeon2";
+    spawnMonsters();
+    g.px = 110; g.facing = 1; g.depth = 0;
+    g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    g.camX = 0;
+    saveGame();
+  }
+  function drawStoneDoorPrompt() {
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (!stoneDoorNear()) return;
+    var x = STONE_DOOR_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to go deeper";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(20,10,30,0.72)";
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
+    else ctx.rect(x - tw / 2 - 10, y - 13, tw + 20, 26);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(label, x, y + 5);
+    ctx.restore();
   }
   function drawIronDoorPrompt() {
     if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
@@ -1846,8 +1901,8 @@
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false;
     g.room = to;
     if (g.scooter.riding) g.scooter.room = to;
-    if (to === "dungeon") spawnMonsters();
-    else if (from === "dungeon") clearMonsters();
+    if (isDungeonRoom(to)) spawnMonsters();
+    else if (isDungeonRoom(from)) clearMonsters();
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
     // Climbing back in from the Shopping District lands at the window.
@@ -1937,6 +1992,7 @@
     if (chestNear()) { openChest(); return; }
     if (gardenDoorNear()) { startHomeWalk(); return; }
     if (ironDoorNear()) { enterDungeonFromIronDoor(); return; }
+    if (stoneDoorNear()) { enterDungeon2(); return; }
     if (portalNear()) { goThroughPortal(); return; }
   }
   // The action list: when several commands are available at once,
@@ -2006,6 +2062,7 @@
       if (chestNear()) acts.push({ id: "chest", label: "Open the chest", run: openChest });
       if (gardenDoorNear()) acts.push({ id: "homedoor", label: "Go home", run: startHomeWalk });
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
+    if (stoneDoorNear()) acts.push({ id: "stone", label: "Go deeper", run: enterDungeon2 });
       if (portalNear()) acts.push({ id: "portal", label: "Go home", run: goThroughPortal });
     }
     var ids = acts.map(function (a) { return a.id + ":" + a.label; }).join("|");
@@ -2567,19 +2624,73 @@
   // tab never loses a day. NPCs wander on their own, so their spots
   // are not saved; they start fresh where they belong.
   var SAVE_KEY = "lostUndergroundSaveV1";
+  // The save object: one shape for the autosave slot and for files,
+  // so a file and the autosave are interchangeable.
+  function buildSaveObject() {
+    return {
+      day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
+      room: g.room, px: g.px, depth: g.depth, facing: g.facing,
+      scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
+      fountainWished: g.fountainWished, proposed: g.proposed,
+      chestsOpened: Object.keys(g.chestsOpened),
+      chestLayout: g.chestLayout, chestDay: g.chestDay,
+      fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
+    };
+  }
   function saveGame() {
     if (!g.started) return;
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
-        day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
-        room: g.room, px: g.px, depth: g.depth, facing: g.facing,
-        scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
-        fountainWished: g.fountainWished, proposed: g.proposed,
-        chestsOpened: Object.keys(g.chestsOpened),
-        chestLayout: g.chestLayout, chestDay: g.chestDay,
-        fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
-      }));
+      localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveObject()));
     } catch (e) { /* storage unavailable: the game still plays */ }
+  }
+  // Download the current progress as a file, so she can keep as many
+  // saves as she likes and load an old one back even after starting
+  // a new game. Works mid-game and from the title screen.
+  function exportSave() {
+    var data = null;
+    if (g.started) data = buildSaveObject();
+    else data = loadSave();
+    if (!data) { showSaveMsg("Nothing to save yet."); return; }
+    try {
+      var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "lost-underground-save-day" + (data.day || 1) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      showSaveMsg("Saved to a file. Keep it safe!");
+    } catch (e) { showSaveMsg("Could not save that file."); }
+  }
+  function showSaveMsg(text) {
+    var el = document.getElementById("saveMsg");
+    if (!el) return;
+    el.textContent = text;
+    el.hidden = false;
+    setTimeout(function () { el.hidden = true; }, 3500);
+  }
+  // Load a save file back: read it, check it looks like a save, put
+  // it into the world, write it to the autosave slot too (so Continue
+  // picks it up), and start.
+  function importSaveFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!data || typeof data.day !== "number" || !data.room || !ROOMS[data.room]) throw new Error("not a save");
+        applySave(data);
+        saveGame();
+        startGame();
+        showSaveMsg("Loaded your save file. Welcome back!");
+      } catch (e) {
+        showSaveMsg("That file is not a Lost Underground save.");
+      }
+    };
+    reader.onerror = function () { showSaveMsg("Could not read that file."); };
+    reader.readAsText(file);
   }
   function loadSave() {
     try {
@@ -2716,7 +2827,7 @@
   function clearMonsters() { g.monsters = []; g.coins = []; }
   function monsterH(m) { return g.h * MONSTERS[m.type].h; }
   function updateMonsters() {
-    if (g.room !== "dungeon") return;
+    if (!isDungeonRoom(g.room)) return;
     for (var i = g.monsters.length - 1; i >= 0; i--) {
       var m = g.monsters[i];
       var def = MONSTERS[m.type];
@@ -2783,7 +2894,7 @@
     }
   }
   function drawMonsters() {
-    if (g.room !== "dungeon") return;
+    if (!isDungeonRoom(g.room)) return;
     for (var i = 0; i < g.monsters.length; i++) {
       var m = g.monsters[i];
       var def = MONSTERS[m.type];
@@ -4567,6 +4678,7 @@
     drawInspectPrompt();
     drawPropPrompt();
     drawIronDoorPrompt();
+  drawStoneDoorPrompt();
     drawPortalPrompt();
     drawScooterPrompt();
     drawFountainPrompt();
@@ -5370,7 +5482,30 @@
       rollChests();
       startGame();
     });
+    var exportSaveBtn = document.getElementById("exportSaveBtn");
+    if (exportSaveBtn) exportSaveBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      exportSave();
+    });
+    var importSaveBtn = document.getElementById("importSaveBtn");
+    var saveFileInput = document.getElementById("saveFileInput");
+    if (importSaveBtn && saveFileInput) {
+      importSaveBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        saveFileInput.click();
+      });
+      saveFileInput.addEventListener("change", function () {
+        if (saveFileInput.files && saveFileInput.files[0]) importSaveFile(saveFileInput.files[0]);
+        saveFileInput.value = "";
+      });
+    }
   }
+  // The little save button in the corner, for saving mid-game.
+  var saveFileBtn = document.getElementById("saveFileBtn");
+  if (saveFileBtn) saveFileBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    exportSave();
+  });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
