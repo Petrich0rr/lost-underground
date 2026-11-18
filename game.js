@@ -49,11 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=68" forces a fresh download: when her health or her energy
-  // runs out, Sylvia collapses, Ray carries her home, and Dr. Kian
-  // is waiting in the chamber before he walks out. A browser that
-  // cached ?v=67 picks up the rescue.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=68"; return img; }
+  // "?v=69" forces a fresh download: the shadow under the characters
+  // is a dark picture now, not a canvas fill, so it can never turn
+  // green from the energy bar again. A browser that cached ?v=68
+  // picks up the fix.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=69"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -216,6 +216,7 @@
   var heartFullImg = loadImg("assets/heart-full.png");
   var heartHalfImg = loadImg("assets/heart-half.png");
   var heartEmptyImg = loadImg("assets/heart-empty.png");
+  var shadowImg = loadImg("assets/shadow.png");
   // Treasure chest opening: closed, slightly open, open with coins,
   // open with more coins and a sparkle. All on one common canvas,
   // bottom-aligned, so the lid rises and the base stays put.
@@ -2802,10 +2803,19 @@
   }
 
   function shadow(x, feetY, w) {
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.beginPath();
-    ctx.ellipse(x, feetY + 4, w * 0.32, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // The shadow is a picture now, not a canvas fill. Canvas fills
+    // kept picking up the energy bar's colour (the green shadow the
+    // player saw), and a picture cannot be tinted by another fill.
+    // Same fix as the pink heart images in v67.
+    if (shadowImg && shadowImg.complete && shadowImg.naturalWidth > 0) {
+      var sw = w * 0.64, sh = 12;
+      ctx.drawImage(shadowImg, x - sw / 2, feetY + 4 - sh / 2, sw, sh);
+    } else {
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(x, feetY + 4, w * 0.32, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Dungeon monsters: Key Knight, Candle Pup, Bitey Rock, Bell Ghost.
