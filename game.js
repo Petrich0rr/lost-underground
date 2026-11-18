@@ -40,13 +40,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=35" forces a fresh download after the Secret Garden is added:
-  // a hidden garden beside the Flooded Cistern, to its right. The
-  // cistern's right edge leads to it, and its left edge leads back
-  // to the cistern. Floor 0.72, depth 0.04, so their feet land on
-  // the stone walkway above the pond. A browser that cached ?v=34
-  // picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=35"; return img; }
+  // "?v=36" forces a fresh download after the dungeon monsters are
+  // added: Key Knight, Candle Pup, Bitey Rock and Bell Ghost live in
+  // the Ancient Dungeon, 2 hits each to kill, 1 coin dropped per kill,
+  // 3 monster hits cost one heart, and kissing Ray restores one heart.
+  // A browser that cached ?v=35 picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=36"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -175,6 +174,13 @@
   var quarryImg = loadImg("assets/bg-quarry.jpg");
   var tunnelsImg = loadImg("assets/bg-tunnels.jpg");
   var dungeonImg = loadImg("assets/bg-dungeon.jpg");
+  // Dungeon monsters: four cuties who live in the Ancient Dungeon.
+  // Each has 4 frames that cycle as it moves, hops, or bobs.
+  var monsterKeyknightImgs = [loadImg("assets/monster-keyknight-01.png"), loadImg("assets/monster-keyknight-02.png"), loadImg("assets/monster-keyknight-03.png"), loadImg("assets/monster-keyknight-04.png")];
+  var monsterCandlepupImgs = [loadImg("assets/monster-candlepup-01.png"), loadImg("assets/monster-candlepup-02.png"), loadImg("assets/monster-candlepup-03.png"), loadImg("assets/monster-candlepup-04.png")];
+  var monsterBiteyrockImgs = [loadImg("assets/monster-biteyrock-01.png"), loadImg("assets/monster-biteyrock-02.png"), loadImg("assets/monster-biteyrock-03.png"), loadImg("assets/monster-biteyrock-04.png")];
+  var monsterBellghostImgs = [loadImg("assets/monster-bellghost-01.png"), loadImg("assets/monster-bellghost-02.png"), loadImg("assets/monster-bellghost-03.png"), loadImg("assets/monster-bellghost-04.png")];
+  var coinImgs = [loadImg("assets/coin-01.png"), loadImg("assets/coin-02.png"), loadImg("assets/coin-03.png"), loadImg("assets/coin-04.png")];
   var upper1Img = loadImg("assets/bg-upper1.jpg");
   var upper2Img = loadImg("assets/bg-upper2.jpg");
   var upper3Img = loadImg("assets/bg-upper3.jpg");
@@ -369,6 +375,13 @@
     // little intro line for the new place.
     lastRoom: null,
     hp: 100, hpMax: 100,
+    // Dungeon monsters and coins: the monsters live only in the
+    // Ancient Dungeon and are spawned fresh each time she enters it.
+    // A monster drops 1 coin when it dies, picked up by walking over
+    // it. monsterHits counts monster hits toward losing a heart (3
+    // hits = one heart). hurtT is a brief invulnerability after a
+    // hit. kissHealT is the cooldown before a kiss can heal again.
+    monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
     // Climbing out the chamber window, or up a staircase: Ray goes
@@ -1194,6 +1207,8 @@
     // street entrance, so it is never left riding in another room.
     if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; }
     g.room = roomKey;
+    if (roomKey === "dungeon") spawnMonsters();
+    else clearMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
@@ -1500,6 +1515,7 @@
     if (!ironDoorNear()) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false;
     g.room = "dungeon";
+    spawnMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
@@ -1692,6 +1708,8 @@
     var to = EXITS[g.room][side];
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false;
     g.room = to;
+    if (to === "dungeon") spawnMonsters();
+    else if (from === "dungeon") clearMonsters();
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
     // Climbing back in from the Shopping District lands at the window.
@@ -1758,6 +1776,12 @@
   function tryKiss() {
     if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.rayTalk.open || g.propRead.open || g.scooter.riding || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
+    // A kiss restores one heart, if she is hurt and the last healing
+    // kiss was a few seconds ago, so it cannot be spammed to full.
+    if (g.hp < g.hpMax && g.kissHealT <= 0) {
+      g.hp = Math.min(g.hpMax, g.hp + 20);
+      g.kissHealT = 300;
+    }
   }
   // Gunner's pink scooter. He sells it from his repair shop for $0
   // for now (no coins yet). Once bought it is parked at the entrance
@@ -1948,6 +1972,157 @@
     ctx.fill();
   }
 
+  // Dungeon monsters: Key Knight, Candle Pup, Bitey Rock, Bell Ghost.
+  // They live only in the Ancient Dungeon. Each one takes 2 hits to
+  // kill (Sylvia's kick or Ray's punch) and drops 1 coin when it dies.
+  // A monster hit on Sylvia counts toward a heart: 3 hits from any of
+  // them cost her one heart (20 HP). Kissing Ray restores one heart.
+  // h is the monster's height as a fraction of the canvas height, so
+  // they are big enough for her high kick to reach, and they hop and
+  // bob up into the kick as they move.
+  var MONSTERS = {
+    keyknight: { imgs: monsterKeyknightImgs, h: 0.21, speed: 0.5, hop: 0.010 },
+    candlepup: { imgs: monsterCandlepupImgs, h: 0.20, speed: 0.9, hop: 0.05 },
+    biteyrock: { imgs: monsterBiteyrockImgs, h: 0.23, speed: 0.4, hop: 0.055 },
+    bellghost: { imgs: monsterBellghostImgs, h: 0.22, speed: 0.6, hop: 0.02 }
+  };
+  function spawnMonsters() {
+    g.monsters = [];
+    g.coins = [];
+    var types = ["keyknight", "candlepup", "biteyrock", "bellghost", "keyknight", "candlepup", "biteyrock", "bellghost"];
+    for (var i = 0; i < types.length; i++) {
+      g.monsters.push({
+        type: types[i],
+        x: 350 + i * 200 + Math.random() * 80,
+        depth: -Math.random() * depthRange() * 0.8,
+        dir: Math.random() < 0.5 ? -1 : 1,
+        pause: Math.random() * 120,
+        walk: 0,
+        hp: 2,
+        hopT: Math.floor(Math.random() * 90),
+        hitT: 0,
+        atkT: 0
+      });
+    }
+  }
+  function clearMonsters() { g.monsters = []; g.coins = []; }
+  function monsterH(m) { return g.h * MONSTERS[m.type].h; }
+  function updateMonsters() {
+    if (g.room !== "dungeon") return;
+    for (var i = g.monsters.length - 1; i >= 0; i--) {
+      var m = g.monsters[i];
+      var def = MONSTERS[m.type];
+      if (m.hitT > 0) m.hitT -= 1;
+      if (m.atkT > 0) m.atkT -= 1;
+      m.hopT += 1;
+      // Chase Sylvia when she is close, wander when she is far.
+      var dx = g.px - m.x;
+      var chasing = Math.abs(dx) < 350 && !g.sleeping && !g.kiss.active;
+      if (m.pause > 0) { m.pause -= 1; }
+      else {
+        if (chasing) {
+          m.dir = dx > 0 ? 1 : -1;
+          m.x += m.dir * def.speed * 1.6;
+          var dd = g.depth - m.depth;
+          m.depth += Math.max(-0.8, Math.min(0.8, dd));
+        } else {
+          m.x += m.dir * def.speed;
+          m.walk += 0.3;
+          if (Math.random() < 0.002) m.pause = 60 + Math.random() * 120;
+        }
+        if (m.x < 150) { m.x = 150; m.dir = 1; m.pause = 60 + Math.random() * 120; }
+        else if (m.x > room().w - 150) { m.x = room().w - 150; m.dir = -1; m.pause = 60 + Math.random() * 120; }
+      }
+      // Attack: close to Sylvia, its cooldown ready, and she is not
+      // briefly invulnerable from a recent hit.
+      if (Math.abs(m.x - g.px) < 80 && Math.abs(m.depth - g.depth) < 20 && m.atkT <= 0 && g.hurtT <= 0 && !g.sleeping && !g.kiss.active) {
+        m.atkT = 120;
+        g.hurtT = 60;
+        g.monsterHits += 1;
+        if (g.monsterHits >= 3) {
+          g.monsterHits = 0;
+          g.hp = Math.max(0, g.hp - 20);
+        }
+        // Shove the monster back so it does not sit on top of her.
+        m.x += (m.x < g.px ? -1 : 1) * 50;
+      }
+    }
+    // Coins spin on the floor; walking over one picks it up.
+    for (var j = g.coins.length - 1; j >= 0; j--) {
+      var c = g.coins[j];
+      if (Math.abs(c.x - g.px) < 60 && Math.abs(c.depth - g.depth) < 20) {
+        g.coins.splice(j, 1);
+        g.coinCount += 1;
+      }
+    }
+  }
+  function hitMonsters(fromX, facing, fromDepth) {
+    // Sylvia's kick or Ray's punch lands: any monster in front of the
+    // attacker, within reach and on the same depth band, takes a hit.
+    // 2 hits kill it, and it drops 1 coin where it falls.
+    for (var i = g.monsters.length - 1; i >= 0; i--) {
+      var m = g.monsters[i];
+      var dx = m.x - fromX;
+      if (facing === 1 ? (dx < 0 || dx > 150) : (dx > 0 || dx < -150)) continue;
+      if (Math.abs(m.depth - fromDepth) > 30) continue;
+      m.hp -= 1;
+      m.hitT = 12;
+      m.x += facing * 30;
+      if (m.hp <= 0) {
+        g.coins.push({ x: m.x, depth: m.depth });
+        g.monsters.splice(i, 1);
+      }
+    }
+  }
+  function drawMonsters() {
+    if (g.room !== "dungeon") return;
+    for (var i = 0; i < g.monsters.length; i++) {
+      var m = g.monsters[i];
+      var def = MONSTERS[m.type];
+      var imgs = def.imgs;
+      var img = imgs[Math.floor(m.hopT / 12) % imgs.length];
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var h = monsterH(m);
+      var w = h * (img.naturalWidth / img.naturalHeight);
+      // Hop and bob: the pup hops, the rock bounces, the ghost bobs in
+      // the air, the knight takes tiny steps with a small bounce. The
+      // lift carries them up into her high kick.
+      var lift = 0;
+      if (m.type === "candlepup") {
+        var ph = m.hopT % 90;
+        lift = ph < 30 ? Math.sin(ph / 30 * Math.PI) * g.h * def.hop : 0;
+      } else if (m.type === "biteyrock") {
+        var bh = m.hopT % 110;
+        lift = bh < 35 ? Math.sin(bh / 35 * Math.PI) * g.h * def.hop : 0;
+      } else if (m.type === "bellghost") {
+        lift = g.h * 0.02 + Math.sin(m.hopT * 0.08) * g.h * 0.015;
+      } else {
+        lift = Math.abs(Math.sin(m.hopT * 0.15)) * g.h * 0.008;
+      }
+      var feetY = groundY() + m.depth - lift;
+      var x = m.x * scale() - g.camX;
+      shadow(x, feetY, w);
+      ctx.save();
+      if (m.hitT > 0 && m.hitT % 4 < 2) ctx.globalAlpha = 0.4;
+      ctx.translate(x, feetY - h / 2);
+      if (m.dir === -1) ctx.scale(-1, 1);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+  }
+  function drawCoins() {
+    for (var i = 0; i < g.coins.length; i++) {
+      var c = g.coins[i];
+      var img = coinImgs[Math.floor(g.time / 8) % coinImgs.length];
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var h = g.h * 0.08;
+      var w = h * (img.naturalWidth / img.naturalHeight);
+      var feetY = groundY() + c.depth;
+      var x = c.x * scale() - g.camX;
+      shadow(x, feetY, w);
+      ctx.drawImage(img, x - w / 2, feetY - h, w, h);
+    }
+  }
   function drawSylvia() {
     if (g.climb.active && g.climb.sylHidden) return;
     if (g.inspect.active) {
@@ -3104,6 +3279,16 @@
       var cx = 44 + i * 24, cy = 22;
       drawHeart(cx, cy, 9, full ? "#ff5b8f" : half ? "#ff9ebb" : "rgba(255,255,255,0.25)");
     }
+    // Coins beside the hearts: a little gold coin and the count.
+    var coinImg = coinImgs[0];
+    if (coinImg && coinImg.complete && coinImg.naturalWidth > 0) {
+      var ch2 = 18;
+      var cw2 = ch2 * (coinImg.naturalWidth / coinImg.naturalHeight);
+      ctx.drawImage(coinImg, 160, 13, cw2, ch2);
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.fillText(String(g.coinCount), 184, 27);
     ctx.restore();
   }
   function drawStairPrompt() {
@@ -3334,6 +3519,7 @@
     if (g.inspect.active && g.inspect.phase === "drop") { drawDescent(); return; }
     drawBg();
     drawProps();
+    drawCoins();
     drawScooter();
     drawArchGlow();
     drawHp();
@@ -3366,6 +3552,7 @@
     drawKian();
     drawYuto();
     drawAdler();
+    drawMonsters();
     if (!g.scooter.riding && !g.sleeping) drawSylvia();
     drawTalk();
     drawOwnerTalk();
@@ -3618,8 +3805,12 @@
     if (target > worldW() - g.w) target = worldW() - g.w;
     g.camX += (target - g.camX) * 0.12;
     if (g.attack.cooldown > 0) g.attack.cooldown -= 1;
+    if (g.hurtT > 0) g.hurtT -= 1;
+    if (g.kissHealT > 0) g.kissHealT -= 1;
     if (g.attack.active) {
       g.attack.t += 1;
+      // The high kick extends at t 8: that is when it connects.
+      if (g.attack.t === 8) hitMonsters(g.px, g.facing, g.depth);
       if (g.attack.t >= 30) g.attack.active = false;
     }
     // Ray: fights with Sylvia when she attacks, follows her when she
@@ -3638,6 +3829,8 @@
       r.dir = g.px < r.x ? -1 : 1;
     } else if (r.fight.active) {
       r.fight.t += 1;
+      // His punch lands mid-fight: monsters in front of him take a hit.
+      if (r.fight.t === 30) hitMonsters(r.x, r.dir, r.depth);
       var tx = fightTargetX();
       var dx = tx - r.x;
       if (Math.abs(dx) > 25) {
@@ -3929,6 +4122,7 @@
       g.embrace.active = true;
       g.embrace.t = 0;
     }
+    updateMonsters();
     draw();
   }
   requestAnimationFrame(tick);
