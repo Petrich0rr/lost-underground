@@ -144,7 +144,8 @@
     mirror: { active: false, blink: 0, blinkT: 200, manifesting: false, manifestT: 0, affirmIdx: 0 },
     // The framed photo on the nightstand: active while she is looking
     // at it, popped up over a blurred game.
-    photo: { active: false }
+    photo: { active: false },
+    map: { active: false }
   };
   // Her affirmations, said to the mirror with her eyes shut. She is
   // girl bossy but shy, and every one of them is optimistic: her life
@@ -457,6 +458,50 @@
   function closePhoto() {
     g.photo.active = false;
     var pop = document.getElementById("photoPopup");
+    if (pop) pop.hidden = true;
+  }
+  // The world map. The map button (top left, under the HP hearts)
+  // opens it: the whole underground world, blurred behind, with
+  // Sylvia's and Ray's heads pinned at their current room.
+  // Fractions of the map image (1672x941).
+  var MAP_PINS = {
+    chamber:  { x: 0.125, y: 0.575 },
+    bar:      { x: 0.45,  y: 0.625 },
+    shopping: { x: 0.425, y: 0.56 },
+    repair:   { x: 0.37,  y: 0.60 },
+    clothing: { x: 0.40,  y: 0.57 },
+    salon:    { x: 0.49,  y: 0.57 },
+    arcade:   { x: 0.55,  y: 0.60 },
+    subway:   { x: 0.18,  y: 0.385 },
+    garden:   { x: 0.925, y: 0.455 }
+  };
+  var MAP_ROOM_NAMES = {
+    chamber: "Silvia & Ray's Room",
+    bar: "The Neon Ruin Bar",
+    shopping: "Underground Shopping District",
+    repair: "The Repair Shop",
+    clothing: "The Clothing Store",
+    salon: "The Style Studio",
+    arcade: "The Arcade",
+    subway: "Forgotten Subway Platform",
+    garden: "Swamp Garden"
+  };
+  function openMap() {
+    if (g.mirror.active || g.photo.active || g.map.active) return;
+    g.map.active = true;
+    var pin = MAP_PINS[g.room] || MAP_PINS.chamber;
+    var ps = document.getElementById("pinSylvia");
+    var pr = document.getElementById("pinRay");
+    if (ps) { ps.style.left = (pin.x * 100) + "%"; ps.style.top = (pin.y * 100) + "%"; }
+    if (pr) { pr.style.left = (pin.x * 100) + "%"; pr.style.top = (pin.y * 100) + "%"; }
+    var cap = document.getElementById("mapCaption");
+    if (cap) cap.textContent = MAP_ROOM_NAMES[g.room] || MAP_ROOM_NAMES.chamber;
+    var pop = document.getElementById("mapPopup");
+    if (pop) pop.hidden = false;
+  }
+  function closeMap() {
+    g.map.active = false;
+    var pop = document.getElementById("mapPopup");
     if (pop) pop.hidden = true;
   }
   function manifest() {
@@ -1463,6 +1508,18 @@
     if (mBtn0) mBtn0.hidden = true;
     var mcBtn0 = document.getElementById("mirrorCloseBtn");
     if (mcBtn0) mcBtn0.hidden = true;
+    if (g.map.active) {
+      // The map is open: the world is blurred behind it. Nothing moves
+      // until she closes it.
+      var tBtnM = document.getElementById("talkBtn");
+      if (tBtnM) tBtnM.hidden = true;
+      var eBtnM = document.getElementById("enterBtn");
+      if (eBtnM) eBtnM.hidden = true;
+      var aBtnM = document.getElementById("attackBtn");
+      if (aBtnM) aBtnM.hidden = true;
+      draw();
+      return;
+    }
     if (g.photo.active) {
       // Looking at the framed photo: the popup blurs the game behind
       // it. Nothing moves until she puts it back.
@@ -1682,9 +1739,10 @@
     if (e.code === "KeyE") { tryEnter(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
+    if (g.map.active) return;
     if (setKey(e.code, true)) {
       var r = canvas.getBoundingClientRect();
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
@@ -1731,6 +1789,10 @@
   if (mirrorCloseBtn) mirrorCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); exitMirror(); });
   var photoPopup = document.getElementById("photoPopup");
   if (photoPopup) photoPopup.addEventListener("click", function (e) { e.stopPropagation(); closePhoto(); });
+  var mapBtn = document.getElementById("mapBtn");
+  if (mapBtn) mapBtn.addEventListener("click", function (e) { e.stopPropagation(); openMap(); });
+  var mapPopup = document.getElementById("mapPopup");
+  if (mapPopup) mapPopup.addEventListener("click", function (e) { e.stopPropagation(); closeMap(); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
