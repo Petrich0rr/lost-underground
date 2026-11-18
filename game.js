@@ -140,7 +140,10 @@
     // blink counts a blink in progress, blinkT counts down to the
     // next blink, and manifesting holds her eyes shut on an
     // affirmation for a few seconds.
-    mirror: { active: false, blink: 0, blinkT: 200, manifesting: false, manifestT: 0, affirmIdx: 0 }
+    mirror: { active: false, blink: 0, blinkT: 200, manifesting: false, manifestT: 0, affirmIdx: 0 },
+    // The framed photo on the nightstand: active while she is looking
+    // at it, popped up over a blurred game.
+    photo: { active: false }
   };
   // Her affirmations, said to the mirror with her eyes shut. She is
   // girl bossy but shy, and every one of them is optimistic: her life
@@ -360,6 +363,26 @@
     g.mirror.active = false;
     g.mirror.manifesting = false;
   }
+  // The framed photo on the nightstand, beside the bed: walk up to it
+  // and press E and it pops up over the game, with the rest of the
+  // screen blurred behind it. Esc or a tap puts it back.
+  var PHOTO_X = 1050, PHOTO_RANGE = 110;
+  function photoNear() {
+    return g.room === "chamber" && Math.abs(g.px - PHOTO_X) < PHOTO_RANGE;
+  }
+  function openPhoto() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active || g.mirror.active || g.photo.active) return;
+    if (!photoNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false;
+    g.photo.active = true;
+    var pop = document.getElementById("photoPopup");
+    if (pop) pop.hidden = false;
+  }
+  function closePhoto() {
+    g.photo.active = false;
+    var pop = document.getElementById("photoPopup");
+    if (pop) pop.hidden = true;
+  }
   function manifest() {
     if (!g.mirror.active) return;
     g.mirror.affirmIdx = Math.floor(Math.random() * AFFIRMATIONS.length);
@@ -553,6 +576,8 @@
   function tryEnter() {
     if (g.embrace.active) return;
     if (g.sleeping) { wakeUp(); return; }
+    if (g.photo.active) { closePhoto(); return; }
+    if (photoNear()) { openPhoto(); return; }
     if (bedNear()) { goToBed(); return; }
     if (vanityNear()) { enterMirror(); return; }
     if (windowNear()) { climbOutWindow(); return; }
@@ -1137,7 +1162,7 @@
     ctx.restore();
   }
   function drawBedPrompt() {
-    if (g.kiss.active || g.talk.open) return;
+    if (g.kiss.active || g.talk.open || g.photo.active) return;
     if (!g.sleeping && !bedNear()) return;
     var x = BED_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1156,7 +1181,7 @@
     ctx.restore();
   }
   function drawVanityPrompt() {
-    if (g.kiss.active || g.talk.open || g.climb.active || g.mirror.active) return;
+    if (g.kiss.active || g.talk.open || g.climb.active || g.mirror.active || g.photo.active) return;
     if (!vanityNear()) return;
     var x = VANITY_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1164,6 +1189,25 @@
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
     var label = "Press E to look in the mirror";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
+  function drawPhotoPrompt() {
+    if (g.kiss.active || g.talk.open || g.climb.active || g.mirror.active || g.photo.active) return;
+    if (!photoNear()) return;
+    var x = PHOTO_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to look at the photo";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.beginPath();
@@ -1243,6 +1287,7 @@
     drawBedPrompt();
     drawWindowPrompt();
     drawVanityPrompt();
+    drawPhotoPrompt();
     drawStairPrompt();
     drawBeerDoorPrompt();
     drawShopPrompt();
@@ -1292,6 +1337,18 @@
     if (mBtn0) mBtn0.hidden = true;
     var mcBtn0 = document.getElementById("mirrorCloseBtn");
     if (mcBtn0) mcBtn0.hidden = true;
+    if (g.photo.active) {
+      // Looking at the framed photo: the popup blurs the game behind
+      // it. Nothing moves until she puts it back.
+      var tBtnP = document.getElementById("talkBtn");
+      if (tBtnP) tBtnP.hidden = true;
+      var eBtnP = document.getElementById("enterBtn");
+      if (eBtnP) eBtnP.hidden = true;
+      var aBtnP = document.getElementById("attackBtn");
+      if (aBtnP) aBtnP.hidden = true;
+      draw();
+      return;
+    }
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
     if (g.ownerTalk.open) {
       var otk = g.ownerTalk.key;
@@ -1309,6 +1366,7 @@
     if (enterBtn) {
       if (g.climb.active) { enterBtn.hidden = true; }
       else if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
+      else if (photoNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Look at the photo"; }
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
       else if (vanityNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Look in the mirror"; }
       else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
@@ -1490,8 +1548,9 @@
     if (e.code === "KeyE") { tryEnter(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } g.talk.open = false; g.ownerTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } g.talk.open = false; g.ownerTalk.open = false; return; }
     if (g.mirror.active) return;
+    if (g.photo.active) return;
     if (setKey(e.code, true)) {
       var r = canvas.getBoundingClientRect();
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
@@ -1536,6 +1595,8 @@
   if (manifestBtn) manifestBtn.addEventListener("click", function (e) { e.stopPropagation(); manifest(); });
   var mirrorCloseBtn = document.getElementById("mirrorCloseBtn");
   if (mirrorCloseBtn) mirrorCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); exitMirror(); });
+  var photoPopup = document.getElementById("photoPopup");
+  if (photoPopup) photoPopup.addEventListener("click", function (e) { e.stopPropagation(); closePhoto(); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
