@@ -39,12 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=21" forces a fresh download after the off-screen culling
-  // checks are removed from the character draws, so Sylvia and Ray
-  // can no longer vanish when their computed screen position goes
-  // off-screen in the tunnels, so a browser that cached ?v=20 picks
-  // up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=21"; return img; }
+  // "?v=22" forces a fresh download after Gunner's pink scooter is
+  // added (his shop, the parked scooter on the street, riding
+  // together with the headlight), so a browser that cached ?v=21
+  // picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=22"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -136,6 +135,11 @@
   // secret passage under the arcade floor.
   var descentImg = loadImg("assets/descent.jpg");
   var rayCrouchImg = loadImg("assets/ray-crouch.png");
+  // The pink scooter Gunner sells, and the four riding frames of
+  // Ray driving with Sylvia in front. The scooter is parked on the
+  // shopping street after you buy it, and you ride it together.
+  var scooterImg = loadImg("assets/scooter.png");
+  var scooterRideImgs = ["assets/scooter-ride-01.png", "assets/scooter-ride-02.png", "assets/scooter-ride-03.png", "assets/scooter-ride-04.png"].map(loadImg);
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
   ROOMS.subway.frames = [subwayImg];
@@ -258,6 +262,12 @@
     // The framed photo on the nightstand: active while she is looking
     // at it, popped up over a blurred game.
     photo: { active: false },
+    // Gunner's pink scooter: owned once you buy it from his shop for
+    // $0, riding while the two of them are on it together, x is where
+    // it is parked on the shopping street, frame is the riding
+    // animation frame. The shop is open while the shop panel shows.
+    scooter: { owned: false, riding: false, x: 280, frame: 0 },
+    shopOpen: false,
     map: { active: false },
     inspect: { active: false, t: 0, arch: 0, phase: "look" },
     // The portal tunnel: active while they pass through the tunnel
@@ -394,7 +404,7 @@
     g.talk.idx = idx; g.talk.open = true;
   }
   function pressT() {
-    if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding) return;
     if (g.propRead.open) { closePropRead(); return; }
     if (g.talk.open) { talkLine(); return; }
     if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
@@ -597,7 +607,7 @@
   }
   function closeRayTalk() { g.rayTalk.open = false; g.rayTalk.step = 0; g.rayTalk.choice = -1; }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -806,6 +816,9 @@
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
     g.embrace.active = false; g.sleeping = false; g.ray.inBed = false;
+    // Jumping away on the map leaves the scooter parked back at the
+    // street entrance, so it is never left riding in another room.
+    if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; }
     g.room = roomKey;
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -1013,7 +1026,7 @@
     if (panel) panel.hidden = true;
   }
   function startInspect() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
     // Already reading a piece of junk: I puts it back down and she
     // stands back up.
     if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; }
@@ -1344,6 +1357,7 @@
     if (g.sleeping) { wakeUp(); return; }
     if (g.photo.active) { closePhoto(); return; }
     if (g.propRead.open) { closePropRead(); return; }
+    if (g.scooter.riding) { dismountScooter(); return; }
     if (photoNear()) { openPhoto(); return; }
     if (bedNear()) { goToBed(); return; }
     if (vanityNear()) { enterMirror(); return; }
@@ -1352,6 +1366,7 @@
     if (beerDoorNear()) { enterBarFromBeerDoor(); return; }
     var shop = shopNear();
     if (shop) { enterShop(shop); return; }
+    if (scooterNear()) { mountScooter(); return; }
     var prop = propNear();
     if (prop) { readProp(prop); return; }
     if (inspectNear()) { startInspect(); return; }
@@ -1361,8 +1376,131 @@
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.rayTalk.open || g.propRead.open || !kissNear()) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.rayTalk.open || g.propRead.open || g.scooter.riding || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
+  }
+  // Gunner's pink scooter. He sells it from his repair shop for $0
+  // for now (no coins yet). Once bought it is parked at the entrance
+  // of the shopping district street, and the two of them can ride it
+  // together, faster than running, with the headlight lighting the
+  // way ahead. It stays on the street: get off to go through a door.
+  var SCOOTER_X = 280, SCOOTER_RANGE = 110;
+  function scooterNear() {
+    return g.room === "shopping" && g.scooter.owned && !g.scooter.riding && Math.abs(g.px - g.scooter.x) < SCOOTER_RANGE;
+  }
+  function mountScooter() {
+    if (!scooterNear()) return;
+    g.scooter.riding = true;
+    g.scooter.x = g.px;
+    g.scooter.frame = 0;
+    g.ray.x = g.px; g.ray.dir = g.facing;
+    g.ray.pause = 0; g.ray.fight.active = false;
+  }
+  function dismountScooter() {
+    if (!g.scooter.riding) return;
+    g.scooter.riding = false;
+    g.scooter.x = g.px;
+    g.ray.x = g.px - g.facing * 70; g.ray.dir = g.facing;
+    if (g.ray.x < 60) g.ray.x = 60;
+    if (g.ray.x > room().w - 60) g.ray.x = room().w - 60;
+  }
+  // Gunner's shop: a little panel over the game. Buying the scooter
+  // is $0 for now, and it appears parked on the street right away.
+  function openShop() {
+    if (g.shopOpen) return;
+    g.shopOpen = true;
+    g.ownerTalk.open = false;
+    var panel = document.getElementById("shopPanel");
+    if (panel) panel.hidden = false;
+    var buy = document.getElementById("shopBuyBtn");
+    if (buy) {
+      buy.disabled = g.scooter.owned;
+      buy.textContent = g.scooter.owned ? "Already yours" : "Buy it for $0";
+    }
+    var note = document.getElementById("shopNote");
+    if (note) note.textContent = g.scooter.owned ? "You own the pink scooter. It is parked outside on the street." : "";
+  }
+  function closeShop() {
+    g.shopOpen = false;
+    var panel = document.getElementById("shopPanel");
+    if (panel) panel.hidden = true;
+  }
+  function buyScooter() {
+    if (g.scooter.owned) return;
+    g.scooter.owned = true;
+    g.scooter.riding = false;
+    g.scooter.x = SCOOTER_X;
+    var buy = document.getElementById("shopBuyBtn");
+    if (buy) { buy.disabled = true; buy.textContent = "Already yours"; }
+    var note = document.getElementById("shopNote");
+    if (note) note.textContent = "You own the pink scooter. It is parked outside on the street.";
+  }
+  function drawScooter() {
+    // The parked scooter on the shopping street, waiting to be ridden.
+    if (g.room !== "shopping" || !g.scooter.owned || g.scooter.riding) return;
+    if (!scooterImg || !scooterImg.complete || scooterImg.naturalWidth === 0) return;
+    // Sized so the parked scooter is the same width as the scooter
+    // in the riding frames, so mounting it does not shrink it.
+    var h = sylviaH() * 0.68;
+    var w = h * (scooterImg.naturalWidth / scooterImg.naturalHeight);
+    var x = g.scooter.x * scale() - g.camX;
+    var feetY = groundY() + 2;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.drawImage(scooterImg, x - w / 2, feetY - h, w, h);
+    ctx.restore();
+  }
+  function drawScooterRide() {
+    // The two of them on the scooter together: Ray driving, Sylvia
+    // in front. The frames cycle while moving. The headlight throws
+    // a soft light ahead in the direction they are facing.
+    var imgs = scooterRideImgs;
+    var img = imgs[g.scooter.frame % imgs.length];
+    if (!img || !img.complete || img.naturalWidth === 0) img = imgs[0];
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var h = sylviaH() * 1.15;
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + g.depth;
+    var x = g.px * scale() - g.camX;
+    // The headlight: a soft warm light ahead of the scooter, in the
+    // direction they are facing. It is the scooter's light, not the
+    // characters glowing.
+    var hx = x + g.facing * w * 0.52;
+    var hy = feetY - h * 0.62;
+    ctx.save();
+    var grad = ctx.createRadialGradient(hx, hy, 4, hx, hy, w * 0.95);
+    grad.addColorStop(0, "rgba(255, 238, 175, 0.34)");
+    grad.addColorStop(0.55, "rgba(255, 236, 170, 0.14)");
+    grad.addColorStop(1, "rgba(255, 236, 170, 0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, w * 0.95, w * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    if (g.facing === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  function drawScooterPrompt() {
+    if (g.scooter.riding || !scooterNear()) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to ride the scooter";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
   }
 
   function scale() { return g.h / room().h; }
@@ -2219,6 +2357,7 @@
     if (g.inspect.active && g.inspect.phase === "drop") { drawDescent(); return; }
     drawBg();
     drawProps();
+    drawScooter();
     drawArchGlow();
     drawHp();
     drawVickyPrompt();
@@ -2234,14 +2373,16 @@
     drawPropPrompt();
     drawIronDoorPrompt();
     drawPortalPrompt();
+    drawScooterPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); return; }
-    drawRay();
+    if (g.scooter.riding) drawScooterRide();
+    else drawRay();
     drawChar();
     drawMikey();
     drawGunner();
     drawArcadeKids();
-    if (!g.sleeping) drawSylvia();
+    if (!g.scooter.riding && !g.sleeping) drawSylvia();
     drawTalk();
     drawOwnerTalk();
     drawKidTalk();
@@ -2309,6 +2450,20 @@
       draw();
       return;
     }
+    if (g.shopOpen) {
+      // Gunner's shop is open: the panel is over the game. Nothing
+      // moves until she buys or closes it.
+      var tBtnS = document.getElementById("talkBtn");
+      if (tBtnS) tBtnS.hidden = true;
+      var eBtnS = document.getElementById("enterBtn");
+      if (eBtnS) eBtnS.hidden = true;
+      var aBtnS = document.getElementById("attackBtn");
+      if (aBtnS) aBtnS.hidden = true;
+      var sBtnS = document.getElementById("shopBtn");
+      if (sBtnS) sBtnS.hidden = true;
+      draw();
+      return;
+    }
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
     if (g.ownerTalk.open) {
       var otk = g.ownerTalk.key;
@@ -2360,9 +2515,16 @@
       else if (rayNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Ray"; }
       else talkBtn.hidden = true;
     }
+    var shopBtn = document.getElementById("shopBtn");
+    if (shopBtn) {
+      // Gunner's shop: only while his talk bubble is open, so she
+      // talks to him first, then opens his shop from the chat.
+      shopBtn.hidden = !(g.ownerTalk.open && g.ownerTalk.key === "gunner" && !g.shopOpen);
+    }
     var enterBtn = document.getElementById("enterBtn");
     if (enterBtn) {
       if (g.climb.active || g.portal.active) { enterBtn.hidden = true; }
+      else if (g.scooter.riding && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Get off the scooter"; }
       else if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
       else if (photoNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Look at the photo"; }
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
@@ -2371,6 +2533,7 @@
       else if (stairsNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = STAIRS[stairsNear()].btn; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
       else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
+      else if (scooterNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Ride the scooter"; }
       else if (propNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.propRead.open ? "Put it down" : "Inspect"; }
       else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.inspect.active ? "Go down" : "Inspect"; }
       else if (ironDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Iron door"; }
@@ -2412,7 +2575,7 @@
       // A movement key wakes her up, and then walks as normal.
       if (keys.left || keys.right || keys.up || keys.down) wakeUp();
     }
-    var speed = keys.fast ? 4.4 : 2.2;
+    var speed = g.scooter.riding ? (keys.fast ? 10 : 7) : (keys.fast ? 4.4 : 2.2);
     if (keys.left) { g.px -= speed; g.facing = -1; }
     if (keys.right) { g.px += speed; g.facing = 1; }
     if (keys.up) { g.depth -= speed * 0.5; }
@@ -2435,7 +2598,13 @@
     // Ray: fights with Sylvia when she attacks, follows her when she
     // gets far away (or into another room), wanders when they are close.
     var r = g.ray;
-    if (g.sleeping) {
+    if (g.scooter.riding) {
+      // On the scooter together: he rides on the back, and the
+      // riding frames cycle while they move.
+      r.x = g.px; r.dir = g.facing; r.depth = g.depth;
+      if (keys.left || keys.right) g.scooter.frame = Math.floor(g.time / 4) % 4;
+      else g.scooter.frame = 0;
+    } else if (g.sleeping) {
       // He is in bed with her; he does not move, fight, or wander.
     } else if (g.rayTalk.open) {
       // Talking to her: he stands still and faces her.
@@ -2641,6 +2810,12 @@
   if (mapPopup) mapPopup.addEventListener("click", function (e) { e.stopPropagation(); closeMap(); });
   var mapWrap = document.getElementById("mapWrap");
   if (mapWrap) mapWrap.addEventListener("click", function (e) { e.stopPropagation(); mapJump(e); });
+  var shopBtn = document.getElementById("shopBtn");
+  if (shopBtn) shopBtn.addEventListener("click", function (e) { e.stopPropagation(); openShop(); });
+  var shopBuyBtn = document.getElementById("shopBuyBtn");
+  if (shopBuyBtn) shopBuyBtn.addEventListener("click", function (e) { e.stopPropagation(); buyScooter(); });
+  var shopCloseBtn = document.getElementById("shopCloseBtn");
+  if (shopCloseBtn) shopCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeShop(); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
