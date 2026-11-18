@@ -57,6 +57,8 @@
   var embraceImg = loadImg("assets/embrace.png");
   var rayBackWalkImgs = ["assets/ray-back-walk-01.png", "assets/ray-back-walk-02.png"].map(loadImg);
   var rayPunchImg = loadImg("assets/ray-punch.png");
+  var rayReachImg = loadImg("assets/ray-reach.png");
+  var sylviaClimbImg = loadImg("assets/sylvia-pose-sneak.png");
   var charWalkImgs = ["assets/owner-walk-01.png", "assets/owner-walk-02.png", "assets/owner-walk-03.png", "assets/owner-walk-04.png"].map(loadImg);
   var charIdleImg = loadImg("assets/owner-idle.png");
   var charTalkImg = loadImg("assets/owner-talk.png");
@@ -108,7 +110,11 @@
     ownerTalk: { open: false, idx: -1, key: null },
     hp: 100, hpMax: 100,
     sleeping: false,
-    embrace: { active: false, t: 0, cooldown: 0 }
+    embrace: { active: false, t: 0, cooldown: 0 },
+    // Climbing out the chamber window: Ray goes first, then reaches
+    // back for her, and she climbs up to his hand. While it plays,
+    // the two of them are driven by the climb, not by the keys.
+    climb: { active: false, t: 0, rayStartX: 0, sylStartX: 0, rayY: 0, sylY: 0, rayHidden: false, sylHidden: false }
   };
   var VICKY_X = 560; // the bartender in the background, behind the bar
   var VICKY_LINES = [
@@ -178,7 +184,7 @@
     g.talk.idx = idx; g.talk.open = true;
   }
   function pressT() {
-    if (g.kiss.active) return;
+    if (g.kiss.active || g.climb.active) return;
     if (g.talk.open) { talkLine(); return; }
     if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
     if (vickyNear()) talkLine();
@@ -209,7 +215,7 @@
     o.dir = g.px < o.x ? -1 : 1; // face Sylvia
   }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.climb.active || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -259,15 +265,64 @@
     return g.room === "chamber" && Math.abs(g.px - WINDOW_X) < WINDOW_RANGE;
   }
   function climbOutWindow() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active) return;
     g.talk.open = false; g.ownerTalk.open = false;
-    g.room = "shopping";
-    g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
-    // You climb out on the left side of the street, facing the shops.
-    g.px = 110; g.facing = 1;
-    g.ray.x = 60; g.ray.dir = 1;
-    resize();
-    g.camX = 0;
+    // Cute climb: Ray goes out first, then reaches back for her,
+    // and she climbs up to his hand. The room switches at the end.
+    g.climb.active = true; g.climb.t = 0;
+    g.climb.rayStartX = g.ray.x; g.climb.sylStartX = g.px;
+    g.climb.rayY = 0; g.climb.sylY = 0;
+    g.climb.rayHidden = false; g.climb.sylHidden = false;
+  }
+  // One climb, in phases (ticks, 60 a second): Ray runs to the
+  // window (0-40), climbs up through it (40-80), then leans back in
+  // and reaches for her (80-115). She walks to the window (115-145)
+  // and climbs up to his hand (145-180), and then they are out.
+  function updateClimb() {
+    var c = g.climb;
+    c.t += 1;
+    var rise = g.h * 0.30; // the window sill above the floor
+    if (c.t <= 40) {
+      var k = c.t / 40;
+      g.ray.dir = (WINDOW_X - 30 - c.rayStartX) >= 0 ? 1 : -1;
+      g.ray.x = c.rayStartX + (WINDOW_X - 30 - c.rayStartX) * k;
+      g.ray.walk += 1; g.ray.pause = 0;
+    } else if (c.t <= 80) {
+      var k2 = (c.t - 40) / 40;
+      g.ray.x = WINDOW_X - 30; g.ray.dir = 1;
+      c.rayY = -rise * k2;
+      g.ray.walk += 1;
+      if (c.t === 80) c.rayHidden = true;
+    } else if (c.t <= 115) {
+      c.rayHidden = false;
+      g.ray.x = WINDOW_X - 10; g.ray.dir = -1;
+      c.rayY = -rise * 0.95;
+    } else if (c.t <= 145) {
+      var k4 = (c.t - 115) / 30;
+      g.px = c.sylStartX + (WINDOW_X - 95 - c.sylStartX) * k4;
+      g.facing = 1; g.walk += 1;
+    } else if (c.t <= 180) {
+      var k5 = (c.t - 145) / 35;
+      g.px = WINDOW_X - 95; g.facing = 1;
+      c.sylY = -rise * k5;
+      g.walk += 1;
+      if (c.t === 180) c.sylHidden = true;
+    } else {
+      c.active = false;
+      c.rayY = 0; c.sylY = 0; c.rayHidden = false; c.sylHidden = false;
+      g.room = "shopping";
+      g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
+      g.px = 110; g.facing = 1;
+      g.ray.x = 60; g.ray.dir = 1;
+      resize();
+      g.camX = 0;
+      return;
+    }
+    // Keep the camera on the window while they climb.
+    var target = WINDOW_X * scale() - g.w * 0.38;
+    if (target < 0) target = 0;
+    if (target > worldW() - g.w) target = worldW() - g.w;
+    g.camX += (target - g.camX) * 0.12;
   }
   // The bar door in the Shopping District (world x, in the 2172-wide
   // street). The beer mug over the double doors marks the tavern, and
@@ -316,7 +371,7 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
@@ -375,7 +430,7 @@
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || !kissNear()) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
   }
 
@@ -443,6 +498,25 @@
   }
 
   function drawSylvia() {
+    if (g.climb.active && g.climb.sylHidden) return;
+    if (g.climb.active) {
+      // Climbing out the window: she waits in her idle pose, then
+      // walks to the window and climbs up in the sneak pose.
+      var cimg = g.climb.t > 115 ? sylviaClimbImg : sylviaIdleImg;
+      if (!cimg || !cimg.complete || cimg.naturalWidth === 0) cimg = sylviaIdleImg;
+      if (!cimg || !cimg.complete || cimg.naturalWidth === 0) return;
+      var ct = (g.depth + depthRange()) / depthRange();
+      var ch = sylviaH() * (0.92 + 0.08 * ct);
+      var cw = ch * (cimg.naturalWidth / cimg.naturalHeight);
+      var cfeet = groundY() + g.depth + g.climb.sylY;
+      var cx = g.px * scale() - g.camX;
+      shadow(cx, cfeet, cw);
+      ctx.save();
+      ctx.translate(cx, cfeet - ch / 2);
+      ctx.drawImage(cimg, -cw / 2, -ch / 2, cw, ch);
+      ctx.restore();
+      return;
+    }
     var moving = keys.left || keys.right || keys.up || keys.down;
     var img;
     if (g.attack.active) {
@@ -501,6 +575,30 @@
   function drawRay() {
     var r = g.ray;
     if (r.inBed) return; // under the covers with her
+    if (g.climb.active && g.climb.rayHidden) return;
+    if (g.climb.active) {
+      // Climbing out the window: he runs to it and climbs up in his
+      // walk frames, then leans back in and reaches for her.
+      var rimg = g.climb.t > 80 ? rayReachImg
+        : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length];
+      if (!rimg || !rimg.complete || rimg.naturalWidth === 0) rimg = rayIdleImg;
+      if (!rimg || !rimg.complete || rimg.naturalWidth === 0) return;
+      var rt = (r.depth + depthRange()) / depthRange();
+      var rh = rayH() * (0.92 + 0.08 * rt);
+      var rw = rh * (rimg.naturalWidth / rimg.naturalHeight);
+      var rfeet = groundY() + r.depth - 6 + g.climb.rayY;
+      var rx = r.x * scale() - g.camX;
+      if (rx < -rw || rx > g.w + rw) return;
+      shadow(rx, rfeet, rw);
+      ctx.save();
+      ctx.translate(rx, rfeet - rh / 2);
+      // The reach faces right, so flip it when he reaches left for
+      // her. The walk frames face right, flip when he runs left.
+      if (g.climb.t > 80 || r.dir === -1) ctx.scale(-1, 1);
+      ctx.drawImage(rimg, -rw / 2, -rh / 2, rw, rh);
+      ctx.restore();
+      return;
+    }
     var walking = r.pause <= 0;
     var img;
     if (r.fight.active) {
@@ -784,7 +882,7 @@
     ctx.restore();
   }
   function drawWindowPrompt() {
-    if (g.kiss.active || g.talk.open) return;
+    if (g.kiss.active || g.talk.open || g.climb.active) return;
     if (!windowNear()) return;
     var x = WINDOW_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -898,13 +996,21 @@
     }
     var enterBtn = document.getElementById("enterBtn");
     if (enterBtn) {
-      if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
+      if (g.climb.active) { enterBtn.hidden = true; }
+      else if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
       else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
       else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
+    }
+    if (g.climb.active) {
+      // Climbing out the window: the climb drives them both, and
+      // nothing else moves until they are through.
+      updateClimb();
+      draw();
+      return;
     }
     if (g.kiss.active) {
       g.kiss.t += 1;
