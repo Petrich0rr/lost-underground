@@ -39,11 +39,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=12" forces a fresh download after I only crouches when
-  // there is something to inspect, and the junk text moves to a
-  // frosted blue panel at the top of the screen with a glowing
-  // border, so a browser that cached ?v=11 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=12"; return img; }
+  // "?v=13" forces a fresh download after the inspection panel
+  // loses its blue background and goes translucent, so a browser
+  // that cached ?v=12 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=13"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
