@@ -42,11 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=55" forces a fresh download after the story is set: they
-  // grew up underground, the surface is a dream, and getting out
-  // is too dangerous. A browser that cached ?v=54 picks up the
+  // "?v=56" forces a fresh download after the treasure chests:
+  // inspect one and it opens, granting a random 3 to 20 gold
+  // coins, once each. A browser that cached ?v=55 picks up the
   // new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=55"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=56"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -188,6 +188,10 @@
   var monsterBiteyrockImgs = [loadImg("assets/monster-biteyrock-01.png"), loadImg("assets/monster-biteyrock-02.png"), loadImg("assets/monster-biteyrock-03.png"), loadImg("assets/monster-biteyrock-04.png")];
   var monsterBellghostImgs = [loadImg("assets/monster-bellghost-01.png"), loadImg("assets/monster-bellghost-02.png"), loadImg("assets/monster-bellghost-03.png"), loadImg("assets/monster-bellghost-04.png")];
   var coinImgs = [loadImg("assets/coin-01.png"), loadImg("assets/coin-02.png"), loadImg("assets/coin-03.png"), loadImg("assets/coin-04.png")];
+  // Treasure chest opening: closed, slightly open, open with coins,
+  // open with more coins and a sparkle. All on one common canvas,
+  // bottom-aligned, so the lid rises and the base stays put.
+  var chestImgs = [loadImg("assets/chest-01.png"), loadImg("assets/chest-02.png"), loadImg("assets/chest-03.png"), loadImg("assets/chest-04.png")];
   var upper1Img = loadImg("assets/bg-upper1.jpg");
   var upper2Img = loadImg("assets/bg-upper2.jpg");
   var upper3Img = loadImg("assets/bg-upper3.jpg");
@@ -402,6 +406,7 @@
     // hit. kissHealT is the cooldown before a kiss can heal again.
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
+    chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
     homeWalk: { active: false, t: 0 },
     // The proposal on the Surface: once, when they walk all the way
     // to the right edge of the outside, Ray proposes. proposal holds
@@ -1850,6 +1855,7 @@
     if (prop) { readProp(prop); return; }
     if (inspectNear()) { startInspect(); return; }
     if (fountainNear()) { makeWish(); return; }
+    if (chestNear()) { openChest(); return; }
     if (gardenDoorNear()) { startHomeWalk(); return; }
     if (ironDoorNear()) { enterDungeonFromIronDoor(); return; }
     if (portalNear()) { goThroughPortal(); return; }
@@ -1893,7 +1899,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -1917,6 +1923,7 @@
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
       if (inspectNear()) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
       if (fountainNear() && !g.fountainWished) acts.push({ id: "fountain", label: "Make a wish", run: makeWish });
+      if (chestNear()) acts.push({ id: "chest", label: "Open the chest", run: openChest });
       if (gardenDoorNear()) acts.push({ id: "homedoor", label: "Go home", run: startHomeWalk });
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
       if (portalNear()) acts.push({ id: "portal", label: "Go home", run: goThroughPortal });
@@ -2174,6 +2181,114 @@
     ctx.fillText(g.fountainMsg, x, y);
     ctx.restore();
   }
+  // Treasure chests: inspect one and it opens, granting a random
+  // 3 to 20 gold coins, once each. 2 to 3 per room, in the Forgotten
+  // subway, the Crystal Quarry, the Secret Garden and the Old
+  // Service Tunnels.
+  var CHEST_RANGE = 110;
+  var CHESTS = [
+    { id: "subway-0", room: "subway", x: 450, d: 0.5 },
+    { id: "subway-1", room: "subway", x: 850, d: 0.7 },
+    { id: "subway-2", room: "subway", x: 1450, d: 0.6 },
+    { id: "quarry-0", room: "quarry", x: 500, d: 0.6 },
+    { id: "quarry-1", room: "quarry", x: 1600, d: 0.7 },
+    { id: "garden-0", room: "garden", x: 350, d: 0.6 },
+    { id: "garden-1", room: "garden", x: 1800, d: 0.5 },
+    { id: "tunnels-0", room: "tunnels", x: 200, d: 0.6 },
+    { id: "tunnels-1", room: "tunnels", x: 850, d: 0.5 },
+    { id: "tunnels-2", room: "tunnels", x: 1570, d: 0.8 }
+  ];
+  function chestNear() {
+    // Nearest unopened chest in this room, within range.
+    var best = null, bestD = 1e9;
+    for (var i = 0; i < CHESTS.length; i++) {
+      var c = CHESTS[i];
+      if (c.room !== g.room || g.chestsOpened[c.id]) continue;
+      var dx = Math.abs(g.px - c.x);
+      if (dx < CHEST_RANGE && dx < bestD) { best = c; bestD = dx; }
+    }
+    return best;
+  }
+  function openChest() {
+    // Guards mirror makeWish: nothing else going on.
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open) return;
+    if (g.chestOpen) return;
+    var c = chestNear();
+    if (!c) return;
+    g.chestOpen = { id: c.id, t: 0 };
+  }
+  function drawChests() {
+    // Chests in this room. Unopened ones sit closed; the one opening
+    // cycles its frames; opened ones stay open with the coins showing.
+    var dr = depthRange();
+    for (var i = 0; i < CHESTS.length; i++) {
+      var c = CHESTS[i];
+      if (c.room !== g.room) continue;
+      var img = chestImgs[0];
+      if (g.chestsOpened[c.id]) img = chestImgs[3];
+      else if (g.chestOpen && g.chestOpen.id === c.id) img = chestImgs[Math.min(3, Math.floor(g.chestOpen.t / 12))];
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var h = g.h * 0.11 * (0.92 + 0.08 * c.d);
+      var w = h * img.naturalWidth / img.naturalHeight;
+      var x = c.x * scale() - g.camX;
+      var y = groundY() - dr * (1 - c.d);
+      ctx.drawImage(img, x - w / 2, y - h, w, h);
+    }
+  }
+  function drawChestGlow() {
+    // A soft golden shimmer under unopened chests, so they are easy
+    // to find. It fades out once a chest is opened.
+    for (var i = 0; i < CHESTS.length; i++) {
+      var c = CHESTS[i];
+      if (c.room !== g.room || g.chestsOpened[c.id]) continue;
+      var pulse = 0.20 + 0.12 * Math.sin(Date.now() / 500 + i);
+      var x = c.x * scale() - g.camX;
+      var y = groundY() - depthRange() * (1 - c.d);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = "#ffd977";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 40, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = pulse * 1.6;
+      ctx.fillStyle = "#fff3c4";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 20, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  function drawChestPrompt() {
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (!chestNear()) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to open the chest";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
+  function drawChestMsg() {
+    if (g.chestMsgT <= 0 || !g.chestMsg) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 64;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, g.chestMsgT / 60);
+    ctx.font = "700 14px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffd977";
+    ctx.fillText(g.chestMsg, x, y);
+    ctx.restore();
+  }
   // The stone arch doorway on the right of the Secret Garden. Its
   // dark opening is centred at world x 2025 in the 2172-wide room
   // (measured from the art with marker lines). It is more like a
@@ -2350,6 +2465,7 @@
         room: g.room, px: g.px, depth: g.depth, facing: g.facing,
         scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
         fountainWished: g.fountainWished, proposed: g.proposed,
+        chestsOpened: Object.keys(g.chestsOpened),
         fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
       }));
     } catch (e) { /* storage unavailable: the game still plays */ }
@@ -2381,6 +2497,8 @@
     g.scooter.room = s.scooterRoom || "shopping";
     g.scooter.x = (typeof s.scooterX === "number") ? s.scooterX : SCOOTER_X;
     g.fountainWished = !!s.fountainWished;
+    g.chestsOpened = {};
+    (s.chestsOpened || []).forEach(function (id) { g.chestsOpened[id] = true; });
     g.proposed = !!s.proposed;
     if (s.fashion) {
       g.fashion.gownOwned = !!s.fashion.gownOwned;
@@ -2739,7 +2857,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen) return;
+    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
@@ -4189,10 +4307,12 @@
     if (g.inspect.active && g.inspect.phase === "drop") { drawDescent(); return; }
     drawBg();
     drawProps();
+    drawChests();
     drawCoins();
     drawScooter();
     drawArchGlow();
     drawFountainGlow();
+    drawChestGlow();
     drawGardenDoorGlow();
     drawHp();
     drawEnergyAndDay();
@@ -4211,6 +4331,7 @@
     drawPortalPrompt();
     drawScooterPrompt();
     drawFountainPrompt();
+    drawChestPrompt();
     drawGardenDoorPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
@@ -4242,6 +4363,7 @@
     drawAdlerTalk();
     drawRayTalk();
     drawFountainMsg();
+    drawChestMsg();
     drawDebug();
   }
 
@@ -4496,6 +4618,21 @@
     if (target > worldW() - g.w) target = worldW() - g.w;
     g.camX += (target - g.camX) * 0.12;
     if (g.fountainMsgT > 0) g.fountainMsgT -= 1;
+    if (g.chestOpen) {
+      // The chest lid rises over 48 ticks, then the coins spill out:
+      // a random 3 to 20, once per chest, and it saves.
+      g.chestOpen.t += 1;
+      if (g.chestOpen.t >= 48) {
+        var n = 3 + Math.floor(Math.random() * 18);
+        g.coinCount += n;
+        g.chestsOpened[g.chestOpen.id] = true;
+        g.chestMsg = "+" + n + " coins!";
+        g.chestMsgT = 180;
+        g.chestOpen = null;
+        saveGame();
+      }
+    }
+    if (g.chestMsgT > 0) g.chestMsgT -= 1;
     if (g.attack.cooldown > 0) g.attack.cooldown -= 1;
     if (g.hurtT > 0) g.hurtT -= 1;
     if (g.kissHealT > 0) g.kissHealT -= 1;
