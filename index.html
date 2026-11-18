@@ -23,7 +23,8 @@
   .mirrorCloseBtn[hidden] { display: none; }
   .photoPopup { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; background: rgba(10, 6, 18, 0.45); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); cursor: pointer; }
   .photoPopup[hidden] { display: none; }
-  .photoPopup img { max-width: 92%; max-height: 82%; width: auto; height: auto; border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,0.65); }
+  .photoPopup img { max-width: 92%; max-height: 74%; width: auto; height: auto; border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,0.65); }
+  .photoPopup .photoQuote { font-family: Georgia, serif; font-style: italic; font-size: 16px; line-height: 1.5; color: rgba(255,255,255,0.92); text-align: center; max-width: 520px; }
   .photoPopup .photoHint { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.85); background: rgba(0,0,0,0.55); border-radius: 999px; padding: 8px 16px; }
   .attackBtn { position: absolute; left: 16px; bottom: 56px; z-index: 5; background: #0201a7; color: #fff; border: 0; border-radius: 999px; padding: 12px 20px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none; }
   @media (pointer: coarse) { .attackBtn { display: block; } }
@@ -57,7 +58,7 @@
     <button class="talkBtn" id="enterBtn" type="button" hidden>Enter your chamber</button>
     <button class="talkBtn" id="manifestBtn" type="button" hidden>Manifest</button>
     <button class="mirrorCloseBtn" id="mirrorCloseBtn" type="button" hidden>Step away</button>
-    <div class="photoPopup" id="photoPopup" hidden><img src="assets/couple-photo.jpg" alt="A framed photo of Sylvia and Ray kissing in the ruins"><span class="photoHint">Tap or press Esc to put it back</span></div>
+    <div class="photoPopup" id="photoPopup" hidden><img src="assets/couple-photo.jpg" alt="A framed photo of Sylvia and Ray kissing in the ruins"><span class="photoQuote">"We should get better photos taken when we're out of the swamps..." — Sylvia</span><span class="photoHint">Tap or press Esc to put it back</span></div>
     <div class="bar"><span>W A S D or arrow keys to walk · Hold Space to go faster · Click to attack</span><span>Ray just wanders the bar</span></div>
   </section>
 
@@ -66,7 +67,7 @@
     <div class="tile"><h2>Meet Sylvia and Ray</h2><p>Sylvia is the main character. Ray is a head taller than her and just wanders the bar while she finds the way out.</p></div>
     <div class="tile"><h2>The bar</h2><p>The bar under the ground, where Vicky pours drinks. The stairs on the right lead up to the Forgotten subway. Their chamber is through the far left edge.</p></div>
     <div class="tile"><h2>The golden mirror</h2><p>The makeup desk in the chamber, with a golden arched mirror. She looks in it, blinks, and when she manifests she shuts her eyes and says her life is about to get better, and she and Ray will get out and live happily on land.</p></div>
-    <div class="tile"><h2>The photo on the nightstand</h2><p>A framed photo of Sylvia and Ray kissing in the ruins, on the nightstand beside the bed. Walk up to it and press E and it pops up big, with the rest of the game blurred behind it. Tap it or press Esc to put it back.</p></div>
+    <div class="tile"><h2>The photo on the nightstand</h2><p>A framed photo of Sylvia and Ray kissing in the ruins, on the nightstand beside the bed. Walk right up to it and press E and it pops up big, with the rest of the game blurred behind it. Sylvia says they should get better photos taken when they are out of the swamps. Tap it or press Esc to put it back.</p></div>
     <div class="tile"><h2>The Forgotten subway</h2><p>An abandoned station up the stairs from the bar, with a rusty old train. The stairs on the right climb up to the garden.</p></div>
     <div class="tile"><h2>The Garden</h2><p>A lush underground garden above the subway, with waterfalls, a pond and a stone bridge. The stairs on the right climb higher, toward the way out.</p></div>
     <div class="tile"><h2>The Shopping District</h2><p>A neon canal street under the ground, with a repairs shop, a clothing store, a style studio and an arcade. Climb out of the chamber window to get there. The bar door with the beer mug leads to the bar.</p></div>
