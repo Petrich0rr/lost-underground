@@ -163,7 +163,7 @@
     // at it, popped up over a blurred game.
     photo: { active: false },
     map: { active: false },
-    inspect: { active: false, t: 0 }
+    inspect: { active: false, t: 0, arch: 0 }
   };
   // Her affirmations, said to the mirror with her eyes shut. She is
   // girl bossy but shy, and every one of them is optimistic: her life
@@ -540,23 +540,31 @@
     var pop = document.getElementById("mapPopup");
     if (pop) pop.hidden = true;
   }
-  // The secret under the arcade floor: one of the dark arches in the
-  // floor is a hidden passage down to the Crystal Quarry. Walk over
-  // it and press E to inspect it. They crouch down to look, then
+  // The secret under the arcade floor: three dark arches in the
+  // floor are hidden passages down to the Crystal Quarry. Walk over
+  // one and press I to inspect it. They crouch down to look, then
   // jump down together, holding hands, and land in the quarry.
-  var INSPECT_X = 1080, INSPECT_RANGE = 90;
-  function inspectNear() {
-    return g.room === "arcade" && Math.abs(g.px - INSPECT_X) < INSPECT_RANGE;
+  var INSPECT_XS = [348, 1086, 1955], INSPECT_RANGE = 90;
+  function inspectArch() {
+    if (g.room !== "arcade") return null;
+    var best = null, bd = 1e9;
+    for (var i = 0; i < INSPECT_XS.length; i++) {
+      var d = Math.abs(g.px - INSPECT_XS[i]);
+      if (d < bd) { bd = d; best = INSPECT_XS[i]; }
+    }
+    return bd < INSPECT_RANGE ? best : null;
   }
+  function inspectNear() { return inspectArch() !== null; }
   function drawInspectPrompt() {
     if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.inspect.active) return;
-    if (!inspectNear()) return;
-    var x = INSPECT_X * scale() - g.camX;
+    var ax = inspectArch();
+    if (ax === null) return;
+    var x = ax * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to inspect";
+    var label = "Press I to inspect";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.beginPath();
@@ -569,19 +577,20 @@
   }
   function startInspect() {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.inspect.active) return;
-    if (!inspectNear()) return;
+    var ax = inspectArch();
+    if (ax === null) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
-    g.inspect.active = true; g.inspect.t = 0;
+    g.inspect.active = true; g.inspect.t = 0; g.inspect.arch = ax;
     // Face the secret spot while they crouch down to look at it.
-    g.facing = g.px < INSPECT_X ? 1 : -1;
-    g.ray.dir = g.ray.x < INSPECT_X ? 1 : -1;
+    g.facing = g.px < ax ? 1 : -1;
+    g.ray.dir = g.ray.x < ax ? 1 : -1;
   }
   function updateInspect() {
     g.inspect.t += 1;
     var t = g.inspect.t;
     if (t < 60) {
       // They crouch down and inspect the secret spot.
-      g.camX = clampCam(INSPECT_X * scale() - g.w * 0.38);
+      g.camX = clampCam(g.inspect.arch * scale() - g.w * 0.38);
       return;
     }
     if (t >= 150) {
@@ -1894,6 +1903,7 @@
     if (e.code === "KeyK") { tryKiss(); return; }
     if (e.code === "KeyH") { tryAttack(); return; }
     if (e.code === "KeyE") { tryEnter(); return; }
+    if (e.code === "KeyI") { startInspect(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
     if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
