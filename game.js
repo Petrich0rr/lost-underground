@@ -49,10 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=76" forces a fresh download: X never uses their names, and
-  // when he shows himself at the bottom both of them turn and face
-  // him, shocked. A browser that cached ?v=75 picks up both.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=76"; return img; }
+  // "?v=77" forces a fresh download: the energy bar drains faster
+  // now, a full bar in about 10 minutes instead of 25, so it
+  // actually moves while she plays. A browser that cached ?v=76
+  // picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=77"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -5338,10 +5339,10 @@
       // A movement key wakes her up, and then walks as normal.
       if (keys.left || keys.right || keys.up || keys.down) wakeUp();
     }
-    // Energy drains very slowly while she is awake: 1 point every
-    // 15 seconds, so a full bar lasts about 25 minutes. It does not
+    // Energy drains slowly while she is awake: 1 point every
+    // 6 seconds, so a full bar lasts about 10 minutes. It does not
     // drain while she sleeps, or while a menu or cutscene holds her.
-    if (!g.sleeping) g.energy = Math.max(0, g.energy - 1 / 900);
+    if (!g.sleeping) g.energy = Math.max(0, g.energy - 1 / 360);
     // Out of health or out of energy, she collapses and Ray carries
     // her home. Either one reaching zero starts the rescue.
     if ((g.hp <= 0 || g.energy <= 0) && !g.rescue.active) startRescue();
