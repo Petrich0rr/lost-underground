@@ -39,12 +39,13 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=25" forces a fresh download after the tunnels vanish is
-  // fixed: the iron-door and portal prompts called a roundRect that
-  // did not exist, and the error stopped the draw before the
-  // characters, so they vanished in the portal range. Both prompts
-  // now use ctx.roundRect with a ctx.rect fallback, like the rest.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=25"; return img; }
+  // "?v=26" forces a fresh download after Alexis is added (one of
+  // the wealthiest in the underground, spoiled and bitchy, lowkey
+  // after Ray, wandering the Shopping District street, the clothing
+  // store and the bar), plus a small fix so the junk prompt hides
+  // when a door prompt is showing. A browser that cached ?v=25
+  // picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=26"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -91,6 +92,16 @@
   var eveTalkImg = loadImg("assets/eve-talk.png");
   var eveSurprisedImg = loadImg("assets/eve-surprised.png");
   var eveLaughImg = loadImg("assets/eve-laugh.png");
+  // Alexis, one of the wealthiest in the underground, spoiled and
+  // bitchy, lowkey after Ray. She wanders the Shopping District
+  // street and goes to the clothing store and the bar often. Four
+  // walk frames (facing right), a standing pose, and talk, surprised
+  // and laughing poses.
+  var alexisWalkImgs = ["assets/alexis-walk-01.png", "assets/alexis-walk-02.png", "assets/alexis-walk-03.png", "assets/alexis-walk-04.png"].map(loadImg);
+  var alexisIdleImg = loadImg("assets/alexis-idle.png");
+  var alexisTalkImg = loadImg("assets/alexis-talk.png");
+  var alexisSurprisedImg = loadImg("assets/alexis-surprised.png");
+  var alexisLaughImg = loadImg("assets/alexis-laugh.png");
   // The arcade kids: three regulars who stay in the arcade. Each has
   // an idle portrait and a 4-frame side walk, all facing right.
   var arcadeGamerWalkImgs = ["assets/arcade-gamer-walk-01.png", "assets/arcade-gamer-walk-02.png", "assets/arcade-gamer-walk-03.png", "assets/arcade-gamer-walk-04.png"].map(loadImg);
@@ -244,12 +255,20 @@
     // anywhere else. laughT counts down a laugh after she says
     // something funny; surprisedT counts down her greeting surprise.
     eve: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0, laughT: 0, surprisedT: 0 },
+    // Alexis, one of the wealthiest in the underground, spoiled and
+    // bitchy, lowkey after Ray. She wanders the Shopping District
+    // street and goes to the clothing store and the bar often, so her
+    // room rotates between the three when Sylvia is not with her.
+    // roomT counts down to her next move; laughT and surprisedT are
+    // her talk poses, like Eve's.
+    alexis: { x: 1400, dir: 1, pause: 120, walk: 0, depth: 0, room: "shopping", roomT: 3000, laughT: 0, surprisedT: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
     ownerTalk: { open: false, idx: -1, key: null },
     kidTalk: { open: false, idx: -1, key: null },
     eveTalk: { open: false, idx: -1 },
+    alexisTalk: { open: false, idx: -1 },
     // Talking to Ray: open while the conversation runs. step 0 is
     // Ray's opening line (Sylvia's turn to pick a reply), step 1 is
     // Sylvia's line showing, step 2 is Ray's reply showing.
@@ -438,6 +457,39 @@
       g.eve.surprisedT = 0;
     }
   }
+  // Alexis, one of the wealthiest in the underground, very spoiled
+  // and bitchy, lowkey after Ray. She wanders the Shopping District
+  // street and goes to the clothing store and the bar often.
+  var ALEXIS_LINES = [
+    "Oh, Sylvia. Still wearing that same blue dress? How... loyal of you.",
+    "I own three fur stoles. Three. Down here. Do you know how hard that is? Of course you do not.",
+    "Ray is so strong. It is a shame he spends all his time following you around like a lost puppy.",
+    "Char's shop is cute. I bought half of it last week. She did not even blink.",
+    "I only come to the bar because Vicky is the only one who pours my drink correctly. Everyone else is an amateur.",
+    "I am the wealthiest person in the underground. I do not brag. I just state facts.",
+    "You and Ray are... sweet. In a tragic, sewer kind of way.",
+    "If I wanted Ray, I could have him. I am just being polite. For now.",
+    "This dress cost more than your whole room. But do not feel bad. Most things do.",
+    "You are lucky, Sylvia. Ray is a catch. I would know. I have been fishing."
+  ];
+  function alexisNear() { return g.room === g.alexis.room && Math.abs(g.px - g.alexis.x) < 150; }
+  function alexisTalkLine() {
+    var first = !g.alexisTalk.open;
+    var idx;
+    do { idx = Math.floor(Math.random() * ALEXIS_LINES.length); }
+    while (ALEXIS_LINES.length > 1 && idx === g.alexisTalk.idx);
+    g.alexisTalk.idx = idx; g.alexisTalk.open = true;
+    if (first) {
+      // Greeting: she is surprised to see Sylvia, then the mask goes
+      // back on.
+      g.alexis.surprisedT = 45;
+      g.alexis.laughT = 0;
+    } else {
+      // She laughs after her little jabs, because of course she does.
+      g.alexis.laughT = 90;
+      g.alexis.surprisedT = 0;
+    }
+  }
   function kidLines(key) {
     if (key === "dino") return KUSH_LINES;
     if (key === "cup") return LIA_LINES;
@@ -457,6 +509,7 @@
     if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
     if (g.kidTalk.open) { kidTalkLine(g.kidTalk.key); return; }
     if (g.eveTalk.open) { eveTalkLine(); return; }
+    if (g.alexisTalk.open) { alexisTalkLine(); return; }
     if (g.rayTalk.open) { advanceRayTalk(); return; }
     // One conversation at a time: the room's own NPC wins, and Ray
     // is the fallback when nobody else is near to talk to.
@@ -466,6 +519,7 @@
     var kid = kidNear();
     if (kid) { kidTalkLine(kid); return; }
     if (eveNear()) { eveTalkLine(); return; }
+    if (alexisNear()) { alexisTalkLine(); return; }
     if (rayNear()) rayTalkLine();
   }
   // The shop owners. Walk up to one and press T to talk: they stop and
@@ -656,7 +710,7 @@
   }
   function closeRayTalk() { g.rayTalk.open = false; g.rayTalk.step = 0; g.rayTalk.choice = -1; }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -860,7 +914,7 @@
   function teleportToRoom(roomKey) {
     if (!ROOMS[roomKey]) return;
     closeMap();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.rayTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.rayTalk.open = false;
     g.propRead.open = false; hidePropPanel();
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
@@ -904,7 +958,7 @@
   }
   function inspectNear() { return inspectArch() !== null; }
   function drawInspectPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
     // One small, quiet button down at the floor, right over the arch.
     // It stays subtle so the secret does not shout.
     var ax = g.inspect.active ? g.inspect.arch : inspectArch();
@@ -981,7 +1035,7 @@
     return bd < PROP_RANGE ? best : null;
   }
   function readProp(p) {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x;
     // Crouch down to read it, the same as pressing I.
     g.inspect.active = true; g.inspect.phase = "look"; g.inspect.arch = null; g.inspect.t = 0;
@@ -991,7 +1045,10 @@
   }
   function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; hidePropPanel(); }
   function drawPropPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
+    // A door prompt wins over a junk prompt when Sylvia stands near
+    // both, so the two texts never draw on top of each other.
+    if (portalNear() || ironDoorNear()) return;
     var p = propNear();
     if (!p) return;
     var x = g.px * scale() - g.camX;
@@ -1075,7 +1132,7 @@
     if (panel) panel.hidden = true;
   }
   function startInspect() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
     // Already reading a piece of junk: I puts it back down and she
     // stands back up.
     if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; }
@@ -1091,7 +1148,7 @@
     // else there is nothing to look at, so no crouch.
     var ax = inspectArch();
     var prop = propNear();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false;
     if (ax !== null) {
       // At a secret arch: crouch down and look at it.
       g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = ax;
@@ -1149,7 +1206,7 @@
     return g.room === "tunnels" && Math.abs(g.px - IRON_DOOR_X) < IRON_DOOR_RANGE;
   }
   function drawIronDoorPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
     var x = IRON_DOOR_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1167,9 +1224,9 @@
     ctx.restore();
   }
   function enterDungeonFromIronDoor() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false;
     g.room = "dungeon";
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -1186,7 +1243,7 @@
     return g.room === "tunnels" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
   }
   function drawPortalPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     var x = PORTAL_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1204,9 +1261,9 @@
     ctx.restore();
   }
   function goThroughPortal() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false;
     // Straight back home to their room, no tunnel image, no wait.
     g.room = "chamber";
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -1356,12 +1413,12 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
     var to = EXITS[g.room][side];
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false;
     g.room = to;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
@@ -1963,6 +2020,40 @@
     ctx.restore();
   }
 
+  // Alexis, one of the wealthiest in the underground, spoiled and
+  // bitchy, lowkey after Ray. She appears in whichever room she is
+  // in right now: the Shopping District street, the clothing store,
+  // or the bar. While talking she shows her surprised pose for the
+  // greeting, her talk pose for the line, and her laughing pose
+  // right after one of her little jabs.
+  function drawAlexis() {
+    if (g.room !== g.alexis.room) return;
+    var ax = g.alexis;
+    var talking = g.alexisTalk.open;
+    var walking = !talking && ax.pause <= 0;
+    var img;
+    if (talking && ax.surprisedT > 0) img = alexisSurprisedImg;
+    else if (talking && ax.laughT > 0) img = alexisLaughImg;
+    else if (talking) img = alexisTalkImg;
+    else img = walking ? alexisWalkImgs[Math.floor(ax.walk / 6) % alexisWalkImgs.length] : alexisIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = alexisIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (ax.depth + depthRange()) / depthRange();
+    var h = sylviaH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + ax.depth - 6;
+    var x = ax.x * scale() - g.camX;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    // Her walk frames face right, so flip them when she walks left.
+    // The idle, talk, surprised and laugh poses are front views,
+    // never flipped.
+    if (walking && ax.dir === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
   function drawEmbrace() {
     if (!embraceImg || !embraceImg.complete || embraceImg.naturalWidth === 0) {
       drawRay();
@@ -2120,6 +2211,53 @@
     ctx.font = "700 12px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("EVE", bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
+  function drawAlexisTalk() {
+    // Speech bubble above Alexis, tail pointing down to her. Mirrors
+    // Eve's bubble. She can be in the shopping street, the clothing
+    // store or the bar, so her position is her own room's x.
+    if (!g.alexisTalk.open) return;
+    var ax = g.alexis;
+    var ex = ax.x * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(ALEXIS_LINES[g.alexisTalk.idx], maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText("ALEXIS").width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, ex - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, ex));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("ALEXIS", bx + 16, by + 20);
     ctx.fillStyle = "#1a1a2e";
     ctx.font = "400 14px 'Open Sans', sans-serif";
     for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
@@ -2532,8 +2670,8 @@
     drawIronDoorPrompt();
     drawPortalPrompt();
     drawScooterPrompt();
-    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); return; }
-    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); return; }
+    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); return; }
+    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); return; }
     if (g.scooter.riding) drawScooterRide();
     else drawRay();
     drawChar();
@@ -2541,11 +2679,13 @@
     drawGunner();
     drawArcadeKids();
     drawEve();
+    drawAlexis();
     if (!g.scooter.riding && !g.sleeping) drawSylvia();
     drawTalk();
     drawOwnerTalk();
     drawKidTalk();
     drawEveTalk();
+    drawAlexisTalk();
     drawRayTalk();
     drawDebug();
   }
@@ -2637,6 +2777,9 @@
     if (g.eveTalk.open) {
       if (g.room !== "shopping" || Math.abs(g.px - g.eve.x) > 180) g.eveTalk.open = false;
     }
+    if (g.alexisTalk.open) {
+      if (g.room !== g.alexis.room || Math.abs(g.px - g.alexis.x) > 180) g.alexisTalk.open = false;
+    }
     if (g.rayTalk.open && Math.abs(g.px - g.ray.x) > 180) closeRayTalk();
     if (g.propRead.open && Math.abs(g.px - g.propRead.x) > 180) closePropRead();
     // Sylvia's reply choices: four buttons around her head, only
@@ -2674,10 +2817,12 @@
       else if (g.ownerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.kidTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.eveTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.alexisTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
       else if (nearKid) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + KIDS[nearKid].name; }
       else if (eveNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Eve"; }
+      else if (alexisNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Alexis"; }
       else if (rayNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Ray"; }
       else talkBtn.hidden = true;
     }
@@ -2876,6 +3021,37 @@
       }
     }
     if (g.eveTalk.open) ev.dir = g.px < ev.x ? -1 : 1; // face Sylvia
+    // Alexis: she wanders the Shopping District street and goes to
+    // the clothing store and the bar often, so her room rotates
+    // between the three. She only moves rooms when her talk is closed
+    // and Sylvia is not in her room, so she never vanishes in front
+    // of Sylvia. While talking she stands still and faces Sylvia;
+    // her laugh and surprise timers count down here.
+    var ax = g.alexis;
+    if (ax.laughT > 0) ax.laughT -= 1;
+    if (ax.surprisedT > 0) ax.surprisedT -= 1;
+    if (!g.alexisTalk.open && g.room !== ax.room) {
+      ax.roomT -= 1;
+      if (ax.roomT <= 0) {
+        var aRooms = ["shopping", "clothing", "bar"];
+        var aNext;
+        do { aNext = aRooms[Math.floor(Math.random() * aRooms.length)]; }
+        while (aNext === ax.room);
+        ax.room = aNext;
+        ax.x = 110; ax.dir = 1; ax.pause = 60;
+        ax.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
+      }
+    }
+    if (g.room === ax.room && !g.alexisTalk.open) {
+      if (ax.pause > 0) { ax.pause -= 1; }
+      else {
+        ax.x += ax.dir * 0.8;
+        ax.walk += 0.3;
+        if (ax.x < 150 || ax.x > room().w - 150) { ax.dir *= -1; ax.pause = 60 + Math.random() * 120; }
+        else if (Math.random() < 0.002) { ax.pause = 90 + Math.random() * 150; }
+      }
+    }
+    if (g.alexisTalk.open) ax.dir = g.px < ax.x ? -1 : 1; // face Sylvia
     // When she is standing still and he wanders up right behind
     // her, he holds her for a few seconds, then wanders off again.
     if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
@@ -2921,7 +3097,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
