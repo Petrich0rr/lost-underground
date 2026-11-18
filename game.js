@@ -37,10 +37,9 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=6" forces a fresh download after Ray's talking poses and
-  // the flirty fourth reply, so a browser that cached ?v=5 picks
-  // up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=6"; return img; }
+  // "?v=7" forces a fresh download after the Ray talk crash fix,
+  // so a browser that cached ?v=6 picks up the working code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=7"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -310,8 +309,8 @@
   function pressT() {
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (g.talk.open) { talkLine(); return; }
-    if (g.ownerTalk.open || g.rayTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
-    if (g.kidTalk.open || g.rayTalk.open) { kidTalkLine(g.kidTalk.key); return; }
+    if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
+    if (g.kidTalk.open) { kidTalkLine(g.kidTalk.key); return; }
     if (g.rayTalk.open) { advanceRayTalk(); return; }
     // One conversation at a time: the room's own NPC wins, and Ray
     // is the fallback when nobody else is near to talk to.
@@ -1539,7 +1538,7 @@
   function drawKidTalk() {
     // Speech bubble above the arcade kid Sylvia is talking to,
     // tail pointing down to them. Mirrors the owners' bubble.
-    if (!g.kidTalk.open || g.rayTalk.open) return;
+    if (!g.kidTalk.open) return;
     var key = g.kidTalk.key;
     var k = g.kids[key];
     var name = KIDS[key].name.toUpperCase();
@@ -1647,7 +1646,7 @@
   function drawOwnerTalk() {
     // Speech bubble above the shop owner Sylvia is talking to,
     // tail pointing down to them. Mirrors Vicky's bubble.
-    if (!g.ownerTalk.open || g.rayTalk.open) return;
+    if (!g.ownerTalk.open) return;
     var key = g.ownerTalk.key;
     var o = g[key];
     var name = OWNERS[key].name.toUpperCase();
@@ -2028,11 +2027,11 @@
       return;
     }
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
-    if (g.ownerTalk.open || g.rayTalk.open) {
+    if (g.ownerTalk.open) {
       var otk = g.ownerTalk.key;
       if (g.room !== OWNERS[otk].room || Math.abs(g.px - g[otk].x) > 180) g.ownerTalk.open = false;
     }
-    if (g.kidTalk.open || g.rayTalk.open) {
+    if (g.kidTalk.open) {
       var ktk = g.kidTalk.key;
       if (g.room !== "arcade" || Math.abs(g.px - g.kids[ktk].x) > 180) g.kidTalk.open = false;
     }
@@ -2056,8 +2055,8 @@
       var nearOwner = ownerNear();
       var nearKid = kidNear();
       if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
-      else if (g.ownerTalk.open || g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.kidTalk.open || g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.ownerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.kidTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
       else if (nearKid) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + KIDS[nearKid].name; }
@@ -2224,7 +2223,7 @@
       var kidKeys = ["gamer", "dino", "cup"];
       for (var ki = 0; ki < kidKeys.length; ki++) {
         var kd = g.kids[kidKeys[ki]];
-        if (g.kidTalk.open || g.rayTalk.open && g.kidTalk.key === kidKeys[ki]) continue;
+        if (g.kidTalk.open && g.kidTalk.key === kidKeys[ki]) continue;
         if (kd.pause > 0) { kd.pause -= 1; }
         else {
           kd.x += kd.dir * 0.8;
