@@ -40,12 +40,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=36" forces a fresh download after the dungeon monsters are
-  // added: Key Knight, Candle Pup, Bitey Rock and Bell Ghost live in
-  // the Ancient Dungeon, 2 hits each to kill, 1 coin dropped per kill,
-  // 3 monster hits cost one heart, and kissing Ray restores one heart.
-  // A browser that cached ?v=35 picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=36"; return img; }
+  // "?v=37" forces a fresh download after the monsters are made a
+  // bit smaller but jump much higher, and the iron door prompt now
+  // says Dungeon instead of iron door. A browser that cached ?v=36
+  // picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=37"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1500,7 +1499,7 @@
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to go through the iron door";
+    var label = "Press E to go to Dungeon";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(20,10,30,0.72)";
     if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
@@ -1981,10 +1980,10 @@
   // they are big enough for her high kick to reach, and they hop and
   // bob up into the kick as they move.
   var MONSTERS = {
-    keyknight: { imgs: monsterKeyknightImgs, h: 0.21, speed: 0.5, hop: 0.010 },
-    candlepup: { imgs: monsterCandlepupImgs, h: 0.20, speed: 0.9, hop: 0.05 },
-    biteyrock: { imgs: monsterBiteyrockImgs, h: 0.23, speed: 0.4, hop: 0.055 },
-    bellghost: { imgs: monsterBellghostImgs, h: 0.22, speed: 0.6, hop: 0.02 }
+    keyknight: { imgs: monsterKeyknightImgs, h: 0.16, speed: 0.5, hop: 0.07 },
+    candlepup: { imgs: monsterCandlepupImgs, h: 0.15, speed: 0.9, hop: 0.12 },
+    biteyrock: { imgs: monsterBiteyrockImgs, h: 0.17, speed: 0.4, hop: 0.13 },
+    bellghost: { imgs: monsterBellghostImgs, h: 0.16, speed: 0.6, hop: 0.03 }
   };
   function spawnMonsters() {
     g.monsters = [];
@@ -2084,24 +2083,26 @@
       if (!img || !img.complete || img.naturalWidth === 0) continue;
       var h = monsterH(m);
       var w = h * (img.naturalWidth / img.naturalHeight);
-      // Hop and bob: the pup hops, the rock bounces, the ghost bobs in
-      // the air, the knight takes tiny steps with a small bounce. The
-      // lift carries them up into her high kick.
+      // Jump high: the pup hops, the rock bounces, the knight jumps
+      // too, and the ghost floats high and bobs in the air. The lift
+      // carries them up into her high kick.
       var lift = 0;
-      if (m.type === "candlepup") {
+      if (m.type === "keyknight") {
+        var kh = m.hopT % 100;
+        lift = kh < 40 ? Math.sin(kh / 40 * Math.PI) * g.h * def.hop : 0;
+      } else if (m.type === "candlepup") {
         var ph = m.hopT % 90;
-        lift = ph < 30 ? Math.sin(ph / 30 * Math.PI) * g.h * def.hop : 0;
+        lift = ph < 35 ? Math.sin(ph / 35 * Math.PI) * g.h * def.hop : 0;
       } else if (m.type === "biteyrock") {
         var bh = m.hopT % 110;
-        lift = bh < 35 ? Math.sin(bh / 35 * Math.PI) * g.h * def.hop : 0;
-      } else if (m.type === "bellghost") {
-        lift = g.h * 0.02 + Math.sin(m.hopT * 0.08) * g.h * 0.015;
+        lift = bh < 40 ? Math.sin(bh / 40 * Math.PI) * g.h * def.hop : 0;
       } else {
-        lift = Math.abs(Math.sin(m.hopT * 0.15)) * g.h * 0.008;
+        lift = g.h * 0.04 + Math.sin(m.hopT * 0.08) * g.h * def.hop;
       }
-      var feetY = groundY() + m.depth - lift;
+      var groundFeetY = groundY() + m.depth;
+      var feetY = groundFeetY - lift;
       var x = m.x * scale() - g.camX;
-      shadow(x, feetY, w);
+      shadow(x, groundFeetY, w);
       ctx.save();
       if (m.hitT > 0 && m.hitT % 4 < 2) ctx.globalAlpha = 0.4;
       ctx.translate(x, feetY - h / 2);
@@ -3750,7 +3751,7 @@
       else if (scooterNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Ride the scooter"; }
       else if (propNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.propRead.open ? "Put it down" : "Inspect"; }
       else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.inspect.active ? "Go down" : "Inspect"; }
-      else if (ironDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Iron door"; }
+      else if (ironDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Dungeon"; }
       else if (portalNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go home"; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
