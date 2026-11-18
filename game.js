@@ -442,7 +442,7 @@
   // The framed photo on the nightstand, beside the bed: walk up to it
   // and press E and it pops up over the game, with the rest of the
   // screen blurred behind it. Esc or a tap puts it back.
-  var PHOTO_X = 1050, PHOTO_RANGE = 110;
+  var PHOTO_X = 1050, PHOTO_RANGE = 70;
   function photoNear() {
     return g.room === "chamber" && Math.abs(g.px - PHOTO_X) < PHOTO_RANGE;
   }
@@ -1287,7 +1287,7 @@
     ctx.restore();
   }
   function drawBedPrompt() {
-    if (g.kiss.active || g.talk.open || g.photo.active) return;
+    if (g.kiss.active || g.talk.open || g.photo.active || photoNear()) return;
     if (!g.sleeping && !bedNear()) return;
     var x = BED_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
