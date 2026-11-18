@@ -49,11 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=66" forces a fresh download: three deeper dungeon levels
-  // (the Crypt, the Cages, the Court) through the dungeon's stone
-  // door, and save files you can download and load back. A browser
-  // that cached ?v=65 picks up both.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=66"; return img; }
+  // "?v=67" forces a fresh download: the health hearts are pink
+  // heart images now, not canvas fills, so the fifth heart can never
+  // pick up the energy bar's color again. A browser that cached
+  // ?v=66 picks up the fix.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=67"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -212,6 +212,9 @@
   var monsterBiteyrockImgs = [loadImg("assets/monster-biteyrock-01.png"), loadImg("assets/monster-biteyrock-02.png"), loadImg("assets/monster-biteyrock-03.png"), loadImg("assets/monster-biteyrock-04.png")];
   var monsterBellghostImgs = [loadImg("assets/monster-bellghost-01.png"), loadImg("assets/monster-bellghost-02.png"), loadImg("assets/monster-bellghost-03.png"), loadImg("assets/monster-bellghost-04.png")];
   var coinImgs = [loadImg("assets/coin-01.png"), loadImg("assets/coin-02.png"), loadImg("assets/coin-03.png"), loadImg("assets/coin-04.png")];
+  var heartFullImg = loadImg("assets/heart-full.png");
+  var heartHalfImg = loadImg("assets/heart-half.png");
+  var heartEmptyImg = loadImg("assets/heart-empty.png");
   // Treasure chest opening: closed, slightly open, open with coins,
   // open with more coins and a sparkle. All on one common canvas,
   // bottom-aligned, so the lid rises and the base stays put.
@@ -4352,31 +4355,26 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
-  // Health hearts, redrawn clean. Every heart is pink, no outline,
-  // no gold anywhere near them: full = solid pink, half = lighter
-  // pink, empty = a faint pink outline so it still reads as a heart.
+  // Health hearts, drawn as pink heart images. They are pictures,
+  // not canvas fills, so nothing else on the top row can tint one.
   function drawHp() {
     ctx.save();
     ctx.font = "700 11px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.fillText("HP", 14, 26);
+    // The hearts are images now, not canvas fills, so no fill color
+    // from anywhere else in the HUD can ever tint one. Full = solid
+    // pink, half = light pink, empty = a faint pink heart.
     for (var i = 0; i < 5; i++) {
       var full = g.hp >= (i + 1) * 20;
       var half = !full && g.hp > i * 20;
       var cx = 44 + i * 24, cy = 22;
-      if (full) {
-        drawHeart(cx, cy, 9, "#ff5b8f");
-      } else if (half) {
-        drawHeart(cx, cy, 9, "#ff8fb5");
+      var hImg = full ? heartFullImg : half ? heartHalfImg : heartEmptyImg;
+      if (hImg && hImg.complete && hImg.naturalWidth > 0) {
+        ctx.drawImage(hImg, cx - 10, cy - 10, 20, 20);
       } else {
-        ctx.strokeStyle = "rgba(255,91,143,0.45)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy + 9 * 0.35);
-        ctx.bezierCurveTo(cx - 9, cy - 9 * 0.5, cx - 9 * 0.45, cy - 9 * 1.1, cx, cy - 9 * 0.4);
-        ctx.bezierCurveTo(cx + 9 * 0.45, cy - 9 * 1.1, cx + 9, cy - 9 * 0.5, cx, cy + 9 * 0.35);
-        ctx.stroke();
+        drawHeart(cx, cy, 9, full ? "#ff5b8f" : half ? "#ff8fb5" : "rgba(255,91,143,0.25)");
       }
     }
     // Coins sit beside the hearts on the top row, small and set well
