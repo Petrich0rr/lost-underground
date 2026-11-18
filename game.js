@@ -42,13 +42,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=46" forces a fresh download after the garden door home: the
-  // stone arch on the right of the Secret Garden takes them back
-  // home to the chamber. They walk through it together, backs to
-  // the camera, in their back walk frames, and arrive in the room.
-  // A soft warm glow marks the doorway. A browser that cached ?v=45
+  // "?v=47" forces a fresh download after the garden door becomes
+  // E-gated like a portal, and they walk UP into the open doorway
+  // instead of to the right. Walking into it no longer starts it;
+  // press E (or tap Go home) to go home. A browser that cached ?v=46
   // picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=46"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=47"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -2051,10 +2050,12 @@
   }
   // The stone arch doorway on the right of the Secret Garden. Its
   // dark opening is centred at world x 2025 in the 2172-wide room
-  // (measured from the art with marker lines). Walk through it and
-  // they walk home together, backs to the camera, into the doorway,
-  // and arrive in the chamber. It is the second way home, beside the
-  // blue tunnel mouth in the Old Service Tunnels.
+  // (measured from the art with marker lines). It is more like a
+  // portal: press E (or tap Go home) and they walk up into the open
+  // doorway together, backs to the camera, and arrive in the
+  // chamber. It is the second way home, beside the blue tunnel mouth
+  // in the Old Service Tunnels. Walking into it does NOT start it;
+  // it needs E, like the portal.
   var GARDEN_DOOR_X = 2025, GARDEN_DOOR_RANGE = 90;
   function gardenDoorNear() {
     return g.room === "garden" && Math.abs(g.px - GARDEN_DOOR_X) < GARDEN_DOOR_RANGE;
@@ -2068,20 +2069,18 @@
     g.facing = 1;
   }
   function updateHomeWalk() {
-    // They walk together through the doorway, backs to the camera,
-    // drifting up into the dark arch as they go, then arrive home.
+    // They walk up into the open doorway together, backs to the
+    // camera, drifting to the centre of the arch as they go, then
+    // arrive home. They go up, not to the right: the doorway is an
+    // opening they step into, like a portal.
     g.homeWalk.t += 1;
-    g.px += 2;
-    g.depth -= 0.8;
+    g.px += (GARDEN_DOOR_X - g.px) * 0.05;
+    g.depth -= 1.2;
     if (g.depth < -depthRange()) g.depth = -depthRange();
     g.ray.x = g.px - 70;
     g.ray.depth = g.depth;
     g.ray.vdir = -1; g.ray.dir = 1;
     g.walk += 0.3; g.ray.walk += 0.3;
-    var target = g.px * scale() - g.w * 0.38;
-    if (target < 0) target = 0;
-    if (target > worldW() - g.w) target = worldW() - g.w;
-    g.camX += (target - g.camX) * 0.12;
     if (g.homeWalk.t >= 90) {
       g.homeWalk.active = false;
       g.room = "chamber";
@@ -2114,7 +2113,7 @@
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Walk through the door to go home";
+    var label = "Press E to go home";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.beginPath();
@@ -4049,8 +4048,8 @@
     // E needed. Stairs still need E to climb. Riding the scooter
     // through an edge carries it along (switchRoom moves its room).
     if ((keys.left && doorSide() === "left") || (keys.right && doorSide() === "right")) switchRoom();
-    // Walking into the garden door starts the walk home together.
-    if (g.room === "garden" && gardenDoorNear() && keys.right) startHomeWalk();
+    // The garden door is E-gated like a portal, so walking into it
+    // does nothing on its own. Press E (or tap Go home) to go home.
     if (keys.left || keys.right || keys.up || keys.down) g.walk += keys.fast ? 0.6 : 0.3;
     // Camera follows Sylvia across the bar.
     var target = g.px * scale() - g.w * 0.38;
