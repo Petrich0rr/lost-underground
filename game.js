@@ -42,11 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=54" forces a fresh download after the sleep confirm, the
-  // mayor of the whole underground city (he does not know about
-  // the way out), and the energy label shortening to E. A browser
-  // that cached ?v=53 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=54"; return img; }
+  // "?v=55" forces a fresh download after the story is set: they
+  // grew up underground, the surface is a dream, and getting out
+  // is too dangerous. A browser that cached ?v=54 picks up the
+  // new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=55"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -389,7 +389,7 @@
     // Energy: Sylvia's stamina for the day. It drains very slowly
     // while she is awake (about 25 minutes to empty) and refills
     // when she sleeps. At zero she walks slower and cannot run.
-    // day counts the mornings since she got lost down here; it
+    // day counts the mornings; it
     // goes up by one every time she wakes up. started stays false
     // on the title screen, so the world waits until she picks
     // Continue or New Game.
