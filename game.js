@@ -39,13 +39,15 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=32" forces a fresh download after the bar floor props are
-  // removed: Erika does not want any objects on the floor in the bar.
-  // The bar entry is gone from PROPS (drawProps and propNear both
-  // return early when PROPS[g.room] is missing), so the bar floor is
-  // clean; the subway, cistern, quarry, tunnels and dungeon keep
-  // their junk. A browser that cached ?v=31 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=32"; return img; }
+  // "?v=33" forces a fresh download after the white halo is cleaned
+  // off the shop owners (Char, Mikey, Gunner) and the arcade kids
+  // (Jamie, Kush, Lia), and the scooter is made smaller (parked
+  // 0.58, was 0.68; riding 0.98, was 1.15). The owners and kids were
+  // made before the white-unmultiply + 1px erosion step was
+  // standard, so they still carried a light halo; the new NPCs were
+  // already clean. A browser that cached ?v=32 picks up the new code
+  // and the cleaned art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=33"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1759,7 +1761,8 @@
     if (!scooterImg || !scooterImg.complete || scooterImg.naturalWidth === 0) return;
     // Sized so the parked scooter is the same width as the scooter
     // in the riding frames, so mounting it does not shrink it.
-    var h = sylviaH() * 0.68;
+    // Smaller now (0.58, was 0.68): Erika said it was a tad big.
+    var h = sylviaH() * 0.58;
     var w = h * (scooterImg.naturalWidth / scooterImg.naturalHeight);
     var x = g.scooter.x * scale() - g.camX;
     var feetY = groundY() + 2;
@@ -1776,7 +1779,8 @@
     var img = imgs[g.scooter.frame % imgs.length];
     if (!img || !img.complete || img.naturalWidth === 0) img = imgs[0];
     if (!img || !img.complete || img.naturalWidth === 0) return;
-    var h = sylviaH() * 1.15;
+    // Smaller now (0.98, was 1.15): Erika said riding it was a tad big.
+    var h = sylviaH() * 0.98;
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
