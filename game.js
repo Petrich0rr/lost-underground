@@ -42,10 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=62" forces a fresh download: the proposal scene uses
-  // Erika's new art, one picture per beat, ending in the embrace.
-  // A browser that cached ?v=61 picks up the new scene.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=62"; return img; }
+  // "?v=63" forces a fresh download: every HUD heart has a white
+  // outline so it reads as a heart, and the coin and energy bar sit
+  // further right, clear of the hearts. A browser that cached ?v=62
+  // picks up the fix.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=63"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -2920,12 +2921,17 @@
   }
 
   function drawHeart(x, y, s, color) {
-    ctx.fillStyle = color;
+    // A white outline around every heart so the shape reads as a heart
+    // even at small size, and no gold beside it can be mistaken for one.
     ctx.beginPath();
     ctx.moveTo(x, y + s * 0.35);
     ctx.bezierCurveTo(x - s, y - s * 0.5, x - s * 0.45, y - s * 1.1, x, y - s * 0.4);
     ctx.bezierCurveTo(x + s * 0.45, y - s * 1.1, x + s, y - s * 0.5, x, y + s * 0.35);
+    ctx.fillStyle = color;
     ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.stroke();
   }
 
   function drawKiss() {
@@ -4249,11 +4255,11 @@
     if (coinImg && coinImg.complete && coinImg.naturalWidth > 0) {
       var ch2 = 14;
       var cw2 = ch2 * (coinImg.naturalWidth / coinImg.naturalHeight);
-      ctx.drawImage(coinImg, 175, 15, cw2, ch2);
+      ctx.drawImage(coinImg, 190, 15, cw2, ch2);
     }
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "700 13px 'Open Sans', sans-serif";
-    ctx.fillText(String(g.coinCount), 194, 27);
+    ctx.fillText(String(g.coinCount), 209, 27);
     ctx.restore();
   }
   // Energy bar and day count. The bar sits beside the health bar
@@ -4269,9 +4275,9 @@
     // The energy label starts just after the hearts, and the bar
     // sits beside them on the top row. The coin count lives on the
     // second row now, clear of the hearts.
-    ctx.fillText("E", 220, 27);
-    var bx = 238, by = 14, bh = 16;
-    var bw = Math.max(50, Math.min(100, g.w - 252));
+    ctx.fillText("E", 235, 27);
+    var bx = 253, by = 14, bh = 16;
+    var bw = Math.max(50, Math.min(100, g.w - 267));
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 8);
     else ctx.rect(bx, by, bw, bh);
