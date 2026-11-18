@@ -59,6 +59,11 @@
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var rayReachImg = loadImg("assets/ray-reach.png");
   var sylviaClimbImg = loadImg("assets/sylvia-pose-sneak.png");
+  // The golden mirror at the chamber vanity: she blinks, and when
+  // she manifests she shuts her eyes and says an affirmation.
+  var mirrorOpenImg = loadImg("assets/mirror-open.jpg");
+  var mirrorHalfImg = loadImg("assets/mirror-half.jpg");
+  var mirrorClosedImg = loadImg("assets/mirror-closed.jpg");
   var charWalkImgs = ["assets/owner-walk-01.png", "assets/owner-walk-02.png", "assets/owner-walk-03.png", "assets/owner-walk-04.png"].map(loadImg);
   var charIdleImg = loadImg("assets/owner-idle.png");
   var charTalkImg = loadImg("assets/owner-talk.png");
@@ -115,8 +120,27 @@
     // first out the window and reaches back for her; on stairs they
     // climb up together. While it plays, the two of them are driven
     // by the climb, not by the keys.
-    climb: { active: false, t: 0, kind: null, to: null, baseX: 0, topX: 0, rayStartX: 0, sylStartX: 0, rayY: 0, sylY: 0, rayHidden: false, sylHidden: false }
+    climb: { active: false, t: 0, kind: null, to: null, baseX: 0, topX: 0, rayStartX: 0, sylStartX: 0, rayY: 0, sylY: 0, rayHidden: false, sylHidden: false },
+    // The mirror at the vanity: active while she is looking into it,
+    // blink counts a blink in progress, blinkT counts down to the
+    // next blink, and manifesting holds her eyes shut on an
+    // affirmation for a few seconds.
+    mirror: { active: false, blink: 0, blinkT: 200, manifesting: false, manifestT: 0, affirmIdx: 0 }
   };
+  // Her affirmations, said to the mirror with her eyes shut. She is
+  // girl bossy but shy, and every one of them is optimistic: her life
+  // is about to get better, she and Ray are getting out of the
+  // sewers, and they will live happily on land, with children up there.
+  var AFFIRMATIONS = [
+    "My life is about to get so much better. I can feel it.",
+    "Ray and I are getting out of these sewers. We will live up there, in the sun.",
+    "One day we will have a little house on land. With a garden. And maybe little ones running around.",
+    "I am going to make it out of here. I am stronger than this place.",
+    "Up there, Ray and I will be happy. Really happy. I know it.",
+    "I deserve a life in the light. And I am going to go get it.",
+    "Our children will grow up under the sky, not under stone. I will make that happen.",
+    "I might be shy, but I am not small. I am going to build a beautiful life up there."
+  ];
   var VICKY_X = 560; // the bartender in the background, behind the bar
   var VICKY_LINES = [
     "You're new. I can tell. The new ones always stare at the ceiling like it's gonna open up.",
@@ -300,6 +324,32 @@
     g.climb.rayStartX = g.ray.x; g.climb.sylStartX = g.px;
     g.climb.rayY = 0; g.climb.sylY = 0;
     g.climb.rayHidden = false; g.climb.sylHidden = false;
+  }
+  // The makeup desk on the left wall of the chamber (world x, in the
+  // 1672-wide room). Walk up to it and look in the golden mirror:
+  // she blinks once in a while, and the Manifest button shuts her
+  // eyes while she says an affirmation.
+  var VANITY_X = 300, VANITY_RANGE = 110;
+  function vanityNear() {
+    return g.room === "chamber" && Math.abs(g.px - VANITY_X) < VANITY_RANGE;
+  }
+  function enterMirror() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active || g.mirror.active) return;
+    if (!vanityNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false;
+    g.mirror.active = true;
+    g.mirror.blink = 0; g.mirror.blinkT = 180 + Math.random() * 120;
+    g.mirror.manifesting = false; g.mirror.manifestT = 0;
+  }
+  function exitMirror() {
+    g.mirror.active = false;
+    g.mirror.manifesting = false;
+  }
+  function manifest() {
+    if (!g.mirror.active) return;
+    g.mirror.affirmIdx = Math.floor(Math.random() * AFFIRMATIONS.length);
+    g.mirror.manifesting = true; g.mirror.manifestT = 0;
+    g.mirror.blink = 0;
   }
   // One climb, in phases (ticks, 60 a second): Ray runs to the
   // window (0-40), climbs up through it (40-80), then leans back in
@@ -489,6 +539,7 @@
     if (g.embrace.active) return;
     if (g.sleeping) { wakeUp(); return; }
     if (bedNear()) { goToBed(); return; }
+    if (vanityNear()) { enterMirror(); return; }
     if (windowNear()) { climbOutWindow(); return; }
     if (stairsNear()) { climbStairs(); return; }
     if (beerDoorNear()) { enterBarFromBeerDoor(); return; }
@@ -1054,13 +1105,94 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
+  function drawVanityPrompt() {
+    if (g.kiss.active || g.talk.open || g.climb.active || g.mirror.active) return;
+    if (!vanityNear()) return;
+    var x = VANITY_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to look in the mirror";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
+  // The golden mirror, full screen: she blinks once in a while, and
+  // while she manifests she keeps her eyes shut on an affirmation.
+  function drawMirror() {
+    var img = mirrorOpenImg;
+    if (g.mirror.manifesting) img = mirrorClosedImg;
+    else if (g.mirror.blink > 0) {
+      var b = g.mirror.blink;
+      if (b <= 3 || b >= 10) img = mirrorHalfImg;
+      else img = mirrorClosedImg;
+    }
+    if (img && img.complete && img.naturalWidth > 0) {
+      var s = Math.max(g.w / img.naturalWidth, g.h / img.naturalHeight);
+      var w = img.naturalWidth * s, h = img.naturalHeight * s;
+      ctx.drawImage(img, (g.w - w) / 2, (g.h - h) / 2, w, h);
+    } else {
+      ctx.fillStyle = "#1a0f1e";
+      ctx.fillRect(0, 0, g.w, g.h);
+    }
+    if (g.mirror.manifesting) {
+      var text = AFFIRMATIONS[g.mirror.affirmIdx];
+      ctx.save();
+      ctx.font = "italic 600 17px Georgia, serif";
+      ctx.textAlign = "center";
+      var maxW = g.w * 0.78;
+      var words = text.split(" ");
+      var lines = [], cur = "";
+      for (var i = 0; i < words.length; i++) {
+        var test = cur ? cur + " " + words[i] : words[i];
+        if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = words[i]; }
+        else cur = test;
+      }
+      if (cur) lines.push(cur);
+      var lh = 24, pad = 16;
+      var boxH = lines.length * lh + pad * 2;
+      var boxY = g.h - boxH - 24;
+      ctx.fillStyle = "rgba(20, 10, 30, 0.72)";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(g.w * 0.11 - 10, boxY, g.w * 0.78 + 20, boxH, 14);
+      else ctx.rect(g.w * 0.11 - 10, boxY, g.w * 0.78 + 20, boxH);
+      ctx.fill();
+      ctx.fillStyle = "#ffe9f2";
+      for (var j = 0; j < lines.length; j++) {
+        ctx.fillText(lines[j], g.w / 2, boxY + pad + lh * (j + 1) - 6);
+      }
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var hint = "Press M to manifest  ·  Esc to step away";
+    var hw = ctx.measureText(hint).width;
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(g.w / 2 - hw / 2 - 10, 8, hw + 20, 20, 10);
+    else ctx.rect(g.w / 2 - hw / 2 - 10, 8, hw + 20, 20);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillText(hint, g.w / 2, 22);
+    ctx.restore();
+  }
   function draw() {
+    if (g.mirror.active) { drawMirror(); return; }
     drawBg();
     drawHp();
     drawVickyPrompt();
     drawDoorPrompt();
     drawBedPrompt();
     drawWindowPrompt();
+    drawVanityPrompt();
     drawStairPrompt();
     drawBeerDoorPrompt();
     drawShopPrompt();
@@ -1078,6 +1210,37 @@
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
+    if (g.mirror.active) {
+      // Looking in the mirror: she blinks once in a while, and
+      // while she manifests she keeps her eyes shut on an
+      // affirmation. Nothing else moves until she steps away.
+      if (g.mirror.manifesting) {
+        g.mirror.manifestT += 1;
+        if (g.mirror.manifestT > 260) { g.mirror.manifesting = false; g.mirror.blinkT = 120 + Math.random() * 120; }
+      } else if (g.mirror.blink > 0) {
+        g.mirror.blink += 1;
+        if (g.mirror.blink > 12) { g.mirror.blink = 0; g.mirror.blinkT = 180 + Math.random() * 180; }
+      } else {
+        g.mirror.blinkT -= 1;
+        if (g.mirror.blinkT <= 0) g.mirror.blink = 1;
+      }
+      var mBtn = document.getElementById("manifestBtn");
+      if (mBtn) { mBtn.hidden = false; mBtn.textContent = g.mirror.manifesting ? "Manifesting..." : "Manifest"; }
+      var mcBtn = document.getElementById("mirrorCloseBtn");
+      if (mcBtn) mcBtn.hidden = false;
+      var tBtn2 = document.getElementById("talkBtn");
+      if (tBtn2) tBtn2.hidden = true;
+      var eBtn2 = document.getElementById("enterBtn");
+      if (eBtn2) eBtn2.hidden = true;
+      var aBtn2 = document.getElementById("attackBtn");
+      if (aBtn2) aBtn2.hidden = true;
+      draw();
+      return;
+    }
+    var mBtn0 = document.getElementById("manifestBtn");
+    if (mBtn0) mBtn0.hidden = true;
+    var mcBtn0 = document.getElementById("mirrorCloseBtn");
+    if (mcBtn0) mcBtn0.hidden = true;
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
     if (g.ownerTalk.open) {
       var otk = g.ownerTalk.key;
@@ -1096,6 +1259,7 @@
       if (g.climb.active) { enterBtn.hidden = true; }
       else if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
+      else if (vanityNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Look in the mirror"; }
       else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
       else if (stairsNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = STAIRS[stairsNear()].btn; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
@@ -1256,7 +1420,9 @@
     if (e.code === "KeyH") { tryAttack(); return; }
     if (e.code === "KeyE") { tryEnter(); return; }
     if (e.code === "KeyT") { pressT(); return; }
-    if (e.code === "Escape") { g.talk.open = false; g.ownerTalk.open = false; return; }
+    if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } g.talk.open = false; g.ownerTalk.open = false; return; }
+    if (g.mirror.active) return;
     if (setKey(e.code, true)) {
       var r = canvas.getBoundingClientRect();
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
@@ -1283,6 +1449,10 @@
   if (attackBtn) attackBtn.addEventListener("click", function (e) { e.stopPropagation(); tryAttack(); });
   var enterBtn = document.getElementById("enterBtn");
   if (enterBtn) enterBtn.addEventListener("click", function (e) { e.stopPropagation(); tryEnter(); });
+  var manifestBtn = document.getElementById("manifestBtn");
+  if (manifestBtn) manifestBtn.addEventListener("click", function (e) { e.stopPropagation(); manifest(); });
+  var mirrorCloseBtn = document.getElementById("mirrorCloseBtn");
+  if (mirrorCloseBtn) mirrorCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); exitMirror(); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
