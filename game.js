@@ -42,11 +42,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=39" forces a fresh download after the Earthen Tunnel and
-  // the Surface are added: the tunnel after Upper Level 3, and the
-  // outside after the tunnel, sunlight and open sky at last. A
-  // browser that cached ?v=38 picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=39"; return img; }
+  // "?v=40" forces a fresh download after the Bell Ghost is made
+  // to fly higher: it was floating at base lift 0.04h with a 0.03h
+  // bob, so it dipped to almost touching the floor. Now it floats at
+  // base 0.11h with a 0.05h bob, staying 0.06h-0.16h up in the air.
+  // A browser that cached ?v=39 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=40"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -2000,7 +2001,7 @@
     keyknight: { imgs: monsterKeyknightImgs, h: 0.16, speed: 0.5, hop: 0.07 },
     candlepup: { imgs: monsterCandlepupImgs, h: 0.15, speed: 0.9, hop: 0.12 },
     biteyrock: { imgs: monsterBiteyrockImgs, h: 0.17, speed: 0.4, hop: 0.13 },
-    bellghost: { imgs: monsterBellghostImgs, h: 0.16, speed: 0.6, hop: 0.03 }
+    bellghost: { imgs: monsterBellghostImgs, h: 0.16, speed: 0.6, hop: 0.05 }
   };
   function spawnMonsters() {
     g.monsters = [];
@@ -2114,7 +2115,7 @@
         var bh = m.hopT % 110;
         lift = bh < 40 ? Math.sin(bh / 40 * Math.PI) * g.h * def.hop : 0;
       } else {
-        lift = g.h * 0.04 + Math.sin(m.hopT * 0.08) * g.h * def.hop;
+        lift = g.h * 0.11 + Math.sin(m.hopT * 0.08) * g.h * def.hop;
       }
       var groundFeetY = groundY() + m.depth;
       var feetY = groundFeetY - lift;
