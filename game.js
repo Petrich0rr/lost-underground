@@ -49,11 +49,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=69" forces a fresh download: the shadow under the characters
-  // is a dark picture now, not a canvas fill, so it can never turn
-  // green from the energy bar again. A browser that cached ?v=68
-  // picks up the fix.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=69"; return img; }
+  // "?v=71" forces a fresh download: the energy bar is pictures
+  // now, not a canvas fill, so the prompt pills can no longer turn
+  // green, and in the proposal Ray stands, then gets down on one
+  // knee, then holds out the ring, silent until the ring is out.
+  // A browser that cached ?v=69 picks up both.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=71"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -64,6 +65,7 @@
   var rayWalkImgs = RAY_WALK.map(loadImg);
   var rayIdleImg = loadImg(RAY_IDLE_SRC);
   var kissImg = loadImg("assets/kiss.png");
+  var proposeStandImg = loadImg("assets/propose-stand.png");
   var proposeKneelImg = loadImg("assets/propose-kneel.png");
   proposeAskImg = loadImg("assets/propose-ask.png");
   proposeSurpriseImgs = ["assets/propose-surprise-01.png", "assets/propose-surprise-02.png", "assets/propose-surprise-03.png"].map(loadImg);
@@ -217,6 +219,9 @@
   var heartHalfImg = loadImg("assets/heart-half.png");
   var heartEmptyImg = loadImg("assets/heart-empty.png");
   var shadowImg = loadImg("assets/shadow.png");
+  var energyBgImg = loadImg("assets/energy-bg.png");
+  var energyFillImg = loadImg("assets/energy-fill.png");
+  var energyFillLowImg = loadImg("assets/energy-fill-low.png");
   // Treasure chest opening: closed, slightly open, open with coins,
   // open with more coins and a sparkle. All on one common canvas,
   // bottom-aligned, so the lid rises and the base stays put.
@@ -3127,6 +3132,7 @@
   }
   function advanceProposal() {
     if (!g.proposal.active) return;
+    if (g.proposal.step === 0 && g.proposal.t < 50) { g.proposal.t = 50; return; }
     g.proposal.step += 1;
     g.proposal.t = 0;
     if (g.proposal.step > 3) endProposal();
@@ -3276,15 +3282,17 @@
     ctx.restore();
   }
   function drawProposal() {
-    // One picture per beat now: step 0 Ray kneels down, then holds
-    // out the ring; step 1 Sylvia's surprised reaction cycles;
+    // One picture per beat now: step 0 Ray stands, then gets down,
+    // then holds out the ring (silent until the ring is out); step 1
+    // Sylvia's surprised reaction cycles;
     // step 2 they stand together happy, step 3 the embrace, with
     // hearts above it.
     var feetY = groundY() + g.depth - 6;
     var cx = g.w / 2;
     if (g.proposal.step === 0) {
-      // Ray kneels down first, then holds out the ring.
-      var frame = Math.floor(g.proposal.t / 25) % 2 === 0 ? proposeKneelImg : proposeAskImg;
+      // Ray stands, then gets down on one knee, then holds out the
+      // ring and stays there. He does not talk until the ring is out.
+      var frame = g.proposal.t < 25 ? proposeStandImg : g.proposal.t < 50 ? proposeKneelImg : proposeAskImg;
       if (frame && frame.complete && frame.naturalWidth > 0) {
         var h = g.h * 0.62;
         var w = h * (frame.naturalWidth / frame.naturalHeight);
@@ -3320,6 +3328,9 @@
       drawHeart(cx, hy - 22, 12 + Math.sin(g.proposal.t * 0.2 + 2) * 2, "#ff5c8a");
     }
     // The line, in a white bubble at the top, like the talk bubbles.
+    // He does not talk while he is standing and getting down, so the
+    // bubble stays hidden until the ring is out (step 0, t >= 50).
+    if (g.proposal.step === 0 && g.proposal.t < 50) return;
     var step = PROPOSAL_LINES[g.proposal.step];
     ctx.save();
     ctx.textAlign = "center";
@@ -4566,25 +4577,38 @@
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     // The energy label starts just after the hearts, and the bar
-    // sits beside them on the top row. The bar is green now so the
-    // only gold on the top row is the coin.
+    // sits beside them on the top row. The bar is pictures now, not
+    // canvas fills: the green fill kept tinting everything drawn
+    // after it (the fifth heart, the shadow, the prompt pills), so
+    // there is no green fill left in the game at all.
     ctx.fillText("E", 235, 27);
     var bx = 253, by = 14, bh = 16;
     var bw = Math.max(50, Math.min(100, g.w - 267));
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 8);
-    else ctx.rect(bx, by, bw, bh);
-    ctx.fill();
-    var frac = Math.max(0, Math.min(1, g.energy / g.energyMax));
-    var pulse = g.energy <= 20 ? 0.55 + 0.45 * Math.sin(g.time * 0.15) : 1;
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle = g.energy <= 20 ? "#ff9e3e" : "#58c96b";
-    if (frac > 0) {
-      if (ctx.roundRect) ctx.roundRect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2, 7);
-      else ctx.rect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2);
+    if (energyBgImg && energyBgImg.complete && energyBgImg.naturalWidth > 0) {
+      ctx.drawImage(energyBgImg, bx, by, bw, bh);
+    } else {
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 8);
+      else ctx.rect(bx, by, bw, bh);
       ctx.fill();
     }
-    ctx.globalAlpha = 1;
+    var frac = Math.max(0, Math.min(1, g.energy / g.energyMax));
+    var pulse = g.energy <= 20 ? 0.55 + 0.45 * Math.sin(g.time * 0.15) : 1;
+    var fillImg = g.energy <= 20 ? energyFillLowImg : energyFillImg;
+    if (frac > 0) {
+      ctx.globalAlpha = pulse;
+      if (fillImg && fillImg.complete && fillImg.naturalWidth > 0) {
+        ctx.drawImage(fillImg, bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2);
+      } else {
+        ctx.fillStyle = g.energy <= 20 ? "#ff9e3e" : "#58c96b";
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2, 7);
+        else ctx.rect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "right";
