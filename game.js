@@ -39,10 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=17" forces a fresh download after a soft warm glow is added
-  // behind Sylvia and Ray so they never vanish into a dark doorway,
-  // so a browser that cached ?v=16 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=17"; return img; }
+  // "?v=18" forces a fresh download after a light rim is added around
+  // Sylvia and Ray so they read as standing clearly in front of a
+  // dark doorway instead of melting into it, so a browser that cached
+  // ?v=17 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=18"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1445,6 +1446,16 @@
     ctx.fill();
     ctx.restore();
   }
+  function rim() {
+    // A light rim hugging the sprite's outline, so a dark character
+    // reads as standing clearly IN FRONT of a dark doorway instead of
+    // melting into it. The glow behind is a soft backdrop; this rim is
+    // the crisp edge that says the character is in front, not inside
+    // the door. Call it after ctx.save(), before drawImage(); the
+    // matching ctx.restore() turns it off again.
+    ctx.shadowColor = "rgba(255, 240, 205, 0.95)";
+    ctx.shadowBlur = 14;
+  }
 
   function drawSylvia() {
     if (g.climb.active && g.climb.sylHidden) return;
@@ -1465,6 +1476,7 @@
       ctx.save();
       ctx.translate(ix, ifeet - ih / 2);
       if (g.facing === -1) ctx.scale(-1, 1);
+      rim();
       ctx.drawImage(iimg, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
       return;
@@ -1488,6 +1500,7 @@
       ctx.save();
       ctx.translate(cx, cfeet - ch / 2);
       if (g.climb.kind === "stairs" && g.facing === -1) ctx.scale(-1, 1);
+      rim();
       ctx.drawImage(cimg, -cw / 2, -ch / 2, cw, ch);
       ctx.restore();
       return;
@@ -1517,6 +1530,7 @@
     // Her stance and kick face right too, so they flip as well, and she
     // attacks the way she is facing. Front and back views are never flipped.
     if (g.facing === -1 && img !== sylviaIdleImg && !keys.up && !keys.down) ctx.scale(-1, 1);
+    rim();
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -1544,6 +1558,7 @@
     ctx.save();
     ctx.translate(mx, feetY - h / 2);
     if (g.px > g.ray.x) ctx.scale(-1, 1);
+    rim();
     ctx.drawImage(kissImg, -w / 2, -h / 2, w, h);
     ctx.restore();
     var my = feetY - h - 22 + Math.sin(g.kiss.t * 0.12) * 4;
@@ -1572,6 +1587,7 @@
       ctx.save();
       ctx.translate(rix, rifeet - rih / 2);
       if (r.dir === -1) ctx.scale(-1, 1);
+      rim();
       ctx.drawImage(riimg, -riw / 2, -rih / 2, riw, rih);
       ctx.restore();
       return;
@@ -1593,6 +1609,7 @@
       glow(tx, tfeet, tw, th);
       ctx.save();
       ctx.translate(tx, tfeet - th / 2);
+      rim();
       ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
       ctx.restore();
       return;
@@ -1621,6 +1638,7 @@
       // her. The walk frames face right, flip when he runs left.
       if (g.climb.kind === "window" && g.climb.t > 80) ctx.scale(-1, 1);
       else if (r.dir === -1) ctx.scale(-1, 1);
+      rim();
       ctx.drawImage(rimg, -rw / 2, -rh / 2, rw, rh);
       ctx.restore();
       return;
@@ -1655,6 +1673,7 @@
     var sideView = r.fight.active || r.vdir === 0;
     if (sideView && img === rayPunchImg) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
+    rim();
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -1789,7 +1808,11 @@
     if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
     glow(x, feetY, w, h);
-    ctx.drawImage(embraceImg, x - w / 2, feetY - h, w, h);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    rim();
+    ctx.drawImage(embraceImg, -w / 2, -h / 2, w, h);
+    ctx.restore();
   }
   function wrapText(text, maxW) {
     var words = text.split(" ");
