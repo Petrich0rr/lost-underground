@@ -39,15 +39,13 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=33" forces a fresh download after the white halo is cleaned
-  // off the shop owners (Char, Mikey, Gunner) and the arcade kids
-  // (Jamie, Kush, Lia), and the scooter is made smaller (parked
-  // 0.58, was 0.68; riding 0.98, was 1.15). The owners and kids were
-  // made before the white-unmultiply + 1px erosion step was
-  // standard, so they still carried a light halo; the new NPCs were
-  // already clean. A browser that cached ?v=32 picks up the new code
-  // and the cleaned art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=33"; return img; }
+  // "?v=34" forces a fresh download after Mayor Adler is added: the
+  // politician who guards the bar, constantly there, walks slow with
+  // his cane. He looks evil but is actually a sweetheart who just
+  // does not know how to speak. He is trying his best. He wanders
+  // the bar only, never changes rooms, at half speed (0.4). A
+  // browser that cached ?v=33 picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=34"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -144,6 +142,16 @@
   var yutoTalkImg = loadImg("assets/yuto-talk.png");
   var yutoSurprisedImg = loadImg("assets/yuto-surprised.png");
   var yutoLaughImg = loadImg("assets/yuto-laugh.png");
+  // Mayor Adler, the politician who guards the bar. He looks evil
+  // but is actually a sweetheart who just does not know how to
+  // speak. He is trying his best. He is constantly in the bar and
+  // walks slow with his cane. Four walk frames (facing right), a
+  // standing pose, and talk, surprised and laughing poses.
+  var adlerWalkImgs = ["assets/adler-walk-01.png", "assets/adler-walk-02.png", "assets/adler-walk-03.png", "assets/adler-walk-04.png"].map(loadImg);
+  var adlerIdleImg = loadImg("assets/adler-idle.png");
+  var adlerTalkImg = loadImg("assets/adler-talk.png");
+  var adlerSurprisedImg = loadImg("assets/adler-surprised.png");
+  var adlerLaughImg = loadImg("assets/adler-laugh.png");
   // The arcade kids: three regulars who stay in the arcade. Each has
   // an idle portrait and a 4-frame side walk, all facing right.
   var arcadeGamerWalkImgs = ["assets/arcade-gamer-walk-01.png", "assets/arcade-gamer-walk-02.png", "assets/arcade-gamer-walk-03.png", "assets/arcade-gamer-walk-04.png"].map(loadImg);
@@ -327,6 +335,13 @@
     // down to his next move; laughT and surprisedT are his talk
     // poses, like the others'.
     yuto: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, room: "shopping", roomT: 3000, laughT: 0, surprisedT: 0 },
+    // Mayor Adler, the politician who guards the bar. He looks evil
+    // but is actually a sweetheart who just does not know how to
+    // speak. He is trying his best. He is constantly in the bar, so
+    // he never changes rooms (no roomT); he just walks slow with his
+    // cane, back and forth. laughT and surprisedT are his talk
+    // poses, like the others'.
+    adler: { x: 700, dir: 1, pause: 120, walk: 0, depth: 0, room: "bar", laughT: 0, surprisedT: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -338,6 +353,7 @@
     diegoTalk: { open: false, idx: -1 },
     kianTalk: { open: false, idx: -1 },
     yutoTalk: { open: false, idx: -1 },
+    adlerTalk: { open: false, idx: -1 },
     // Talking to Ray: open while the conversation runs. step 0 is
     // Ray's opening line (Sylvia's turn to pick a reply), step 1 is
     // Sylvia's line showing, step 2 is Ray's reply showing.
@@ -694,6 +710,40 @@
       g.yuto.surprisedT = 0;
     }
   }
+  // Mayor Adler, the politician who guards the bar. He looks evil
+  // but is actually a sweetheart who just does not know how to
+  // speak. He is trying his best.
+  var ADLER_LINES = [
+    "Hmph. State your business, young lady. ...Ah. It is Sylvia, is it not? Yes. Well. Carry on, then.",
+    "I am the Mayor. I guard this bar. It is a very important job. Someone must do it. ...It is me. I do it.",
+    "You look like trouble. Good trouble, I think. I am still deciding. Do not rush me.",
+    "I did not smile at you. That was... a facial malfunction. Pay it no mind.",
+    "Ray tells me you two are looking for a way out. Hmph. The surface. I have heard of it. It sounds drafty.",
+    "I gave a speech once. It lasted four hours. Nobody stayed. I consider it a success. I spoke very clearly.",
+    "If anyone bothers you in my bar, you tell me. I will... I will have strong words with them. Very strong. The strongest.",
+    "I am not evil. I have been told my face says otherwise. My face is wrong. I am working on it.",
+    "Ahem. As Mayor, I officially declare you... welcome here. There. I said it. Do not make a fuss.",
+    "My cane is not a weapon. It is a walking stick. ...Though it could be a weapon. If it had to be. It does not have to be. Please stop looking at it."
+  ];
+  function adlerNear() { return g.room === g.adler.room && Math.abs(g.px - g.adler.x) < 150; }
+  function adlerTalkLine() {
+    var first = !g.adlerTalk.open;
+    var idx;
+    do { idx = Math.floor(Math.random() * ADLER_LINES.length); }
+    while (ADLER_LINES.length > 1 && idx === g.adlerTalk.idx);
+    g.adlerTalk.idx = idx; g.adlerTalk.open = true;
+    if (first) {
+      // Greeting: he is surprised to see Sylvia, then he tries his
+      // best to sound official and welcoming.
+      g.adler.surprisedT = 45;
+      g.adler.laughT = 0;
+    } else {
+      // He laughs after his lines, a gruff little chuckle, pleased
+      // with himself for speaking well.
+      g.adler.laughT = 90;
+      g.adler.surprisedT = 0;
+    }
+  }
   function kidLines(key) {
     if (key === "dino") return KUSH_LINES;
     if (key === "cup") return LIA_LINES;
@@ -718,6 +768,7 @@
     if (g.diegoTalk.open) { diegoTalkLine(); return; }
     if (g.kianTalk.open) { kianTalkLine(); return; }
     if (g.yutoTalk.open) { yutoTalkLine(); return; }
+    if (g.adlerTalk.open) { adlerTalkLine(); return; }
     if (g.rayTalk.open) { advanceRayTalk(); return; }
     // One conversation at a time: the room's own NPC wins, and Ray
     // is the fallback when nobody else is near to talk to.
@@ -732,6 +783,7 @@
     if (diegoNear()) { diegoTalkLine(); return; }
     if (kianNear()) { kianTalkLine(); return; }
     if (yutoNear()) { yutoTalkLine(); return; }
+    if (adlerNear()) { adlerTalkLine(); return; }
     if (rayNear()) rayTalkLine();
   }
   // The shop owners. Walk up to one and press T to talk: they stop and
@@ -922,7 +974,7 @@
   }
   function closeRayTalk() { g.rayTalk.open = false; g.rayTalk.step = 0; g.rayTalk.choice = -1; }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -1126,7 +1178,7 @@
   function teleportToRoom(roomKey) {
     if (!ROOMS[roomKey]) return;
     closeMap();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.rayTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.rayTalk.open = false;
     g.propRead.open = false; hidePropPanel();
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
@@ -1170,7 +1222,7 @@
   }
   function inspectNear() { return inspectArch() !== null; }
   function drawInspectPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
     // One small, quiet button down at the floor, right over the arch.
     // It stays subtle so the secret does not shout.
     var ax = g.inspect.active ? g.inspect.arch : inspectArch();
@@ -1247,7 +1299,7 @@
     return bd < PROP_RANGE ? best : null;
   }
   function readProp(p) {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x;
     // Crouch down to read it, the same as pressing I.
     g.inspect.active = true; g.inspect.phase = "look"; g.inspect.arch = null; g.inspect.t = 0;
@@ -1257,7 +1309,7 @@
   }
   function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; hidePropPanel(); }
   function drawPropPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
     // A door prompt wins over a junk prompt when Sylvia stands near
     // both, so the two texts never draw on top of each other.
     if (portalNear() || ironDoorNear()) return;
@@ -1344,7 +1396,7 @@
     if (panel) panel.hidden = true;
   }
   function startInspect() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
     // Already reading a piece of junk: I puts it back down and she
     // stands back up.
     if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; }
@@ -1360,7 +1412,7 @@
     // else there is nothing to look at, so no crouch.
     var ax = inspectArch();
     var prop = propNear();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false;
     if (ax !== null) {
       // At a secret arch: crouch down and look at it.
       g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = ax;
@@ -1418,7 +1470,7 @@
     return g.room === "tunnels" && Math.abs(g.px - IRON_DOOR_X) < IRON_DOOR_RANGE;
   }
   function drawIronDoorPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
     var x = IRON_DOOR_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1436,9 +1488,9 @@
     ctx.restore();
   }
   function enterDungeonFromIronDoor() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false;
     g.room = "dungeon";
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -1455,7 +1507,7 @@
     return g.room === "tunnels" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
   }
   function drawPortalPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     var x = PORTAL_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1473,9 +1525,9 @@
     ctx.restore();
   }
   function goThroughPortal() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false;
     // Straight back home to their room, no tunnel image, no wait.
     g.room = "chamber";
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -1625,12 +1677,12 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
     var to = EXITS[g.room][side];
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false;
     g.room = to;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
@@ -2406,6 +2458,40 @@
     ctx.restore();
   }
 
+  // Mayor Adler, the politician who guards the bar. He looks evil
+  // but is actually a sweetheart who just does not know how to
+  // speak. He is trying his best. He is constantly in the bar. He
+  // is a guy, so he is drawn at Ray's height. While talking he
+  // shows his surprised pose for the greeting, his talk pose for
+  // the line, and his laughing pose right after one of his lines.
+  function drawAdler() {
+    if (g.room !== g.adler.room) return;
+    var ad = g.adler;
+    var talking = g.adlerTalk.open;
+    var walking = !talking && ad.pause <= 0;
+    var img;
+    if (talking && ad.surprisedT > 0) img = adlerSurprisedImg;
+    else if (talking && ad.laughT > 0) img = adlerLaughImg;
+    else if (talking) img = adlerTalkImg;
+    else img = walking ? adlerWalkImgs[Math.floor(ad.walk / 6) % adlerWalkImgs.length] : adlerIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = adlerIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (ad.depth + depthRange()) / depthRange();
+    var h = rayH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + ad.depth - 6;
+    var x = ad.x * scale() - g.camX;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    // His walk frames face right, so flip them when he walks left.
+    // The idle, talk, surprised and laugh poses are front views,
+    // never flipped.
+    if (walking && ad.dir === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
   function drawEmbrace() {
     if (!embraceImg || !embraceImg.complete || embraceImg.naturalWidth === 0) {
       drawRay();
@@ -2798,6 +2884,53 @@
     ctx.font = "700 12px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("YUTO", bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
+  function drawAdlerTalk() {
+    // Speech bubble above Mayor Adler, tail pointing down to him.
+    // Mirrors Yuto's bubble. He is always in the bar, so his
+    // position is the bar's x.
+    if (!g.adlerTalk.open) return;
+    var ad = g.adler;
+    var ex = ad.x * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(ADLER_LINES[g.adlerTalk.idx], maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText("MAYOR ADLER").width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, ex - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, ex));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("MAYOR ADLER", bx + 16, by + 20);
     ctx.fillStyle = "#1a1a2e";
     ctx.font = "400 14px 'Open Sans', sans-serif";
     for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
@@ -3210,8 +3343,8 @@
     drawIronDoorPrompt();
     drawPortalPrompt();
     drawScooterPrompt();
-    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); return; }
-    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); return; }
+    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
+    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
     if (g.scooter.riding) drawScooterRide();
     else drawRay();
     drawChar();
@@ -3224,6 +3357,7 @@
     drawDiego();
     drawKian();
     drawYuto();
+    drawAdler();
     if (!g.scooter.riding && !g.sleeping) drawSylvia();
     drawTalk();
     drawOwnerTalk();
@@ -3234,6 +3368,7 @@
     drawDiegoTalk();
     drawKianTalk();
     drawYutoTalk();
+    drawAdlerTalk();
     drawRayTalk();
     drawDebug();
   }
@@ -3340,6 +3475,9 @@
     if (g.yutoTalk.open) {
       if (g.room !== g.yuto.room || Math.abs(g.px - g.yuto.x) > 180) g.yutoTalk.open = false;
     }
+    if (g.adlerTalk.open) {
+      if (g.room !== g.adler.room || Math.abs(g.px - g.adler.x) > 180) g.adlerTalk.open = false;
+    }
     if (g.rayTalk.open && Math.abs(g.px - g.ray.x) > 180) closeRayTalk();
     if (g.propRead.open && Math.abs(g.px - g.propRead.x) > 180) closePropRead();
     // Sylvia's reply choices: four buttons around her head, only
@@ -3382,6 +3520,7 @@
       else if (g.diegoTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.kianTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.yutoTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.adlerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
       else if (nearKid) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + KIDS[nearKid].name; }
@@ -3391,6 +3530,7 @@
       else if (diegoNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Diego"; }
       else if (kianNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Dr. Kian"; }
       else if (yutoNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Yuto"; }
+      else if (adlerNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Mayor Adler"; }
       else if (rayNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Ray"; }
       else talkBtn.hidden = true;
     }
@@ -3745,6 +3885,23 @@
       }
     }
     if (g.yutoTalk.open) yt.dir = g.px < yt.x ? -1 : 1; // face Sylvia
+    // Mayor Adler: he is constantly in the bar, guarding it, so he
+    // never changes rooms. He walks slow with his cane, half the
+    // speed of the others. While talking he stands still and faces
+    // Sylvia; his laugh and surprise timers count down here.
+    var ad = g.adler;
+    if (ad.laughT > 0) ad.laughT -= 1;
+    if (ad.surprisedT > 0) ad.surprisedT -= 1;
+    if (g.room === ad.room && !g.adlerTalk.open) {
+      if (ad.pause > 0) { ad.pause -= 1; }
+      else {
+        ad.x += ad.dir * 0.4;
+        ad.walk += 0.15;
+        if (ad.x < 150) { ad.x = 150; ad.dir = 1; ad.pause = 60 + Math.random() * 120; } else if (ad.x > room().w - 150) { ad.x = room().w - 150; ad.dir = -1; ad.pause = 60 + Math.random() * 120; }
+        else if (Math.random() < 0.002) { ad.pause = 90 + Math.random() * 150; }
+      }
+    }
+    if (g.adlerTalk.open) ad.dir = g.px < ad.x ? -1 : 1; // face Sylvia
     // When she is standing still and he wanders up right behind
     // her, he holds her for a few seconds, then wanders off again.
     if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
