@@ -49,11 +49,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=73" forces a fresh download: the proposal's first beat is
-  // a smooth six-frame kneel-down now, Ray slowly getting down on one
-  // knee before he holds out the ring. A browser that cached ?v=72
-  // picks up the new sequence.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=73"; return img; }
+  // "?v=74" forces a fresh download: the rescue is Sylvia fainting
+  // and Ray catching and carrying her, and a dungeon level only opens
+  // the way deeper once its monsters are all gone, which is also
+  // when X shows himself at the bottom. A browser that cached ?v=73
+  // picks up both.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=74"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -468,6 +469,7 @@
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
+    dungeonMsg: "", dungeonMsgT: 0,
     chestLayout: [], chestDay: 1,
     homeWalk: { active: false, t: 0 },
     // The proposal on the Surface: once, when they walk all the way
@@ -900,7 +902,7 @@
       g.mika.surprisedT = 0;
     }
   }
-  function strangerNear() { return g.room === g.stranger.room && Math.abs(g.px - g.stranger.x) < 150; }
+  function strangerNear() { return g.room === g.stranger.room && dungeonCleared() && Math.abs(g.px - g.stranger.x) < 150; }
   function strangerTalkLine() {
     var first = !g.strangerTalk.open;
     var idx;
@@ -1729,6 +1731,8 @@
   function enterDungeon2() {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!stoneDoorNear()) return;
+    // The way deeper is locked until every monster on this level is gone.
+    if (g.monsters.length > 0) { showDungeonMsg("Clear all the monsters first!"); return; }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = "dungeon2";
     spawnMonsters();
@@ -1745,7 +1749,7 @@
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to go deeper";
+    var label = g.monsters.length > 0 ? "Clear all the monsters first!" : "Press E to go deeper";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(20,10,30,0.72)";
     if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
@@ -1969,6 +1973,12 @@
     if (!side) return;
     var from = g.room;
     var to = EXITS[g.room][side];
+    // Going deeper in the dungeon is locked until this level's
+    // monsters are all gone. Going back up is always open.
+    if (isDungeonRoom(from) && isDungeonRoom(to) && DUNGEON_ORDER[to] > DUNGEON_ORDER[from] && g.monsters.length > 0) {
+      showDungeonMsg("Clear all the monsters first!");
+      return;
+    }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
     if (g.scooter.riding) g.scooter.room = to;
@@ -2529,6 +2539,18 @@
     ctx.fillText(g.chestMsg, x, y);
     ctx.restore();
   }
+  function drawDungeonMsg() {
+    if (g.dungeonMsgT <= 0 || !g.dungeonMsg) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 64;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, g.dungeonMsgT / 60);
+    ctx.font = "700 14px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffd977";
+    ctx.fillText(g.dungeonMsg, x, y);
+    ctx.restore();
+  }
   // The stone arch doorway on the right of the Secret Garden. Its
   // dark opening is centred at world x 2025 in the 2172-wide room
   // (measured from the art with marker lines). It is more like a
@@ -2900,6 +2922,18 @@
     dungeon3: { type: "keyknight", hp: 4, coins: 8, hitsPerDamage: 2, damage: 10 },
     dungeon4: { type: "bellghost", hp: 5, coins: 15, hitsPerDamage: 2, damage: 20 }
   };
+  // The dungeon levels in order, deepest last. Going deeper is locked
+  // until every monster on the current level is gone. Going back up
+  // is always open. At the very bottom, clearing the level is also
+  // what makes X show himself.
+  var DUNGEON_ORDER = { dungeon: 0, dungeon2: 1, dungeon3: 2, dungeon4: 3 };
+  function dungeonCleared() {
+    return isDungeonRoom(g.room) && g.monsters.length === 0;
+  }
+  function showDungeonMsg(text) {
+    g.dungeonMsg = text;
+    g.dungeonMsgT = 180;
+  }
   function spawnMonsters() {
     g.monsters = [];
     g.coins = [];
@@ -4463,6 +4497,8 @@
   // height, walks slowly, and never leaves the Court of Justice.
   function drawStranger() {
     if (g.room !== g.stranger.room) return;
+    // X only shows himself once every monster on this level is gone.
+    if (!dungeonCleared()) return;
     var st = g.stranger;
     var talking = g.strangerTalk.open;
     var walking = !talking && st.pause <= 0;
@@ -5057,6 +5093,7 @@
     drawRayTalk();
     drawFountainMsg();
     drawChestMsg();
+    drawDungeonMsg();
     drawDebug();
   }
 
@@ -5342,6 +5379,7 @@
       }
     }
     if (g.chestMsgT > 0) g.chestMsgT -= 1;
+    if (g.dungeonMsgT > 0) g.dungeonMsgT -= 1;
     if (g.attack.cooldown > 0) g.attack.cooldown -= 1;
     if (g.hurtT > 0) g.hurtT -= 1;
     if (g.kissHealT > 0) g.kissHealT -= 1;
@@ -5684,7 +5722,7 @@
     // The first time Sylvia gets close to X, she is surprised: nobody
     // has ever seen him before. (Ray has no surprised pose, so he just
     // stands there.)
-    if (!g.xSeen && g.room === "dungeon4" && Math.abs(g.px - st.x) < 300) {
+    if (!g.xSeen && g.room === "dungeon4" && dungeonCleared() && Math.abs(g.px - st.x) < 300) {
       g.xSeen = true;
       g.sylviaSurprisedT = 90;
     }
