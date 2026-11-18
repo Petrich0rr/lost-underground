@@ -128,6 +128,7 @@
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
     ownerTalk: { open: false, idx: -1, key: null },
+    kidTalk: { open: false, idx: -1, key: null },
     hp: 100, hpMax: 100,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
@@ -219,6 +220,54 @@
     if (key === "mikey") return MIKEY_LINES;
     return GUNNER_LINES;
   }
+  // The arcade kids. Kush is the boy with the dino plush: he loves
+  // the underground but he is curious to see the land. Lia has the
+  // ponytail and the cup: she really loves snacks and she is just
+  // happy to have her friends. Jamie is the Asian bob girl with the
+  // handheld game: very pessimistic about the underground, does not
+  // really care about things, but she is chill. Kush and Lia are very
+  // positive. Jamie is not.
+  var KUSH_LINES = [
+    "I love it down here. The arcade, the neon, all of it. But I wonder what the sky looks like.",
+    "Up there they have real sun. Like, actual sun. I want to see it once.",
+    "The underground is home. But home could have a window, you know?",
+    "I beat the high score on the fighting game again. The machine knows my name now.",
+    "Do you think it rains up there? Like water just falls from the sky? Wild.",
+    "Lia brings the best snacks. I would follow her anywhere for a snack.",
+    "Jamie says the underground is a trap. I say it is a really fun trap.",
+    "One day I want to stand on land and feel grass. Is grass soft? I bet it is soft.",
+    "The dino plush is my lucky charm. He has seen me win a hundred times.",
+    "If we ever get out, I am bringing this arcade with me. All of it."
+  ];
+  var LIA_LINES = [
+    "I brought snacks! Well, I ate most of them. But I brought the spirit of snacks.",
+    "Kush and Jamie are the best. I am just happy we are all here together.",
+    "A cup of tokens and my friends nearby. What more could a girl want?",
+    "I found a snack machine that still works. Today is a good day.",
+    "The underground is weird and dark, but my friends make it feel like home.",
+    "Do you want a snack? I always have a snack. It is my whole thing.",
+    "Jamie pretends she does not care, but she saved me a seat. She cares.",
+    "Kush talks about the land a lot. I just hope there are snacks up there too.",
+    "I am not worried about getting out. We have each other, and snacks. That is enough.",
+    "You and Ray are so cute together. I am rooting for you two, obviously."
+  ];
+  var JAMIE_LINES = [
+    "The underground is a dump. But it is our dump, I guess.",
+    "Getting out? Sure. Whatever. I will believe it when I see the sun.",
+    "I do not care about much, but I care about my high score. Do not touch it.",
+    "Everyone is so positive down here. It is exhausting. I am going back to my game.",
+    "The land? Probably just more stairs. Everything is stairs.",
+    "Lia is too happy. Kush is too hopeful. I am the only realistic one here.",
+    "I am not pessimistic. I am just not lying to myself.",
+    "If we get out, cool. If not, the arcade still works. Either way.",
+    "You want advice? Do not get your hopes up. It hurts less.",
+    "I am chill. I am always chill. That is the whole point."
+  ];
+  function kidLines(key) {
+    if (key === "dino") return KUSH_LINES;
+    if (key === "cup") return LIA_LINES;
+    return JAMIE_LINES;
+  }
   function vickyNear() { return g.room === "bar" && Math.abs(g.px - VICKY_X) < 140; }
   function talkLine() {
     var idx;
@@ -230,9 +279,12 @@
     if (g.kiss.active || g.climb.active) return;
     if (g.talk.open) { talkLine(); return; }
     if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
+    if (g.kidTalk.open) { kidTalkLine(g.kidTalk.key); return; }
     if (vickyNear()) talkLine();
     var key = ownerNear();
     if (key) ownerTalkLine(key);
+    var kid = kidNear();
+    if (kid) kidTalkLine(kid);
   }
   // The shop owners. Walk up to one and press T to talk: they stop and
   // show their talking pose for a few seconds. No dialogue lines yet.
@@ -257,8 +309,32 @@
     var o = g[key];
     o.dir = g.px < o.x ? -1 : 1; // face Sylvia
   }
+  // The arcade kids. Walk up to one and press T to talk: they stop
+  // and say something. The key is the asset key; the name is theirs.
+  var KIDS = {
+    gamer: { name: "Jamie" },
+    dino: { name: "Kush" },
+    cup: { name: "Lia" }
+  };
+  function kidNear() {
+    if (g.room !== "arcade") return null;
+    var keys = ["gamer", "dino", "cup"];
+    for (var i = 0; i < keys.length; i++) {
+      if (Math.abs(g.px - g.kids[keys[i]].x) < 150) return keys[i];
+    }
+    return null;
+  }
+  function kidTalkLine(key) {
+    var lines = kidLines(key);
+    var idx;
+    do { idx = Math.floor(Math.random() * lines.length); }
+    while (lines.length > 1 && idx === g.kidTalk.idx && g.kidTalk.key === key);
+    g.kidTalk.idx = idx; g.kidTalk.open = true; g.kidTalk.key = key;
+    var k = g.kids[key];
+    k.dir = g.px < k.x ? -1 : 1; // face Sylvia
+  }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.climb.active || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -526,12 +602,12 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
     var to = EXITS[g.room][side];
-    g.talk.open = false; g.ownerTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
     g.room = to;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
@@ -894,7 +970,8 @@
     var keys = ["gamer", "dino", "cup"];
     for (var i = 0; i < keys.length; i++) {
       var k = g.kids[keys[i]];
-      var walking = k.pause <= 0;
+      var talking = g.kidTalk.open && g.kidTalk.key === keys[i];
+      var walking = !talking && k.pause <= 0;
       var img = walking ? imgs[keys[i]].walk[Math.floor(k.walk / 6) % imgs[keys[i]].walk.length] : imgs[keys[i]].idle;
       if (!img || !img.complete || img.naturalWidth === 0) img = imgs[keys[i]].idle;
       if (!img || !img.complete || img.naturalWidth === 0) continue;
@@ -976,6 +1053,54 @@
     ctx.font = "700 12px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("VICKY", bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
+  function drawKidTalk() {
+    // Speech bubble above the arcade kid Sylvia is talking to,
+    // tail pointing down to them. Mirrors the owners' bubble.
+    if (!g.kidTalk.open) return;
+    var key = g.kidTalk.key;
+    var k = g.kids[key];
+    var name = KIDS[key].name.toUpperCase();
+    var kx = k.x * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(kidLines(key)[g.kidTalk.idx], maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText(name).width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, kx - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, kx));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(name, bx + 16, by + 20);
     ctx.fillStyle = "#1a1a2e";
     ctx.font = "400 14px 'Open Sans', sans-serif";
     for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
@@ -1291,8 +1416,8 @@
     drawStairPrompt();
     drawBeerDoorPrompt();
     drawShopPrompt();
-    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); return; }
-    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); return; }
+    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); return; }
+    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); return; }
     drawRay();
     drawChar();
     drawMikey();
@@ -1301,6 +1426,7 @@
     if (!g.sleeping) drawSylvia();
     drawTalk();
     drawOwnerTalk();
+    drawKidTalk();
   }
 
   function tick() {
@@ -1354,12 +1480,19 @@
       var otk = g.ownerTalk.key;
       if (g.room !== OWNERS[otk].room || Math.abs(g.px - g[otk].x) > 180) g.ownerTalk.open = false;
     }
+    if (g.kidTalk.open) {
+      var ktk = g.kidTalk.key;
+      if (g.room !== "arcade" || Math.abs(g.px - g.kids[ktk].x) > 180) g.kidTalk.open = false;
+    }
     var talkBtn = document.getElementById("talkBtn");
     if (talkBtn) {
       var nearOwner = ownerNear();
+      var nearKid = kidNear();
       if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
       else if (g.ownerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.kidTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
+      else if (nearKid) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + KIDS[nearKid].name; }
       else talkBtn.hidden = true;
     }
     var enterBtn = document.getElementById("enterBtn");
@@ -1501,6 +1634,7 @@
       var kidKeys = ["gamer", "dino", "cup"];
       for (var ki = 0; ki < kidKeys.length; ki++) {
         var kd = g.kids[kidKeys[ki]];
+        if (g.kidTalk.open && g.kidTalk.key === kidKeys[ki]) continue;
         if (kd.pause > 0) { kd.pause -= 1; }
         else {
           kd.x += kd.dir * 0.8;
@@ -1548,7 +1682,7 @@
     if (e.code === "KeyE") { tryEnter(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } g.talk.open = false; g.ownerTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (setKey(e.code, true)) {
