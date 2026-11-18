@@ -39,11 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=11" forces a fresh download after I becomes crouch and
-  // inspect anywhere, and the junk text moves to a blue box on the
-  // screen instead of a speech bubble, so a browser that cached
-  // ?v=10 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=11"; return img; }
+  // "?v=12" forces a fresh download after I only crouches when
+  // there is something to inspect, and the junk text moves to a
+  // frosted blue panel at the top of the screen with a glowing
+  // border, so a browser that cached ?v=11 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=12"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -802,7 +802,7 @@
     if (!ROOMS[roomKey]) return;
     closeMap();
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.rayTalk.open = false;
-    g.propRead.open = false;
+    g.propRead.open = false; hidePropPanel();
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
     g.embrace.active = false; g.sleeping = false; g.ray.inBed = false;
@@ -925,8 +925,9 @@
     g.inspect.active = true; g.inspect.phase = "look"; g.inspect.arch = null; g.inspect.t = 0;
     g.facing = g.px < p.x ? 1 : -1;
     g.ray.dir = g.ray.x < p.x ? 1 : -1;
+    showPropPanel();
   }
-  function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; }
+  function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; hidePropPanel(); }
   function drawPropPrompt() {
     if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
     var p = propNear();
@@ -948,39 +949,19 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
-  function drawPropRead() {
-    // No speech bubble. Just the words in a blue box on the screen,
-    // down at the bottom like a caption. E or I or Esc puts it away.
-    if (!g.propRead.open) return;
-    var maxW = Math.min(g.w * 0.8, 560);
-    ctx.save();
-    ctx.font = "400 14px 'Open Sans', sans-serif";
-    var lines = wrapText(g.propRead.text, maxW - 32);
-    var bw = 0;
-    ctx.font = "700 13px 'Open Sans', sans-serif";
-    bw = Math.max(bw, ctx.measureText(g.propRead.name.toUpperCase()).width);
-    ctx.font = "400 14px 'Open Sans', sans-serif";
-    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
-    bw = Math.min(maxW, bw + 32);
-    var bh = 26 + lines.length * 18 + 22;
-    var bx = (g.w - bw) / 2;
-    var by = g.h - bh - 18;
-    ctx.fillStyle = "rgba(2, 1, 167, 0.92)";
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 12);
-    else ctx.rect(bx, by, bw, bh);
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "700 13px 'Open Sans', sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(g.propRead.name.toUpperCase(), bx + 16, by + 22);
-    ctx.font = "400 14px 'Open Sans', sans-serif";
-    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 44 + j * 18);
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
-    ctx.font = "600 11px 'Open Sans', sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText("E or I or Esc to put it down", bx + bw - 14, by + bh - 8);
-    ctx.restore();
+  function showPropPanel() {
+    // The inspection words live in a DOM panel at the top of the
+    // screen, not a canvas bubble: a frosted blue panel with a cool
+    // glowing border, bigger text, so it reads clearly and stands out.
+    var panel = document.getElementById("propPanel");
+    if (!panel) return;
+    document.getElementById("propPanelName").textContent = g.propRead.name.toUpperCase();
+    document.getElementById("propPanelText").textContent = g.propRead.text;
+    panel.hidden = false;
+  }
+  function hidePropPanel() {
+    var panel = document.getElementById("propPanel");
+    if (panel) panel.hidden = true;
   }
   function startInspect() {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active) return;
@@ -994,10 +975,9 @@
       g.inspect.active = false; return;
     }
     if (g.inspect.active) return;
-    // I is crouch and inspect. It always makes them crouch down to
-    // look, wherever they are, so the crouch itself is the inspect.
-    // What they find depends on the spot: an arch, a piece of junk,
-    // or nothing at all.
+    // I is crouch and inspect, but only when there is something to
+    // inspect. An arch, or a piece of junk on the floor. Anywhere
+    // else there is nothing to look at, so no crouch.
     var ax = inspectArch();
     var prop = propNear();
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
@@ -1008,13 +988,11 @@
       g.ray.dir = g.ray.x < ax ? 1 : -1;
     } else if (prop) {
       // Crouch down and read the junk on the floor. readProp sets
-      // the crouch and opens the blue box with what it says.
+      // the crouch and opens the panel with what it says.
       readProp(prop);
-    } else {
-      // Neither an arch nor a piece of junk: they just crouch down
-      // and look around. Press I again or walk away to stand up.
-      g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = null;
     }
+    // If it is neither an arch nor a piece of junk, there is nothing
+    // to inspect here, so I does nothing and they stay standing.
   }
   function updateInspect() {
     g.inspect.t += 1;
@@ -2241,7 +2219,6 @@
     drawOwnerTalk();
     drawKidTalk();
     drawRayTalk();
-    drawPropRead();
   }
 
   function tick() {
