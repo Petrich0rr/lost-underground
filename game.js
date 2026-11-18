@@ -25,6 +25,7 @@
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
     arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
     cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
+    garden: { w: 2172, h: 724, frames: null, floor: 0.72, depth: 0.04 },
     quarry: { w: 2172, h: 724, frames: null, floor: 0.87, depth: 0.04 },
     tunnels: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
     dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 },
@@ -39,13 +40,13 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=34" forces a fresh download after Mayor Adler is added: the
-  // politician who guards the bar, constantly there, walks slow with
-  // his cane. He looks evil but is actually a sweetheart who just
-  // does not know how to speak. He is trying his best. He wanders
-  // the bar only, never changes rooms, at half speed (0.4). A
-  // browser that cached ?v=33 picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=34"; return img; }
+  // "?v=35" forces a fresh download after the Secret Garden is added:
+  // a hidden garden beside the Flooded Cistern, to its right. The
+  // cistern's right edge leads to it, and its left edge leads back
+  // to the cistern. Floor 0.72, depth 0.04, so their feet land on
+  // the stone walkway above the pond. A browser that cached ?v=34
+  // picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=35"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -170,6 +171,7 @@
   var salonImg = loadImg("assets/shop-salon.jpg");
   var arcadeImg = loadImg("assets/shop-arcade.jpg");
   var cisternImg = loadImg("assets/bg-cistern.jpg");
+  var gardenImg = loadImg("assets/bg-secret-garden.jpg");
   var quarryImg = loadImg("assets/bg-quarry.jpg");
   var tunnelsImg = loadImg("assets/bg-tunnels.jpg");
   var dungeonImg = loadImg("assets/bg-dungeon.jpg");
@@ -219,6 +221,7 @@
   ROOMS.salon.frames = [salonImg];
   ROOMS.arcade.frames = [arcadeImg];
   ROOMS.cistern.frames = [cisternImg];
+  ROOMS.garden.frames = [gardenImg];
   ROOMS.quarry.frames = [quarryImg];
   ROOMS.tunnels.frames = [tunnelsImg];
   ROOMS.dungeon.frames = [dungeonImg];
@@ -991,7 +994,8 @@
     clothing: { left: "shopping" },
     salon: { left: "shopping" },
     arcade: { left: "shopping" },
-    cistern: { left: "shopping" },
+    cistern: { left: "shopping", right: "garden" },
+    garden: { left: "cistern" },
     quarry: { left: "arcade", right: "tunnels" },
     tunnels: { left: "quarry" },
     dungeon: { left: "tunnels" },
@@ -1043,6 +1047,7 @@
     if (g.room === "upper2" && to === "upper1") return "Go back down to Upper Level 1";
     if (g.room === "upper3" && to === "upper2") return "Go back down to Upper Level 2";
     if (to === "cistern") return "Go to the Flooded Cistern";
+    if (to === "garden") return "Go to the Secret Garden";
     if (g.room === "dungeon" && to === "tunnels") return "Back to the Old Service Tunnels";
     if (to === "tunnels") return "Go to the Old Service Tunnels";
     if (to === "quarry") return "Back to the Crystal Quarry";
@@ -1129,6 +1134,7 @@
     arcade:   { x: 0.55,  y: 0.60 },
     subway:   { x: 0.18,  y: 0.385 },
     cistern:  { x: 0.70,  y: 0.60 },
+    garden:   { x: 0.80,  y: 0.62 },
     quarry:   { x: 0.13,  y: 0.78 },
     tunnels:  { x: 0.50,  y: 0.80 },
     dungeon:  { x: 0.86,  y: 0.76 },
@@ -1146,6 +1152,7 @@
     arcade: "The Arcade",
     subway: "Forgotten Subway Platform",
     cistern: "Flooded Cistern",
+    garden: "Secret Garden",
     quarry: "Crystal Quarry",
     tunnels: "Old Service Tunnels",
     dungeon: "Ancient Dungeon",
@@ -1345,6 +1352,7 @@
     salon: "Mikey's place. Hairspray, gossip, and good lighting.",
     arcade: "The arcade never really turns off.",
     cistern: "The water is still. Too still.",
+    garden: "A hidden garden, blooming in the dark. It smells like rain and wisteria.",
     quarry: "Pretty crystals. And a little bit wrong.",
     tunnels: "The tunnels smell like damp earth and old metal.",
     dungeon: "Something bad happened here. You can feel it.",
