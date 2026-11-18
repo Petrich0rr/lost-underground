@@ -42,11 +42,14 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=42" forces a fresh download after the "Ride it together,
-  // Ray driving and you in front." line is removed from the scooter
-  // shop panel, How to play, and the pink scooter tile. A browser
-  // that cached ?v=41 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=42"; return img; }
+  // "?v=43" forces a fresh download after three changes: the action
+  // list (several commands at once show as buttons to pick from),
+  // walking to a room's edge takes you to the next scene with no E
+  // (stairs still need E), the scooter travels everywhere with them,
+  // the monsters are smaller, and the Bell Ghost flies even higher
+  // (base lift 0.15, bob 0.05, so 0.10-0.20 up). A browser that
+  // cached ?v=42 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=43"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -406,7 +409,7 @@
     // $0, riding while the two of them are on it together, x is where
     // it is parked on the shopping street, frame is the riding
     // animation frame. The shop is open while the shop panel shows.
-    scooter: { owned: false, riding: false, x: 280, frame: 0 },
+    scooter: { owned: false, riding: false, x: 280, frame: 0, room: "shopping" },
     shopOpen: false,
     map: { active: false },
     inspect: { active: false, t: 0, arch: 0, phase: "look" },
@@ -1082,10 +1085,12 @@
     return "Back to the bar";
   }
   function doorPrompt() {
+    // No "Press E to" here: walking through an edge door is
+    // automatic now, so the prompt just names the destination.
     var to = EXITS[g.room][doorSide()];
-    if (to === "bar") return "Press E to go back to the bar";
-    if (to === "shopping") return "Press E to go back to the street";
-    return "Press E to " + doorLabel().charAt(0).toLowerCase() + doorLabel().slice(1);
+    if (to === "bar") return "Go back to the bar";
+    if (to === "shopping") return "Go back to the street";
+    return doorLabel();
   }
   // The canal window on the right wall of the chamber (world x,
   // in the 1672-wide room). Walking up to it offers a climb out
@@ -1220,7 +1225,7 @@
     g.embrace.active = false; g.sleeping = false; g.ray.inBed = false;
     // Jumping away on the map leaves the scooter parked back at the
     // street entrance, so it is never left riding in another room.
-    if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; }
+    if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; g.scooter.room = "shopping"; }
     g.room = roomKey;
     if (roomKey === "dungeon") spawnMonsters();
     else clearMonsters();
@@ -1725,6 +1730,7 @@
     var to = EXITS[g.room][side];
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false;
     g.room = to;
+    if (g.scooter.riding) g.scooter.room = to;
     if (to === "dungeon") spawnMonsters();
     else if (from === "dungeon") clearMonsters();
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -1797,7 +1803,56 @@
     if (inspectNear()) { startInspect(); return; }
     if (ironDoorNear()) { enterDungeonFromIronDoor(); return; }
     if (portalNear()) { goThroughPortal(); return; }
-    if (atDoor()) switchRoom();
+  }
+  // The action list: when several commands are available at once,
+  // list them all as buttons so she can see every action and choose,
+  // instead of stacking them into one button that hides the rest.
+  // The first button is what E does (tryEnter's priority order).
+  // Tapping a button runs just that action. Edge doors are not in
+  // the list: walking through them is automatic now.
+  var lastActionIds = "";
+  function updateActionList() {
+    var list = document.getElementById("actionList");
+    if (!list) return;
+    if (g.climb.active || g.portal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    var acts = [];
+    if (g.sleeping) {
+      acts.push({ id: "wake", label: "Get up", run: wakeUp });
+    } else if (g.propRead.open) {
+      acts.push({ id: "putdown", label: "Put it down", run: closePropRead });
+    } else if (g.scooter.riding) {
+      acts.push({ id: "dismount", label: "Get off the scooter", run: dismountScooter });
+    } else {
+      if (photoNear()) acts.push({ id: "photo", label: "Look at the photo", run: openPhoto });
+      if (bedNear()) acts.push({ id: "bed", label: "Go to bed", run: goToBed });
+      if (vanityNear()) acts.push({ id: "mirror", label: "Look in the mirror", run: enterMirror });
+      if (windowNear()) acts.push({ id: "window", label: "Climb out the window", run: climbOutWindow });
+      var st = stairsNear();
+      if (st) acts.push({ id: "stairs", label: STAIRS[st].btn, run: climbStairs });
+      if (beerDoorNear()) acts.push({ id: "beer", label: "Enter the bar", run: enterBarFromBeerDoor });
+      var sh = shopNear();
+      if (sh) acts.push({ id: "shop", label: SHOPS[sh].btn, run: function () { enterShop(sh); } });
+      if (scooterNear()) acts.push({ id: "scooter", label: "Ride the scooter", run: mountScooter });
+      var pr = propNear();
+      if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
+      if (inspectNear()) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
+      if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
+      if (portalNear()) acts.push({ id: "portal", label: "Go home", run: goThroughPortal });
+    }
+    var ids = acts.map(function (a) { return a.id + ":" + a.label; }).join("|");
+    if (ids === lastActionIds) { list.hidden = acts.length === 0; return; }
+    lastActionIds = ids;
+    list.innerHTML = "";
+    for (var i = 0; i < acts.length; i++) {
+      (function (a) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = a.label;
+        b.addEventListener("click", function (e) { e.stopPropagation(); a.run(); });
+        list.appendChild(b);
+      })(acts[i]);
+    }
+    list.hidden = acts.length === 0;
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
@@ -1814,10 +1869,12 @@
   // for now (no coins yet). Once bought it is parked at the entrance
   // of the shopping district street, and the two of them can ride it
   // together, faster than running, with the headlight lighting the
-  // way ahead. It stays on the street: get off to go through a door.
+  // way ahead. It travels everywhere with them now: riding through
+  // an edge door carries it into the next room. Get off to climb
+  // stairs or to go through a shop, bar, or iron door.
   var SCOOTER_X = 280, SCOOTER_RANGE = 110;
   function scooterNear() {
-    return g.room === "shopping" && g.scooter.owned && !g.scooter.riding && Math.abs(g.px - g.scooter.x) < SCOOTER_RANGE;
+    return g.scooter.room === g.room && g.scooter.owned && !g.scooter.riding && Math.abs(g.px - g.scooter.x) < SCOOTER_RANGE;
   }
   function mountScooter() {
     if (!scooterNear()) return;
@@ -1831,6 +1888,7 @@
     if (!g.scooter.riding) return;
     g.scooter.riding = false;
     g.scooter.x = g.px;
+    g.scooter.room = g.room;
     g.ray.x = g.px - g.facing * 70; g.ray.dir = g.facing;
     if (g.ray.x < 60) g.ray.x = 60;
     if (g.ray.x > room().w - 60) g.ray.x = room().w - 60;
@@ -1861,14 +1919,15 @@
     g.scooter.owned = true;
     g.scooter.riding = false;
     g.scooter.x = SCOOTER_X;
+    g.scooter.room = "shopping";
     var buy = document.getElementById("shopBuyBtn");
     if (buy) { buy.disabled = true; buy.textContent = "Already yours"; }
     var note = document.getElementById("shopNote");
     if (note) note.textContent = "You own the pink scooter. It is parked outside on the street.";
   }
   function drawScooter() {
-    // The parked scooter on the shopping street, waiting to be ridden.
-    if (g.room !== "shopping" || !g.scooter.owned || g.scooter.riding) return;
+    // The parked scooter, wherever it was left, waiting to be ridden.
+    if (g.scooter.room !== g.room || !g.scooter.owned || g.scooter.riding) return;
     if (!scooterImg || !scooterImg.complete || scooterImg.naturalWidth === 0) return;
     // Sized so the parked scooter is the same width as the scooter
     // in the riding frames, so mounting it does not shrink it.
@@ -2008,10 +2067,10 @@
   // they are big enough for her high kick to reach, and they hop and
   // bob up into the kick as they move.
   var MONSTERS = {
-    keyknight: { imgs: monsterKeyknightImgs, h: 0.16, speed: 0.5, hop: 0.07 },
-    candlepup: { imgs: monsterCandlepupImgs, h: 0.15, speed: 0.9, hop: 0.12 },
-    biteyrock: { imgs: monsterBiteyrockImgs, h: 0.17, speed: 0.4, hop: 0.13 },
-    bellghost: { imgs: monsterBellghostImgs, h: 0.16, speed: 0.6, hop: 0.05 }
+    keyknight: { imgs: monsterKeyknightImgs, h: 0.13, speed: 0.5, hop: 0.07 },
+    candlepup: { imgs: monsterCandlepupImgs, h: 0.12, speed: 0.9, hop: 0.12 },
+    biteyrock: { imgs: monsterBiteyrockImgs, h: 0.14, speed: 0.4, hop: 0.13 },
+    bellghost: { imgs: monsterBellghostImgs, h: 0.13, speed: 0.6, hop: 0.05 }
   };
   function spawnMonsters() {
     g.monsters = [];
@@ -2125,7 +2184,7 @@
         var bh = m.hopT % 110;
         lift = bh < 40 ? Math.sin(bh / 40 * Math.PI) * g.h * def.hop : 0;
       } else {
-        lift = g.h * 0.11 + Math.sin(m.hopT * 0.08) * g.h * def.hop;
+        lift = g.h * 0.15 + Math.sin(m.hopT * 0.08) * g.h * def.hop;
       }
       var groundFeetY = groundY() + m.depth;
       var feetY = groundFeetY - lift;
@@ -3623,7 +3682,7 @@
       if (mcBtn) mcBtn.hidden = false;
       var tBtn2 = document.getElementById("talkBtn");
       if (tBtn2) tBtn2.hidden = true;
-      var eBtn2 = document.getElementById("enterBtn");
+      var eBtn2 = document.getElementById("actionList");
       if (eBtn2) eBtn2.hidden = true;
       var aBtn2 = document.getElementById("attackBtn");
       if (aBtn2) aBtn2.hidden = true;
@@ -3639,7 +3698,7 @@
       // until she closes it.
       var tBtnM = document.getElementById("talkBtn");
       if (tBtnM) tBtnM.hidden = true;
-      var eBtnM = document.getElementById("enterBtn");
+      var eBtnM = document.getElementById("actionList");
       if (eBtnM) eBtnM.hidden = true;
       var aBtnM = document.getElementById("attackBtn");
       if (aBtnM) aBtnM.hidden = true;
@@ -3651,7 +3710,7 @@
       // it. Nothing moves until she puts it back.
       var tBtnP = document.getElementById("talkBtn");
       if (tBtnP) tBtnP.hidden = true;
-      var eBtnP = document.getElementById("enterBtn");
+      var eBtnP = document.getElementById("actionList");
       if (eBtnP) eBtnP.hidden = true;
       var aBtnP = document.getElementById("attackBtn");
       if (aBtnP) aBtnP.hidden = true;
@@ -3663,7 +3722,7 @@
       // moves until she buys or closes it.
       var tBtnS = document.getElementById("talkBtn");
       if (tBtnS) tBtnS.hidden = true;
-      var eBtnS = document.getElementById("enterBtn");
+      var eBtnS = document.getElementById("actionList");
       if (eBtnS) eBtnS.hidden = true;
       var aBtnS = document.getElementById("attackBtn");
       if (aBtnS) aBtnS.hidden = true;
@@ -3764,26 +3823,7 @@
       // talks to him first, then opens his shop from the chat.
       shopBtn.hidden = !(g.ownerTalk.open && g.ownerTalk.key === "gunner" && !g.shopOpen);
     }
-    var enterBtn = document.getElementById("enterBtn");
-    if (enterBtn) {
-      if (g.climb.active || g.portal.active) { enterBtn.hidden = true; }
-      else if (g.scooter.riding && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Get off the scooter"; }
-      else if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
-      else if (photoNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Look at the photo"; }
-      else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
-      else if (vanityNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Look in the mirror"; }
-      else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
-      else if (stairsNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = STAIRS[stairsNear()].btn; }
-      else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
-      else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
-      else if (scooterNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Ride the scooter"; }
-      else if (propNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.propRead.open ? "Put it down" : "Inspect"; }
-      else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.inspect.active ? "Go down" : "Inspect"; }
-      else if (ironDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Dungeon"; }
-      else if (portalNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go home"; }
-      else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
-      else enterBtn.hidden = true;
-    }
+    updateActionList();
     if (g.climb.active) {
       // Climbing out the window: the climb drives them both, and
       // nothing else moves until they are through.
@@ -3827,6 +3867,10 @@
     if (g.px > room().w - 60) g.px = room().w - 60;
     if (g.depth < -depthRange()) g.depth = -depthRange();
     if (g.depth > 0) g.depth = 0;
+    // Walking to the edge of a room takes you to the next scene, no
+    // E needed. Stairs still need E to climb. Riding the scooter
+    // through an edge carries it along (switchRoom moves its room).
+    if ((keys.left && doorSide() === "left") || (keys.right && doorSide() === "right")) switchRoom();
     if (keys.left || keys.right || keys.up || keys.down) g.walk += keys.fast ? 0.6 : 0.3;
     // Camera follows Sylvia across the bar.
     var target = g.px * scale() - g.w * 0.38;
@@ -4236,8 +4280,6 @@
   }
   var attackBtn = document.getElementById("attackBtn");
   if (attackBtn) attackBtn.addEventListener("click", function (e) { e.stopPropagation(); tryAttack(); });
-  var enterBtn = document.getElementById("enterBtn");
-  if (enterBtn) enterBtn.addEventListener("click", function (e) { e.stopPropagation(); tryEnter(); });
   var manifestBtn = document.getElementById("manifestBtn");
   if (manifestBtn) manifestBtn.addEventListener("click", function (e) { e.stopPropagation(); manifest(); });
   var mirrorCloseBtn = document.getElementById("mirrorCloseBtn");
