@@ -93,7 +93,7 @@
   ROOMS.arcade.frames = [arcadeImg];
   ROOMS.garden.frames = [gardenImg];
 
-  var keys = { up: false, down: false, left: false, right: false };
+  var keys = { up: false, down: false, left: false, right: false, fast: false };
   var g = {
     w: 0, h: 340, time: 0, camX: 0, room: "chamber",
     // Sylvia, in chamber-world pixels (chamber is 1672 wide, 941 tall).
@@ -1293,7 +1293,7 @@
       // A movement key wakes her up, and then walks as normal.
       if (keys.left || keys.right || keys.up || keys.down) wakeUp();
     }
-    var speed = 2.2;
+    var speed = keys.fast ? 4.4 : 2.2;
     if (keys.left) { g.px -= speed; g.facing = -1; }
     if (keys.right) { g.px += speed; g.facing = 1; }
     if (keys.up) { g.depth -= speed * 0.5; }
@@ -1302,7 +1302,7 @@
     if (g.px > room().w - 60) g.px = room().w - 60;
     if (g.depth < -depthRange()) g.depth = -depthRange();
     if (g.depth > 0) g.depth = 0;
-    if (keys.left || keys.right || keys.up || keys.down) g.walk += 0.3;
+    if (keys.left || keys.right || keys.up || keys.down) g.walk += keys.fast ? 0.6 : 0.3;
     // Camera follows Sylvia across the bar.
     var target = g.px * scale() - g.w * 0.38;
     if (target < 0) target = 0;
@@ -1330,8 +1330,9 @@
       if (r.fight.t >= 90) { r.fight.active = false; r.pause = 40; }
     } else if (Math.abs(r.x - g.px) > 320) {
       r.dir = r.x < g.px ? 1 : -1;
-      r.x += r.dir * 2.6;
-      r.walk += 1;
+      // He runs too when she is running, so he can still catch her.
+      r.x += r.dir * (keys.fast ? 5.2 : 2.6);
+      r.walk += keys.fast ? 2 : 1;
       r.pause = 0;
     } else if (r.pause > 0) { r.pause -= 1; }
     else {
@@ -1412,6 +1413,7 @@
     else if (code === "ArrowRight" || code === "KeyD") keys.right = on;
     else if (code === "ArrowUp" || code === "KeyW") keys.up = on;
     else if (code === "ArrowDown" || code === "KeyS") keys.down = on;
+    else if (code === "Space") keys.fast = on;
     else return false;
     return true;
   }
@@ -1429,8 +1431,10 @@
     }
   });
   window.addEventListener("keyup", function (e) { setKey(e.code, false); });
-  // Touch: hold the left or right side of the bar to walk that way.
+  // Touch and mouse: hold the left or right side of the bar to walk
+  // that way. A quick tap or click, without holding, is an attack.
   var pointerDir = 0;
+  var pointerDownAt = 0, pointerDownX = 0, pointerDownY = 0;
   function pointerMove(e) {
     var r = canvas.getBoundingClientRect();
     var x = (e.clientX - r.left) / r.width * g.w;
@@ -1439,9 +1443,21 @@
     keys.left = pointerDir === -1;
     keys.right = pointerDir === 1;
   }
-  canvas.addEventListener("pointerdown", function (e) { pointerMove(e); });
+  canvas.addEventListener("pointerdown", function (e) {
+    pointerDownAt = Date.now();
+    pointerDownX = e.clientX; pointerDownY = e.clientY;
+    pointerMove(e);
+  });
   canvas.addEventListener("pointermove", function (e) { if (e.buttons) pointerMove(e); });
-  function pointerEnd() { pointerDir = 0; keys.left = false; keys.right = false; }
+  function pointerEnd(e) {
+    pointerDir = 0; keys.left = false; keys.right = false;
+    if (e && e.clientX !== undefined && pointerDownAt) {
+      var dt = Date.now() - pointerDownAt;
+      var moved = Math.max(Math.abs(e.clientX - pointerDownX), Math.abs(e.clientY - pointerDownY));
+      if (dt < 250 && moved < 12) tryAttack();
+    }
+    pointerDownAt = 0;
+  }
   canvas.addEventListener("pointerup", pointerEnd);
   var talkBtn = document.getElementById("talkBtn");
   if (talkBtn) talkBtn.addEventListener("click", function (e) { e.stopPropagation(); pressT(); });
