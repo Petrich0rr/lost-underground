@@ -42,11 +42,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=63" forces a fresh download: every HUD heart has a white
-  // outline so it reads as a heart, and the coin and energy bar sit
-  // further right, clear of the hearts. A browser that cached ?v=62
-  // picks up the fix.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=63"; return img; }
+  // "?v=64" forces a fresh download: the proposal now shows Ray
+  // kneeling down before he holds out the ring. A browser that
+  // cached ?v=63 picks up the kneel-down.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=64"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -57,7 +56,8 @@
   var rayWalkImgs = RAY_WALK.map(loadImg);
   var rayIdleImg = loadImg(RAY_IDLE_SRC);
   var kissImg = loadImg("assets/kiss.png");
-  var proposeAskImg = loadImg("assets/propose-ask.png");
+  var proposeKneelImg = loadImg("assets/propose-kneel.png");
+  proposeAskImg = loadImg("assets/propose-ask.png");
   proposeSurpriseImgs = ["assets/propose-surprise-01.png", "assets/propose-surprise-02.png", "assets/propose-surprise-03.png"].map(loadImg);
   proposeYesImg = loadImg("assets/propose-yes.png");
   proposeEmbraceImg = loadImg("assets/propose-embrace.png");
@@ -2995,13 +2995,15 @@
     saveGame();
   }
   function drawProposal() {
-    // One picture per beat now: step 0 Ray kneels with the ring,
-    // step 1 Sylvia's surprised reaction cycles, step 2 they stand
-    // together happy, step 3 the embrace, with hearts above it.
+    // One picture per beat now: step 0 Ray kneels down, then holds
+    // out the ring; step 1 Sylvia's surprised reaction cycles;
+    // step 2 they stand together happy, step 3 the embrace, with
+    // hearts above it.
     var feetY = groundY() + g.depth - 6;
     var cx = g.w / 2;
     if (g.proposal.step === 0) {
-      var frame = proposeAskImg;
+      // Ray kneels down first, then holds out the ring.
+      var frame = Math.floor(g.proposal.t / 25) % 2 === 0 ? proposeKneelImg : proposeAskImg;
       if (frame && frame.complete && frame.naturalWidth > 0) {
         var h = g.h * 0.62;
         var w = h * (frame.naturalWidth / frame.naturalHeight);
