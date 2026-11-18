@@ -95,16 +95,17 @@
     ray: { x: 1020, dir: -1, pause: 0, walk: 0, depth: 0, vdir: 0, fight: { active: false, t: 0 } },
     // Char, the clothing store owner. She only ever stands and walks in
     // the clothing store, never anywhere else.
-    char: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0, talk: 0 },
+    char: { x: 1200, dir: -1, pause: 120, walk: 0, depth: 0, vdir: 0 },
     // Mikey, the salon owner. He only ever stands and walks in the
     // salon (the Style Studio), never anywhere else.
-    mikey: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0, talk: 0 },
+    mikey: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
     // Gunner, the repair shop owner. He only ever stands and walks in
     // the repair shop, never anywhere else.
-    gunner: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0, talk: 0 },
+    gunner: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
+    ownerTalk: { open: false, idx: -1, key: null },
     hp: 100, hpMax: 100,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 }
@@ -122,6 +123,53 @@
     "You two are cute. Gross, but cute.",
     "Been here most of my life. The taps have never once run dry. Weird, right?"
   ];
+  // Char, the clothing store owner: a fashion diva with a fur coat and
+  // a cigar. Dramatic, knows her worth, dresses the whole district.
+  var CHAR_LINES = [
+    "That blue dress? Divine. I could sell it ten times over down here.",
+    "Darling, fashion does not stop just because we are underground.",
+    "A lady never rushes a cigar. Or a fitting.",
+    "Everything here is one of a kind. Mostly because I made it.",
+    "Your boy has shoulders like a coat rack. Bring him by, I will dress him.",
+    "The canal ruins the hems. Worth it.",
+    "Up there they wear beige. Beige! I would rather stay.",
+    "I have dressed three generations of this district. Ask anyone.",
+    "You walk like you own the street. Good. Never let them see you hurry.",
+    "Vicky pours a fine drink. I only go for the lighting. It is very flattering."
+  ];
+  // Mikey, the salon owner: fun, loud, obsessed with hair and style.
+  // Best chairs underground, worst tips, free gossip.
+  var MIKEY_LINES = [
+    "Your hair is gorgeous, but I could give it layers that would start a riot.",
+    "Best chairs underground. The mirrors are older than the district.",
+    "Style is not about money, babe. It is about commitment.",
+    "Your man has great hair for a guy who clearly never thinks about it. Unfair.",
+    "I have been cutting hair down here since I was sixteen. The tips are terrible, the gossip is free.",
+    "Do not let the canal water touch your hair. Trust me on this one.",
+    "Upstairs? They have salons with windows. Windows! Imagine the lighting.",
+    "Vicky is my best customer. She tips in stories.",
+    "You have main character energy. Sit in my chair sometime and I will make it official.",
+    "The arcade kids come in here with the wildest hair. I love them."
+  ];
+  // Gunner, the repair shop owner: warm, handy, keeps the district
+  // running. Fixes anything, paid in pie by Vicky.
+  var GUNNER_LINES = [
+    "If it is broken, I can fix it. If it is not broken, give me ten minutes.",
+    "Every tool in here has a story. Most of them involve someone saying watch this.",
+    "I have kept this district running for years. Pipes, gears, doors, you name it.",
+    "Your fella looks handy. If he ever wants work, my bench is always open.",
+    "You look like trouble in a good way. The kind that needs a sturdy door.",
+    "The canal floods the lower gears twice a year. I have the waders ready.",
+    "The stairs up? I oiled the hinges myself. They will hold.",
+    "Vicky's bar runs on my repairs. She pays me in pie. Fair trade.",
+    "The garden above the subway? Beautiful place. The waterfall keeps my gears wet, but I cannot complain.",
+    "The arcade machines break more than anything else down here. The kids play hard."
+  ];
+  function ownerLines(key) {
+    if (key === "char") return CHAR_LINES;
+    if (key === "mikey") return MIKEY_LINES;
+    return GUNNER_LINES;
+  }
   function vickyNear() { return g.room === "bar" && Math.abs(g.px - VICKY_X) < 140; }
   function talkLine() {
     var idx;
@@ -132,9 +180,10 @@
   function pressT() {
     if (g.kiss.active) return;
     if (g.talk.open) { talkLine(); return; }
+    if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
     if (vickyNear()) talkLine();
     var key = ownerNear();
-    if (key) talkToOwner(key);
+    if (key) ownerTalkLine(key);
   }
   // The shop owners. Walk up to one and press T to talk: they stop and
   // show their talking pose for a few seconds. No dialogue lines yet.
@@ -150,14 +199,17 @@
     }
     return null;
   }
-  function talkToOwner(key) {
+  function ownerTalkLine(key) {
+    var lines = ownerLines(key);
+    var idx;
+    do { idx = Math.floor(Math.random() * lines.length); }
+    while (lines.length > 1 && idx === g.ownerTalk.idx && g.ownerTalk.key === key);
+    g.ownerTalk.idx = idx; g.ownerTalk.open = true; g.ownerTalk.key = key;
     var o = g[key];
-    o.talk = 180; // about 3 seconds in the talking pose
-    o.pause = 180; // stay put while talking
     o.dir = g.px < o.x ? -1 : 1; // face Sylvia
   }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -207,8 +259,8 @@
     return g.room === "chamber" && Math.abs(g.px - WINDOW_X) < WINDOW_RANGE;
   }
   function climbOutWindow() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.embrace.active) return;
-    g.talk.open = false;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
+    g.talk.open = false; g.ownerTalk.open = false;
     g.room = "shopping";
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You climb out on the left side of the street, facing the shops.
@@ -225,8 +277,8 @@
     return g.room === "shopping" && Math.abs(g.px - BEER_DOOR_X) < BEER_DOOR_RANGE;
   }
   function enterBarFromBeerDoor() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.embrace.active) return;
-    g.talk.open = false;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
+    g.talk.open = false; g.ownerTalk.open = false;
     g.room = "bar";
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You walk in through the bar door, on the right side of the room,
@@ -253,8 +305,8 @@
     return null;
   }
   function enterShop(key) {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.embrace.active) return;
-    g.talk.open = false;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
+    g.talk.open = false; g.ownerTalk.open = false;
     g.room = key;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You walk in the shop door, on the left side of the room, facing in.
@@ -264,12 +316,12 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.embrace.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
     var to = EXITS[g.room][side];
-    g.talk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false;
     g.room = to;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You come in through the opposite side of the door you left by.
@@ -304,7 +356,7 @@
   }
   function goToBed() {
     g.sleeping = true;
-    g.attack.active = false; g.talk.open = false;
+    g.attack.active = false; g.talk.open = false; g.ownerTalk.open = false;
     // He gets in at the same time, wherever he is: no walking
     // over. He is at her side of the bed, under the covers.
     g.ray.fight.active = false; g.ray.pause = 0;
@@ -489,7 +541,7 @@
     var o = g.char;
     var walking = o.pause <= 0;
     var img;
-    if (o.talk > 0) img = charTalkImg;
+    if (g.ownerTalk.open && g.ownerTalk.key === "char") img = charTalkImg;
     else img = walking ? charWalkImgs[Math.floor(o.walk / 6) % charWalkImgs.length] : charIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = charIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
@@ -516,7 +568,7 @@
     var m = g.mikey;
     var walking = m.pause <= 0;
     var img;
-    if (m.talk > 0) img = mikeyTalkImg;
+    if (g.ownerTalk.open && g.ownerTalk.key === "mikey") img = mikeyTalkImg;
     else img = walking ? mikeyWalkImgs[Math.floor(m.walk / 6) % mikeyWalkImgs.length] : mikeyIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = mikeyIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
@@ -543,7 +595,7 @@
     var n = g.gunner;
     var walking = n.pause <= 0;
     var img;
-    if (n.talk > 0) img = gunnerTalkImg;
+    if (g.ownerTalk.open && g.ownerTalk.key === "gunner") img = gunnerTalkImg;
     else img = walking ? gunnerWalkImgs[Math.floor(n.walk / 6) % gunnerWalkImgs.length] : gunnerIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) img = gunnerIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
@@ -624,6 +676,54 @@
     ctx.font = "700 12px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("VICKY", bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
+  function drawOwnerTalk() {
+    // Speech bubble above the shop owner Sylvia is talking to,
+    // tail pointing down to them. Mirrors Vicky's bubble.
+    if (!g.ownerTalk.open) return;
+    var key = g.ownerTalk.key;
+    var o = g[key];
+    var name = OWNERS[key].name.toUpperCase();
+    var ox = o.x * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(ownerLines(key)[g.ownerTalk.idx], maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText(name).width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, ox - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, ox));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(name, bx + 16, by + 20);
     ctx.fillStyle = "#1a1a2e";
     ctx.font = "400 14px 'Open Sans', sans-serif";
     for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
@@ -769,24 +869,30 @@
     drawWindowPrompt();
     drawBeerDoorPrompt();
     drawShopPrompt();
-    if (g.kiss.active) { drawKiss(); drawTalk(); return; }
-    if (g.embrace.active) { drawEmbrace(); drawTalk(); return; }
+    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); return; }
+    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); return; }
     drawRay();
     drawChar();
     drawMikey();
     drawGunner();
     if (!g.sleeping) drawSylvia();
     drawTalk();
+    drawOwnerTalk();
   }
 
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
+    if (g.ownerTalk.open) {
+      var otk = g.ownerTalk.key;
+      if (g.room !== OWNERS[otk].room || Math.abs(g.px - g[otk].x) > 180) g.ownerTalk.open = false;
+    }
     var talkBtn = document.getElementById("talkBtn");
     if (talkBtn) {
       var nearOwner = ownerNear();
       if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
+      else if (g.ownerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
       else talkBtn.hidden = true;
     }
@@ -875,8 +981,7 @@
     // clothing store, never anywhere else. She wanders it slowly,
     // pausing to look at the racks, and turns at the walls.
     var o = g.char;
-    if (g.room === "clothing") {
-      if (o.talk > 0) o.talk -= 1;
+    if (g.room === "clothing" && !(g.ownerTalk.open && g.ownerTalk.key === "char")) {
       if (o.pause > 0) { o.pause -= 1; }
       else {
         o.x += o.dir * 0.8;
@@ -889,8 +994,7 @@
     // never anywhere else. He wanders it slowly, pausing by the chairs,
     // and turns at the walls.
     var m = g.mikey;
-    if (g.room === "salon") {
-      if (m.talk > 0) m.talk -= 1;
+    if (g.room === "salon" && !(g.ownerTalk.open && g.ownerTalk.key === "mikey")) {
       if (m.pause > 0) { m.pause -= 1; }
       else {
         m.x += m.dir * 0.8;
@@ -903,8 +1007,7 @@
     // repair shop, never anywhere else. He wanders it slowly, pausing
     // by the workbench, and turns at the walls.
     var n = g.gunner;
-    if (g.room === "repair") {
-      if (n.talk > 0) n.talk -= 1;
+    if (g.room === "repair" && !(g.ownerTalk.open && g.ownerTalk.key === "gunner")) {
       if (n.pause > 0) { n.pause -= 1; }
       else {
         n.x += n.dir * 0.8;
@@ -949,7 +1052,7 @@
     if (e.code === "KeyH") { tryAttack(); return; }
     if (e.code === "KeyE") { tryEnter(); return; }
     if (e.code === "KeyT") { pressT(); return; }
-    if (e.code === "Escape") { g.talk.open = false; return; }
+    if (e.code === "Escape") { g.talk.open = false; g.ownerTalk.open = false; return; }
     if (setKey(e.code, true)) {
       var r = canvas.getBoundingClientRect();
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
