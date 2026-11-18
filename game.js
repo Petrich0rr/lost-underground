@@ -42,13 +42,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=44" forces a fresh download after three changes: talking
-  // joins the action list (one button per person nearby, so the old
-  // single Talk button no longer hides anyone or sits on top of the
-  // list), the scooter costs $20 in gold coins, and the headlight is
-  // a softer round glow with no hard rim. A browser that cached
-  // ?v=43 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=44"; return img; }
+  // "?v=45" forces a fresh download after the wishing fountain in
+  // the Secret Garden: walk up and press E to make a wish, and five
+  // gold coins rise from the fountain, one time only, to help save
+  // for the $20 scooter. A soft golden shimmer marks it. A browser
+  // that cached ?v=44 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=45"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -389,6 +388,7 @@
     // hits = one heart). hurtT is a brief invulnerability after a
     // hit. kissHealT is the cooldown before a kiss can heal again.
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
+    fountainWished: false, fountainMsg: "", fountainMsgT: 0,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
     // Climbing out the chamber window, or up a staircase: Ray goes
@@ -1809,6 +1809,7 @@
     var prop = propNear();
     if (prop) { readProp(prop); return; }
     if (inspectNear()) { startInspect(); return; }
+    if (fountainNear()) { makeWish(); return; }
     if (ironDoorNear()) { enterDungeonFromIronDoor(); return; }
     if (portalNear()) { goThroughPortal(); return; }
   }
@@ -1874,6 +1875,7 @@
       var pr = propNear();
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
       if (inspectNear()) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
+      if (fountainNear() && !g.fountainWished) acts.push({ id: "fountain", label: "Make a wish", run: makeWish });
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
       if (portalNear()) acts.push({ id: "portal", label: "Go home", run: goThroughPortal });
     }
@@ -1969,6 +1971,79 @@
     if (buy) { buy.disabled = true; buy.textContent = "Already yours"; }
     var note = document.getElementById("shopNote");
     if (note) note.textContent = "You own the pink scooter. It is parked outside on the street.";
+  }
+  // The wishing fountain in the Secret Garden. The fountain's
+  // central column is at world x 1475 in the 2172-wide room (measured
+  // from the art with marker lines). Walk up and press E to make a
+  // wish: five gold coins rise from the fountain, one time only, to
+  // help save for the $20 scooter. A soft golden shimmer marks it so
+  // it is easy to find.
+  var FOUNTAIN_X = 1475, FOUNTAIN_RANGE = 110, FOUNTAIN_COINS = 5;
+  function fountainNear() {
+    return g.room === "garden" && Math.abs(g.px - FOUNTAIN_X) < FOUNTAIN_RANGE;
+  }
+  function makeWish() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open) return;
+    if (g.fountainWished) {
+      g.fountainMsg = "Your wish already came true.";
+      g.fountainMsgT = 120;
+      return;
+    }
+    g.fountainWished = true;
+    g.coinCount += FOUNTAIN_COINS;
+    g.fountainMsg = "+5 coins! The garden heard your wish.";
+    g.fountainMsgT = 180;
+  }
+  function drawFountainGlow() {
+    // A soft golden shimmer over the fountain basin, so it is easy
+    // to find. It fades out once the wish is made.
+    if (g.room !== "garden" || g.fountainWished) return;
+    var pulse = 0.20 + 0.12 * Math.sin(Date.now() / 500);
+    var x = FOUNTAIN_X * scale() - g.camX;
+    var y = groundY() - 6;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = "#ffd977";
+    ctx.beginPath();
+    ctx.ellipse(x, y, 70, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = pulse * 1.6;
+    ctx.fillStyle = "#fff3c4";
+    ctx.beginPath();
+    ctx.ellipse(x, y, 34, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function drawFountainPrompt() {
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (!fountainNear() || g.fountainWished) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to make a wish";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
+  function drawFountainMsg() {
+    if (g.fountainMsgT <= 0 || !g.fountainMsg) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 64;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, g.fountainMsgT / 60);
+    ctx.font = "700 14px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffd977";
+    ctx.fillText(g.fountainMsg, x, y);
+    ctx.restore();
   }
   function drawScooter() {
     // The parked scooter, wherever it was left, waiting to be ridden.
@@ -3656,6 +3731,7 @@
     drawCoins();
     drawScooter();
     drawArchGlow();
+    drawFountainGlow();
     drawHp();
     drawVickyPrompt();
     drawDoorPrompt();
@@ -3671,6 +3747,7 @@
     drawIronDoorPrompt();
     drawPortalPrompt();
     drawScooterPrompt();
+    drawFountainPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
     if (g.scooter.riding) drawScooterRide();
@@ -3699,6 +3776,7 @@
     drawYutoTalk();
     drawAdlerTalk();
     drawRayTalk();
+    drawFountainMsg();
     drawDebug();
   }
 
@@ -3888,6 +3966,7 @@
     if (target < 0) target = 0;
     if (target > worldW() - g.w) target = worldW() - g.w;
     g.camX += (target - g.camX) * 0.12;
+    if (g.fountainMsgT > 0) g.fountainMsgT -= 1;
     if (g.attack.cooldown > 0) g.attack.cooldown -= 1;
     if (g.hurtT > 0) g.hurtT -= 1;
     if (g.kissHealT > 0) g.kissHealT -= 1;
