@@ -39,12 +39,15 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=30" forces a fresh download after Yuto is added (a Japanese
-  // sexy nerd that loves reading, always teaching people something
-  // new and interesting facts, a bit cocky and egoistic but in a hot
-  // way; he wanders the Shopping District street and the bar). A
-  // browser that cached ?v=29 picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=30"; return img; }
+  // "?v=31" forces a fresh download after the stuck-NPC fix: when
+  // a rotating NPC (Alexis, Priya, Diego, Kian, Yuto) changed rooms
+  // they spawned at x=110, below the wander left bound of 150, and
+  // the bounds check only flipped their direction, so they
+  // oscillated between x=110.0 and x=110.8 forever and looked
+  // frozen. Spawns are now x=200, and the bounds check clamps x
+  // back inside and forces the direction inward. A browser that
+  // cached ?v=30 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=31"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -3510,7 +3513,7 @@
     else {
       r.x += r.dir * 0.9;
       r.walk += 0.3;
-      if (r.x < 120 || r.x > room().w - 120) { r.dir *= -1; r.pause = 60 + Math.random() * 120; }
+      if (r.x < 120) { r.x = 120; r.dir = 1; r.pause = 60 + Math.random() * 120; } else if (r.x > room().w - 120) { r.x = room().w - 120; r.dir = -1; r.pause = 60 + Math.random() * 120; }
       else if (Math.random() < 0.002) { r.pause = 90 + Math.random() * 150; }
     }
     // Ray walks forward and back with her, staying at her depth.
@@ -3527,7 +3530,7 @@
       else {
         o.x += o.dir * 0.8;
         o.walk += 0.3;
-        if (o.x < 150 || o.x > room().w - 150) { o.dir *= -1; o.pause = 60 + Math.random() * 120; }
+        if (o.x < 150) { o.x = 150; o.dir = 1; o.pause = 60 + Math.random() * 120; } else if (o.x > room().w - 150) { o.x = room().w - 150; o.dir = -1; o.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { o.pause = 90 + Math.random() * 150; }
       }
     }
@@ -3540,7 +3543,7 @@
       else {
         m.x += m.dir * 0.8;
         m.walk += 0.3;
-        if (m.x < 150 || m.x > room().w - 150) { m.dir *= -1; m.pause = 60 + Math.random() * 120; }
+        if (m.x < 150) { m.x = 150; m.dir = 1; m.pause = 60 + Math.random() * 120; } else if (m.x > room().w - 150) { m.x = room().w - 150; m.dir = -1; m.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { m.pause = 90 + Math.random() * 150; }
       }
     }
@@ -3553,7 +3556,7 @@
       else {
         n.x += n.dir * 0.8;
         n.walk += 0.3;
-        if (n.x < 150 || n.x > room().w - 150) { n.dir *= -1; n.pause = 60 + Math.random() * 120; }
+        if (n.x < 150) { n.x = 150; n.dir = 1; n.pause = 60 + Math.random() * 120; } else if (n.x > room().w - 150) { n.x = room().w - 150; n.dir = -1; n.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { n.pause = 90 + Math.random() * 150; }
       }
     }
@@ -3569,7 +3572,7 @@
         else {
           kd.x += kd.dir * 0.8;
           kd.walk += 0.3;
-          if (kd.x < 150 || kd.x > room().w - 150) { kd.dir *= -1; kd.pause = 60 + Math.random() * 120; }
+          if (kd.x < 150) { kd.x = 150; kd.dir = 1; kd.pause = 60 + Math.random() * 120; } else if (kd.x > room().w - 150) { kd.x = room().w - 150; kd.dir = -1; kd.pause = 60 + Math.random() * 120; }
           else if (Math.random() < 0.002) { kd.pause = 90 + Math.random() * 150; }
         }
       }
@@ -3586,7 +3589,7 @@
       else {
         ev.x += ev.dir * 0.8;
         ev.walk += 0.3;
-        if (ev.x < 150 || ev.x > room().w - 150) { ev.dir *= -1; ev.pause = 60 + Math.random() * 120; }
+        if (ev.x < 150) { ev.x = 150; ev.dir = 1; ev.pause = 60 + Math.random() * 120; } else if (ev.x > room().w - 150) { ev.x = room().w - 150; ev.dir = -1; ev.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { ev.pause = 90 + Math.random() * 150; }
       }
     }
@@ -3608,7 +3611,7 @@
         do { aNext = aRooms[Math.floor(Math.random() * aRooms.length)]; }
         while (aNext === ax.room);
         ax.room = aNext;
-        ax.x = 110; ax.dir = 1; ax.pause = 60;
+        ax.x = 200; ax.dir = 1; ax.pause = 60;
         ax.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
       }
     }
@@ -3617,7 +3620,7 @@
       else {
         ax.x += ax.dir * 0.8;
         ax.walk += 0.3;
-        if (ax.x < 150 || ax.x > room().w - 150) { ax.dir *= -1; ax.pause = 60 + Math.random() * 120; }
+        if (ax.x < 150) { ax.x = 150; ax.dir = 1; ax.pause = 60 + Math.random() * 120; } else if (ax.x > room().w - 150) { ax.x = room().w - 150; ax.dir = -1; ax.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { ax.pause = 90 + Math.random() * 150; }
       }
     }
@@ -3641,7 +3644,7 @@
         do { pNext = pRooms[Math.floor(Math.random() * pRooms.length)]; }
         while (pNext === pr.room);
         pr.room = pNext;
-        pr.x = 110; pr.dir = 1; pr.pause = 30;
+        pr.x = 200; pr.dir = 1; pr.pause = 30;
         pr.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
       }
     }
@@ -3650,7 +3653,7 @@
       else {
         pr.x += pr.dir * 1.6;
         pr.walk += 0.5;
-        if (pr.x < 150 || pr.x > room().w - 150) { pr.dir *= -1; pr.pause = 30 + Math.random() * 60; }
+        if (pr.x < 150) { pr.x = 150; pr.dir = 1; pr.pause = 30 + Math.random() * 60; } else if (pr.x > room().w - 150) { pr.x = room().w - 150; pr.dir = -1; pr.pause = 30 + Math.random() * 60; }
         else if (Math.random() < 0.001) { pr.pause = 30 + Math.random() * 60; }
       }
     }
@@ -3672,7 +3675,7 @@
         do { dNext = dRooms[Math.floor(Math.random() * dRooms.length)]; }
         while (dNext === dg.room);
         dg.room = dNext;
-        dg.x = 110; dg.dir = 1; dg.pause = 60;
+        dg.x = 200; dg.dir = 1; dg.pause = 60;
         dg.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
       }
     }
@@ -3681,7 +3684,7 @@
       else {
         dg.x += dg.dir * 0.8;
         dg.walk += 0.3;
-        if (dg.x < 150 || dg.x > room().w - 150) { dg.dir *= -1; dg.pause = 60 + Math.random() * 120; }
+        if (dg.x < 150) { dg.x = 150; dg.dir = 1; dg.pause = 60 + Math.random() * 120; } else if (dg.x > room().w - 150) { dg.x = room().w - 150; dg.dir = -1; dg.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { dg.pause = 90 + Math.random() * 150; }
       }
     }
@@ -3703,7 +3706,7 @@
         do { kNext = Math.random() < 0.67 ? "bar" : "shopping"; }
         while (kNext === kn.room);
         kn.room = kNext;
-        kn.x = 110; kn.dir = 1; kn.pause = 60;
+        kn.x = 200; kn.dir = 1; kn.pause = 60;
         kn.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
       }
     }
@@ -3712,7 +3715,7 @@
       else {
         kn.x += kn.dir * 0.8;
         kn.walk += 0.3;
-        if (kn.x < 150 || kn.x > room().w - 150) { kn.dir *= -1; kn.pause = 60 + Math.random() * 120; }
+        if (kn.x < 150) { kn.x = 150; kn.dir = 1; kn.pause = 60 + Math.random() * 120; } else if (kn.x > room().w - 150) { kn.x = room().w - 150; kn.dir = -1; kn.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { kn.pause = 90 + Math.random() * 150; }
       }
     }
@@ -3733,7 +3736,7 @@
         do { yNext = yRooms[Math.floor(Math.random() * yRooms.length)]; }
         while (yNext === yt.room);
         yt.room = yNext;
-        yt.x = 110; yt.dir = 1; yt.pause = 60;
+        yt.x = 200; yt.dir = 1; yt.pause = 60;
         yt.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
       }
     }
@@ -3742,7 +3745,7 @@
       else {
         yt.x += yt.dir * 0.8;
         yt.walk += 0.3;
-        if (yt.x < 150 || yt.x > room().w - 150) { yt.dir *= -1; yt.pause = 60 + Math.random() * 120; }
+        if (yt.x < 150) { yt.x = 150; yt.dir = 1; yt.pause = 60 + Math.random() * 120; } else if (yt.x > room().w - 150) { yt.x = room().w - 150; yt.dir = -1; yt.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { yt.pause = 90 + Math.random() * 150; }
       }
     }
