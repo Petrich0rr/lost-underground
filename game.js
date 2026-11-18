@@ -25,7 +25,7 @@
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
     arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
     cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
-    garden: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
+    garden: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02, minX: 200 },
     quarry: { w: 2172, h: 724, frames: null, floor: 0.87, depth: 0.04 },
     tunnels: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
     dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 },
@@ -33,19 +33,25 @@
     upper2: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
     upper3: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
     earthen: { w: 2172, h: 724, frames: null, floor: 0.85, depth: 0.05 },
-    surface: { w: 2172, h: 724, frames: null, floor: 0.74, depth: 0.02 }
+    surface: { w: 2172, h: 724, frames: null, floor: 0.74, depth: 0.02, minX: 400 }
   };
   function room() { return ROOMS[g.room]; }
+  // Leftmost walkable x for this room. Most rooms use 60; the garden
+  // and the surface have a floating ledge on the left, so they stop
+  // at the stairs where solid ground starts.
+  function roomMinX() { return room().minX || 60; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
   var SYLVIA_IDLE_SRC = "assets/sylvia-idle.png";
   var RAY_WALK = ["assets/ray-walk-01.png", "assets/ray-walk-02.png", "assets/ray-walk-03.png", "assets/ray-walk-04.png", "assets/ray-walk-05.png", "assets/ray-walk-06.png", "assets/ray-walk-07.png", "assets/ray-walk-08.png"];
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=64" forces a fresh download: the proposal now shows Ray
-  // kneeling down before he holds out the ring. A browser that
-  // cached ?v=63 picks up the kneel-down.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=64"; return img; }
+  // "?v=65" forces a fresh download: the health hearts are redrawn
+  // clean (all pink, no outline, no gold near them), the energy bar
+  // is green so gold appears only on the coin, and the garden and
+  // the surface stop at the stairs so nobody stands on the floating
+  // ledge. A browser that cached ?v=64 picks up both fixes.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=65"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1157,7 +1163,7 @@
   }
   function doorSide() {
     var exits = EXITS[g.room];
-    if (exits.left && g.px <= 90) return "left";
+    if (exits.left && g.px <= roomMinX() + 30) return "left";
     if (exits.right && g.px >= room().w - 90) return "right";
     return null;
   }
@@ -1865,6 +1871,8 @@
       g.px = 110; g.facing = 1;
       g.ray.x = 60; g.ray.dir = 1;
     }
+    if (g.px < roomMinX()) { g.px = roomMinX() + 10; g.facing = 1; }
+    if (g.ray.x < roomMinX()) { g.ray.x = roomMinX(); g.ray.dir = 1; }
     resize();
     if (SHOPS[from] && to === "shopping") {
       g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
@@ -2056,7 +2064,7 @@
     g.scooter.x = g.px;
     g.scooter.room = g.room;
     g.ray.x = g.px - g.facing * 70; g.ray.dir = g.facing;
-    if (g.ray.x < 60) g.ray.x = 60;
+    if (g.ray.x < roomMinX()) g.ray.x = roomMinX();
     if (g.ray.x > room().w - 60) g.ray.x = room().w - 60;
   }
   // Gunner's shop: a little panel over the game. Buying the scooter
@@ -2921,17 +2929,12 @@
   }
 
   function drawHeart(x, y, s, color) {
-    // A white outline around every heart so the shape reads as a heart
-    // even at small size, and no gold beside it can be mistaken for one.
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(x, y + s * 0.35);
     ctx.bezierCurveTo(x - s, y - s * 0.5, x - s * 0.45, y - s * 1.1, x, y - s * 0.4);
     ctx.bezierCurveTo(x + s * 0.45, y - s * 1.1, x + s, y - s * 0.5, x, y + s * 0.35);
-    ctx.fillStyle = color;
     ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "rgba(255,255,255,0.9)";
-    ctx.stroke();
   }
 
   function drawKiss() {
@@ -4238,6 +4241,9 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
+  // Health hearts, redrawn clean. Every heart is pink, no outline,
+  // no gold anywhere near them: full = solid pink, half = lighter
+  // pink, empty = a faint pink outline so it still reads as a heart.
   function drawHp() {
     ctx.save();
     ctx.font = "700 11px 'Open Sans', sans-serif";
@@ -4248,7 +4254,19 @@
       var full = g.hp >= (i + 1) * 20;
       var half = !full && g.hp > i * 20;
       var cx = 44 + i * 24, cy = 22;
-      drawHeart(cx, cy, 9, full ? "#ff5b8f" : half ? "#ff4d8a" : "rgba(255,255,255,0.25)");
+      if (full) {
+        drawHeart(cx, cy, 9, "#ff5b8f");
+      } else if (half) {
+        drawHeart(cx, cy, 9, "#ff8fb5");
+      } else {
+        ctx.strokeStyle = "rgba(255,91,143,0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + 9 * 0.35);
+        ctx.bezierCurveTo(cx - 9, cy - 9 * 0.5, cx - 9 * 0.45, cy - 9 * 1.1, cx, cy - 9 * 0.4);
+        ctx.bezierCurveTo(cx + 9 * 0.45, cy - 9 * 1.1, cx + 9, cy - 9 * 0.5, cx, cy + 9 * 0.35);
+        ctx.stroke();
+      }
     }
     // Coins sit beside the hearts on the top row, small and set well
     // apart from the fifth heart so the gold coin never reads as a
@@ -4275,8 +4293,8 @@
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     // The energy label starts just after the hearts, and the bar
-    // sits beside them on the top row. The coin count lives on the
-    // second row now, clear of the hearts.
+    // sits beside them on the top row. The bar is green now so the
+    // only gold on the top row is the coin.
     ctx.fillText("E", 235, 27);
     var bx = 253, by = 14, bh = 16;
     var bw = Math.max(50, Math.min(100, g.w - 267));
@@ -4287,7 +4305,7 @@
     var frac = Math.max(0, Math.min(1, g.energy / g.energyMax));
     var pulse = g.energy <= 20 ? 0.55 + 0.45 * Math.sin(g.time * 0.15) : 1;
     ctx.globalAlpha = pulse;
-    ctx.fillStyle = g.energy <= 20 ? "#ff9e3e" : "#ffd23e";
+    ctx.fillStyle = g.energy <= 20 ? "#ff9e3e" : "#58c96b";
     if (frac > 0) {
       if (ctx.roundRect) ctx.roundRect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2, 7);
       else ctx.rect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2);
@@ -4823,7 +4841,7 @@
     if (keys.right) { g.px += speed; g.facing = 1; }
     if (keys.up) { g.depth -= speed * 0.5; }
     if (keys.down) { g.depth += speed * 0.5; }
-    if (g.px < 60) g.px = 60;
+    if (g.px < roomMinX()) g.px = roomMinX();
     if (g.px > room().w - 60) g.px = room().w - 60;
     if (g.depth < -depthRange()) g.depth = -depthRange();
     if (g.depth > 0) g.depth = 0;
