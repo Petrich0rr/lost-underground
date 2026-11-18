@@ -49,12 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=71" forces a fresh download: the energy bar is pictures
-  // now, not a canvas fill, so the prompt pills can no longer turn
-  // green, and in the proposal Ray stands, then gets down on one
-  // knee, then holds out the ring, silent until the ring is out.
-  // A browser that cached ?v=69 picks up both.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=71"; return img; }
+  // "?v=72" forces a fresh download: X the hooded stranger waits
+  // at the bottom of the dungeon, and each dungeon level has its own
+  // monster with its own toughness, damage and coin reward. A browser
+  // that cached ?v=71 picks up both.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=72"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -183,6 +182,17 @@
   var mikaSurprisedImg = loadImg("assets/mika-surprised.png");
   var mikaLaughImg = loadImg("assets/mika-laugh.png");
   var mikaSitImg = loadImg("assets/mika-sit.png");
+  // X, a hooded stranger who stays at the bottom of the dungeon (the
+  // Court of Justice). Four walk frames (facing right), a standing
+  // pose, talk, surprised and laughing poses. Nobody has ever seen
+  // him, and he does not say much, but he knows a lot of secrets.
+  var xWalkImgs = ["assets/x-walk-01.png", "assets/x-walk-02.png", "assets/x-walk-03.png", "assets/x-walk-04.png"].map(loadImg);
+  var xIdleImg = loadImg("assets/x-idle.png");
+  var xTalkImg = loadImg("assets/x-talk.png");
+  var xSurprisedImg = loadImg("assets/x-surprised.png");
+  var xLaughImg = loadImg("assets/x-laugh.png");
+  // Sylvia's surprised pose, for the first time she sees X.
+  var sylviaSurprisedImg = loadImg("assets/sylvia-pose-surprised.png");
   // The arcade kids: three regulars who stay in the arcade. Each has
   // an idle portrait and a 4-frame side walk, all facing right.
   var arcadeGamerWalkImgs = ["assets/arcade-gamer-walk-01.png", "assets/arcade-gamer-walk-02.png", "assets/arcade-gamer-walk-03.png", "assets/arcade-gamer-walk-04.png"].map(loadImg);
@@ -410,6 +420,12 @@
     // been paused, and she sits once it passes 90 ticks. She starts
     // sitting, by the water at x 1350.
     mika: { x: 1350, dir: 1, pause: 300, walk: 0, depth: 0, room: "cistern", laughT: 0, surprisedT: 0, sitting: true, sitT: 0 },
+    // X: he stays at the bottom of the dungeon (the Court of Justice)
+    // and never leaves it, so he never changes rooms (no roomT). He
+    // wanders it slowly, hooded, saying almost nothing.
+    stranger: { x: 1000, dir: 1, pause: 120, walk: 0, depth: 0, room: "dungeon4", laughT: 0, surprisedT: 0 },
+    // Sylvia's first sight of X: she is surprised, and shows it once.
+    xSeen: false, sylviaSurprisedT: 0,
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -423,6 +439,7 @@
     yutoTalk: { open: false, idx: -1 },
     adlerTalk: { open: false, idx: -1 },
     mikaTalk: { open: false, idx: -1 },
+    strangerTalk: { open: false, idx: -1 },
     // Talking to Ray: open while the conversation runs. step 0 is
     // Ray's opening line (Sylvia's turn to pick a reply), step 1 is
     // Sylvia's line showing, step 2 is Ray's reply showing.
@@ -852,6 +869,20 @@
     "I made a flower out of paper once. It fell apart in the damp. ...I keep making them anyway.",
     "Thank you for talking to me. Really. You have no idea how much a hello means down here."
   ];
+  // X does not say much, but he seems to know a lot of secrets, of
+  // both the underworld and the land above. Nobody knows how old he is.
+  var STRANGER_LINES = [
+    "...You found the bottom. Most people stop at the third level. You did not.",
+    "I have been here longer than the stones. The stones do not remember me. I remember them.",
+    "The surface is not a story. It is real. I have seen the sky. Once. It was... bright.",
+    "Do not trust the quiet down here. The quiet is where the old things listen.",
+    "You carry the sun in your pocket and you do not know it yet. Keep walking up.",
+    "The mayor does not know I am here. Nobody knows I am here. That is how I like it.",
+    "Ray. You look at her like she is the way out. She is. But the way out is not a door.",
+    "I know every secret this city keeps. Ask me one. I may answer. I may not.",
+    "Age? I stopped counting when the first tunnel collapsed. That was a long time ago.",
+    "When you reach the top, do not look back. The dark follows those who hesitate."
+  ];
   function mikaNear() { return g.room === g.mika.room && Math.abs(g.px - g.mika.x) < 150; }
   function mikaTalkLine() {
     var first = !g.mikaTalk.open;
@@ -868,6 +899,23 @@
       // She laughs after her lines, delighted someone is listening.
       g.mika.laughT = 90;
       g.mika.surprisedT = 0;
+    }
+  }
+  function strangerNear() { return g.room === g.stranger.room && Math.abs(g.px - g.stranger.x) < 150; }
+  function strangerTalkLine() {
+    var first = !g.strangerTalk.open;
+    var idx;
+    do { idx = Math.floor(Math.random() * STRANGER_LINES.length); }
+    while (STRANGER_LINES.length > 1 && idx === g.strangerTalk.idx);
+    g.strangerTalk.idx = idx; g.strangerTalk.open = true;
+    if (first) {
+      // Greeting: he is surprised to be spoken to, then he goes still.
+      g.stranger.surprisedT = 45;
+      g.stranger.laughT = 0;
+    } else {
+      // He barely reacts after his lines, just a small gesture.
+      g.stranger.laughT = 90;
+      g.stranger.surprisedT = 0;
     }
   }
   function adlerNear() { return g.room === g.adler.room && Math.abs(g.px - g.adler.x) < 150; }
@@ -917,6 +965,7 @@
     if (g.yutoTalk.open) { yutoTalkLine(); return; }
     if (g.adlerTalk.open) { adlerTalkLine(); return; }
     if (g.mikaTalk.open) { mikaTalkLine(); return; }
+    if (g.strangerTalk.open) { strangerTalkLine(); return; }
     if (g.rayTalk.open) { advanceRayTalk(); return; }
     // One conversation at a time: the room's own NPC wins, and Ray
     // is the fallback when nobody else is near to talk to.
@@ -933,6 +982,7 @@
     if (yutoNear()) { yutoTalkLine(); return; }
     if (adlerNear()) { adlerTalkLine(); return; }
     if (mikaNear()) { mikaTalkLine(); return; }
+    if (strangerNear()) { strangerTalkLine(); return; }
     if (rayNear()) rayTalkLine();
   }
   // The shop owners. Walk up to one and press T to talk: they stop and
@@ -1132,7 +1182,7 @@
   }
   function closeRayTalk() { g.rayTalk.open = false; g.rayTalk.step = 0; g.rayTalk.choice = -1; }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -1361,7 +1411,7 @@
   function teleportToRoom(roomKey) {
     if (!ROOMS[roomKey]) return;
     closeMap();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.rayTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false; g.rayTalk.open = false;
     g.propRead.open = false; hidePropPanel();
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
@@ -1408,7 +1458,7 @@
   }
   function inspectNear() { return inspectArch() !== null; }
   function drawInspectPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
     // One small, quiet button down at the floor, right over the arch.
     // It stays subtle so the secret does not shout.
     var ax = g.inspect.active ? g.inspect.arch : inspectArch();
@@ -1485,7 +1535,7 @@
     return bd < PROP_RANGE ? best : null;
   }
   function readProp(p) {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x; g.propRead.img = p.img ? p.img.src : "";
     // Crouch down to read it, the same as pressing I.
     g.inspect.active = true; g.inspect.phase = "look"; g.inspect.arch = null; g.inspect.t = 0;
@@ -1495,7 +1545,7 @@
   }
   function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; hidePropPanel(); }
   function drawPropPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
     // A door prompt wins over a junk prompt when Sylvia stands near
     // both, so the two texts never draw on top of each other.
     if (portalNear() || ironDoorNear()) return;
@@ -1598,7 +1648,7 @@
     if (imgBox) imgBox.hidden = true;
   }
   function startInspect() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
     // Already reading a piece of junk: I puts it back down and she
     // stands back up.
     if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; }
@@ -1614,7 +1664,7 @@
     // else there is nothing to look at, so no crouch.
     var ax = inspectArch();
     var prop = propNear();
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     if (ax !== null) {
       // At a secret arch: crouch down and look at it.
       g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = ax;
@@ -1678,9 +1728,9 @@
     return g.room === "tunnels" && Math.abs(g.px - IRON_DOOR_X) < IRON_DOOR_RANGE;
   }
   function enterDungeon2() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!stoneDoorNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = "dungeon2";
     spawnMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -1689,7 +1739,7 @@
     saveGame();
   }
   function drawStoneDoorPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!stoneDoorNear()) return;
     var x = STONE_DOOR_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1707,7 +1757,7 @@
     ctx.restore();
   }
   function drawIronDoorPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
     var x = IRON_DOOR_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1725,9 +1775,9 @@
     ctx.restore();
   }
   function enterDungeonFromIronDoor() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = "dungeon";
     spawnMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -1745,7 +1795,7 @@
     return g.room === "tunnels" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
   }
   function drawPortalPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     var x = PORTAL_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -1763,9 +1813,9 @@
     ctx.restore();
   }
   function goThroughPortal() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     // Straight back home to their room, no tunnel image, no wait.
     g.room = "chamber";
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -1915,12 +1965,12 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
     var to = EXITS[g.room][side];
-    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
     if (g.scooter.riding) g.scooter.room = to;
     if (isDungeonRoom(to)) spawnMonsters();
@@ -2033,7 +2083,7 @@
     if (g.propRead.open) return;
     // A talk already open: the only talk action is Next, which
     // advances the conversation that is running.
-    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open) {
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) {
       acts.push({ id: "talk-next", label: "Next", run: pressT });
       return;
     }
@@ -2052,6 +2102,7 @@
     if (yutoNear()) acts.push({ id: "talk-yuto", label: "Talk to Yuto", run: yutoTalkLine });
     if (adlerNear()) acts.push({ id: "talk-adler", label: "Talk to Mayor Adler", run: adlerTalkLine });
     if (mikaNear()) acts.push({ id: "talk-mika", label: "Talk to Mika", run: mikaTalkLine });
+    if (strangerNear()) acts.push({ id: "talk-stranger", label: "Talk to X", run: strangerTalkLine });
     if (acts.length === 0 && rayNear()) acts.push({ id: "talk-ray", label: "Talk to Ray", run: rayTalkLine });
   }
   var lastActionIds = "";
@@ -2278,7 +2329,7 @@
     return g.room === "garden" && Math.abs(g.px - FOUNTAIN_X) < FOUNTAIN_RANGE;
   }
   function makeWish() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open) return;
     if (g.fountainWished) {
       g.fountainMsg = "Your wish already came true.";
       g.fountainMsgT = 120;
@@ -2311,7 +2362,7 @@
     ctx.restore();
   }
   function drawFountainPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding) return;
     if (!fountainNear() || g.fountainWished) return;
     var x = g.px * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -2400,7 +2451,7 @@
   }
   function openChest() {
     // Guards mirror makeWish: nothing else going on.
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open) return;
     if (g.chestOpen) return;
     var c = chestNear();
     if (!c) return;
@@ -2449,7 +2500,7 @@
     }
   }
   function drawChestPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding) return;
     if (!chestNear()) return;
     var x = g.px * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -2492,7 +2543,7 @@
     return g.room === "garden" && Math.abs(g.px - GARDEN_DOOR_X) < GARDEN_DOOR_RANGE;
   }
   function startHomeWalk() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.scooter.riding || g.propRead.open) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.scooter.riding || g.propRead.open) return;
     if (!gardenDoorNear()) return;
     g.talk.open = false; g.ownerTalk.open = false;
     g.homeWalk.active = true; g.homeWalk.t = 0;
@@ -2537,7 +2588,7 @@
     ctx.restore();
   }
   function drawGardenDoorPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.homeWalk.active || g.scooter.riding) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.homeWalk.active || g.scooter.riding) return;
     if (!gardenDoorNear()) return;
     var x = g.px * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -2837,19 +2888,33 @@
     biteyrock: { imgs: monsterBiteyrockImgs, h: 0.14, speed: 0.4, hop: 0.13 },
     bellghost: { imgs: monsterBellghostImgs, h: 0.13, speed: 0.6, hop: 0.05 }
   };
+  // One monster type per dungeon level, each with its own toughness,
+  // damage rhythm and reward. Level 1 is the graveyard (Bitey Rock):
+  // half a heart every 5 attacks, 2 coins, 2 hits to kill. Level 2 is
+  // the Crypt (Candle Pup): half a heart every 3 attacks, 5 coins,
+  // 3 hits. Level 3 is the Cages (Key Knight): half a heart every 2
+  // attacks, 8 coins, 4 hits. Level 4 is the Court (Bell Ghost): a
+  // whole heart every 2 attacks, 15 coins, 5 hits.
+  var DUNGEON_LEVELS = {
+    dungeon:  { type: "biteyrock", hp: 2, coins: 2, hitsPerDamage: 5, damage: 10 },
+    dungeon2: { type: "candlepup", hp: 3, coins: 5, hitsPerDamage: 3, damage: 10 },
+    dungeon3: { type: "keyknight", hp: 4, coins: 8, hitsPerDamage: 2, damage: 10 },
+    dungeon4: { type: "bellghost", hp: 5, coins: 15, hitsPerDamage: 2, damage: 20 }
+  };
   function spawnMonsters() {
     g.monsters = [];
     g.coins = [];
-    var types = ["keyknight", "candlepup", "biteyrock", "bellghost", "keyknight", "candlepup", "biteyrock", "bellghost"];
-    for (var i = 0; i < types.length; i++) {
+    g.monsterHits = 0;
+    var lvl = DUNGEON_LEVELS[g.room] || DUNGEON_LEVELS.dungeon;
+    for (var i = 0; i < 8; i++) {
       g.monsters.push({
-        type: types[i],
+        type: lvl.type,
         x: 350 + i * 200 + Math.random() * 80,
         depth: -Math.random() * depthRange() * 0.8,
         dir: Math.random() < 0.5 ? -1 : 1,
         pause: Math.random() * 120,
         walk: 0,
-        hp: 2,
+        hp: lvl.hp,
         hopT: Math.floor(Math.random() * 90),
         hitT: 0,
         atkT: 0
@@ -2889,10 +2954,11 @@
       if (Math.abs(m.x - g.px) < 80 && Math.abs(m.depth - g.depth) < 20 && m.atkT <= 0 && g.hurtT <= 0 && !g.sleeping && !g.kiss.active) {
         m.atkT = 120;
         g.hurtT = 60;
+        var lvl = DUNGEON_LEVELS[g.room] || DUNGEON_LEVELS.dungeon;
         g.monsterHits += 1;
-        if (g.monsterHits >= 3) {
+        if (g.monsterHits >= lvl.hitsPerDamage) {
           g.monsterHits = 0;
-          g.hp = Math.max(0, g.hp - 20);
+          g.hp = Math.max(0, g.hp - lvl.damage);
         }
         // Shove the monster back so it does not sit on top of her.
         m.x += (m.x < g.px ? -1 : 1) * 50;
@@ -2910,7 +2976,8 @@
   function hitMonsters(fromX, facing, fromDepth) {
     // Sylvia's kick or Ray's punch lands: any monster in front of the
     // attacker, within reach and on the same depth band, takes a hit.
-    // 2 hits kill it, and it drops 1 coin where it falls.
+    // When its level's hit count is spent it dies and drops that
+    // level's coins in a little cluster where it fell.
     for (var i = g.monsters.length - 1; i >= 0; i--) {
       var m = g.monsters[i];
       var dx = m.x - fromX;
@@ -2920,7 +2987,10 @@
       m.hitT = 12;
       m.x += facing * 30;
       if (m.hp <= 0) {
-        g.coins.push({ x: m.x, depth: m.depth });
+        var lvl = DUNGEON_LEVELS[g.room] || DUNGEON_LEVELS.dungeon;
+        for (var k = 0; k < lvl.coins; k++) {
+          g.coins.push({ x: m.x + (Math.random() * 100 - 50), depth: m.depth });
+        }
         g.monsters.splice(i, 1);
       }
     }
@@ -3022,7 +3092,10 @@
     }
     var moving = keys.left || keys.right || keys.up || keys.down;
     var img;
-    if (g.attack.active) {
+    if (g.sylviaSurprisedT > 0) {
+      // She just saw X for the first time: her surprised pose.
+      img = sylviaSurprisedImg;
+    } else if (g.attack.active) {
       // Stance, then the high kick, then back to stance.
       img = (g.attack.t >= 8 && g.attack.t < 22) ? sylviaKickImg : sylviaStanceImg;
     } else if (keys.up || g.homeWalk.active) { img = sylviaBackWalkImgs[Math.floor(g.walk / 6) % sylviaBackWalkImgs.length]; }
@@ -3043,7 +3116,7 @@
     // Sylvia's walk frames face right, so flip them when she faces left.
     // Her stance and kick face right too, so they flip as well, and she
     // attacks the way she is facing. Front and back views are never flipped.
-    if (g.facing === -1 && img !== sylviaIdleImg && !keys.up && !keys.down) ctx.scale(-1, 1);
+    if (g.facing === -1 && img !== sylviaIdleImg && img !== sylviaSurprisedImg && !keys.up && !keys.down) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     // Char's red gown, when she is wearing it. Front view (standing
     // still, or walking toward the camera) gets the front gown, laid
@@ -3121,7 +3194,7 @@
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
     if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
     if (g.rescue.active) return;
-    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open) return;
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
     g.proposal.t = 0;
@@ -4386,6 +4459,82 @@
     ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
     ctx.restore();
   }
+  // X, the hooded stranger at the bottom of the dungeon. He is Ray's
+  // height, walks slowly, and never leaves the Court of Justice.
+  function drawStranger() {
+    if (g.room !== g.stranger.room) return;
+    var st = g.stranger;
+    var talking = g.strangerTalk.open;
+    var walking = !talking && st.pause <= 0;
+    var img;
+    if (talking && st.surprisedT > 0) img = xSurprisedImg;
+    else if (talking && st.laughT > 0) img = xLaughImg;
+    else if (talking) img = xTalkImg;
+    else img = walking ? xWalkImgs[Math.floor(st.walk / 6) % xWalkImgs.length] : xIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = xIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (st.depth + depthRange()) / depthRange();
+    var h = rayH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() + st.depth - 6;
+    var x = st.x * scale() - g.camX;
+    shadow(x, feetY, w);
+    ctx.save();
+    ctx.translate(x, feetY - h / 2);
+    // His walk frames face right, so flip them when he walks left.
+    // The idle, talk, surprised and laugh poses are front views,
+    // never flipped.
+    if (walking && st.dir === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  function drawStrangerTalk() {
+    // Speech bubble above X, tail pointing down to him. Mirrors
+    // Mika's bubble. He is always in the Court of Justice, so his
+    // position is the dungeon4 x.
+    if (!g.strangerTalk.open) return;
+    var st = g.stranger;
+    var ex = st.x * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(STRANGER_LINES[g.strangerTalk.idx], maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText("X").width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, ex - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, ex));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("X", bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
   function drawRayTalk() {
     // Talking to Ray: a speech bubble above whoever is speaking, tail
     // pointing down to them. Ray's name is royal blue, Sylvia's is a
@@ -4870,8 +5019,8 @@
     drawFountainPrompt();
     drawChestPrompt();
     drawGardenDoorPrompt();
-    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); return; }
-    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); return; }
+    if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); drawStrangerTalk(); return; }
+    if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); drawStrangerTalk(); return; }
     if (g.proposal.active) { drawProposal(); return; }
     if (g.rescue.active && g.rescue.phase === "carry") { drawRescue(); return; }
     if (g.scooter.riding) drawScooterRide();
@@ -4888,6 +5037,7 @@
     drawYuto();
     drawAdler();
     drawMika();
+    drawStranger();
     drawMonsters();
     if (!g.scooter.riding && !g.sleeping) drawSylvia();
     drawTalk();
@@ -4901,6 +5051,7 @@
     drawYutoTalk();
     drawAdlerTalk();
     drawMikaTalk();
+    drawStrangerTalk();
     drawRescueKian();
     drawRescueBubble();
     drawRayTalk();
@@ -5037,6 +5188,9 @@
     }
     if (g.mikaTalk.open) {
       if (g.room !== g.mika.room || Math.abs(g.px - g.mika.x) > 180) g.mikaTalk.open = false;
+    }
+    if (g.strangerTalk.open) {
+      if (g.room !== g.stranger.room || Math.abs(g.px - g.stranger.x) > 180) g.strangerTalk.open = false;
     }
     if (g.rayTalk.open && Math.abs(g.px - g.ray.x) > 180) closeRayTalk();
     if (g.propRead.open && Math.abs(g.px - g.propRead.x) > 180) closePropRead();
@@ -5512,6 +5666,29 @@
       }
     }
     if (g.mikaTalk.open) mk.dir = g.px < mk.x ? -1 : 1; // face Sylvia
+    // X: he never leaves the Court of Justice. He wanders it slowly,
+    // hooded, and stands still and faces Sylvia while talking.
+    var st = g.stranger;
+    if (st.laughT > 0) st.laughT -= 1;
+    if (st.surprisedT > 0) st.surprisedT -= 1;
+    if (g.room === st.room && !g.strangerTalk.open) {
+      if (st.pause > 0) { st.pause -= 1; }
+      else {
+        st.x += st.dir * 0.4;
+        st.walk += 0.15;
+        if (st.x < 150) { st.x = 150; st.dir = 1; st.pause = 60 + Math.random() * 150; } else if (st.x > room().w - 150) { st.x = room().w - 150; st.dir = -1; st.pause = 60 + Math.random() * 150; }
+        else if (Math.random() < 0.002) { st.pause = 90 + Math.random() * 150; }
+      }
+    }
+    if (g.strangerTalk.open) st.dir = g.px < st.x ? -1 : 1; // face Sylvia
+    // The first time Sylvia gets close to X, she is surprised: nobody
+    // has ever seen him before. (Ray has no surprised pose, so he just
+    // stands there.)
+    if (!g.xSeen && g.room === "dungeon4" && Math.abs(g.px - st.x) < 300) {
+      g.xSeen = true;
+      g.sylviaSurprisedT = 90;
+    }
+    if (g.sylviaSurprisedT > 0) g.sylviaSurprisedT -= 1;
     // When she is standing still and he wanders up right behind
     // her, he holds her for a few seconds, then wanders off again.
     if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
