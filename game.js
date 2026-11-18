@@ -42,14 +42,13 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=43" forces a fresh download after three changes: the action
-  // list (several commands at once show as buttons to pick from),
-  // walking to a room's edge takes you to the next scene with no E
-  // (stairs still need E), the scooter travels everywhere with them,
-  // the monsters are smaller, and the Bell Ghost flies even higher
-  // (base lift 0.15, bob 0.05, so 0.10-0.20 up). A browser that
-  // cached ?v=42 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=43"; return img; }
+  // "?v=44" forces a fresh download after three changes: talking
+  // joins the action list (one button per person nearby, so the old
+  // single Talk button no longer hides anyone or sits on top of the
+  // list), the scooter costs $20 in gold coins, and the headlight is
+  // a softer round glow with no hard rim. A browser that cached
+  // ?v=43 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=44"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -847,6 +846,15 @@
       if (Math.abs(g.px - g.kids[keys[i]].x) < 150) return keys[i];
     }
     return null;
+  }
+  function kidsNear() {
+    if (g.room !== "arcade") return [];
+    var keys = ["gamer", "dino", "cup"];
+    var out = [];
+    for (var i = 0; i < keys.length; i++) {
+      if (Math.abs(g.px - g.kids[keys[i]].x) < 150) out.push(keys[i]);
+    }
+    return out;
   }
   function kidTalkLine(key) {
     var lines = kidLines(key);
@@ -1809,7 +1817,36 @@
   // instead of stacking them into one button that hides the rest.
   // The first button is what E does (tryEnter's priority order).
   // Tapping a button runs just that action. Edge doors are not in
-  // the list: walking through them is automatic now.
+  // the list: walking through them is automatic now. Talking is in
+  // the same list too, one button per person nearby, so the old
+  // single Talk button no longer hides anyone or sits on top of
+  // this list. Ray is the fallback: he only shows when nobody else
+  // is near to talk to.
+  function addTalkActions(acts) {
+    if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding) return;
+    if (g.propRead.open) return;
+    // A talk already open: the only talk action is Next, which
+    // advances the conversation that is running.
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open) {
+      acts.push({ id: "talk-next", label: "Next", run: pressT });
+      return;
+    }
+    if (vickyNear()) acts.push({ id: "talk-vicky", label: "Talk to Vicky", run: talkLine });
+    var ow = ownerNear();
+    if (ow) acts.push({ id: "talk-owner-" + ow, label: "Talk to " + OWNERS[ow].name, run: function () { ownerTalkLine(ow); } });
+    var kids = kidsNear();
+    for (var i = 0; i < kids.length; i++) {
+      (function (k) { acts.push({ id: "talk-kid-" + k, label: "Talk to " + KIDS[k].name, run: function () { kidTalkLine(k); } }); })(kids[i]);
+    }
+    if (eveNear()) acts.push({ id: "talk-eve", label: "Talk to Eve", run: eveTalkLine });
+    if (alexisNear()) acts.push({ id: "talk-alexis", label: "Talk to Alexis", run: alexisTalkLine });
+    if (priyaNear()) acts.push({ id: "talk-priya", label: "Talk to Priya", run: priyaTalkLine });
+    if (diegoNear()) acts.push({ id: "talk-diego", label: "Talk to Diego", run: diegoTalkLine });
+    if (kianNear()) acts.push({ id: "talk-kian", label: "Talk to Dr. Kian", run: kianTalkLine });
+    if (yutoNear()) acts.push({ id: "talk-yuto", label: "Talk to Yuto", run: yutoTalkLine });
+    if (adlerNear()) acts.push({ id: "talk-adler", label: "Talk to Mayor Adler", run: adlerTalkLine });
+    if (acts.length === 0 && rayNear()) acts.push({ id: "talk-ray", label: "Talk to Ray", run: rayTalkLine });
+  }
   var lastActionIds = "";
   function updateActionList() {
     var list = document.getElementById("actionList");
@@ -1823,6 +1860,7 @@
     } else if (g.scooter.riding) {
       acts.push({ id: "dismount", label: "Get off the scooter", run: dismountScooter });
     } else {
+      addTalkActions(acts);
       if (photoNear()) acts.push({ id: "photo", label: "Look at the photo", run: openPhoto });
       if (bedNear()) acts.push({ id: "bed", label: "Go to bed", run: goToBed });
       if (vanityNear()) acts.push({ id: "mirror", label: "Look in the mirror", run: enterMirror });
@@ -1865,14 +1903,15 @@
       g.kissHealT = 300;
     }
   }
-  // Gunner's pink scooter. He sells it from his repair shop for $0
-  // for now (no coins yet). Once bought it is parked at the entrance
+  // Gunner's pink scooter. He sells it from his repair shop for $20
+  // in gold coins (dropped by dungeon monsters). Once bought it is
+  // parked at the entrance
   // of the shopping district street, and the two of them can ride it
   // together, faster than running, with the headlight lighting the
   // way ahead. It travels everywhere with them now: riding through
   // an edge door carries it into the next room. Get off to climb
   // stairs or to go through a shop, bar, or iron door.
-  var SCOOTER_X = 280, SCOOTER_RANGE = 110;
+  var SCOOTER_X = 280, SCOOTER_RANGE = 110, SCOOTER_PRICE = 20;
   function scooterNear() {
     return g.scooter.room === g.room && g.scooter.owned && !g.scooter.riding && Math.abs(g.px - g.scooter.x) < SCOOTER_RANGE;
   }
@@ -1903,11 +1942,15 @@
     if (panel) panel.hidden = false;
     var buy = document.getElementById("shopBuyBtn");
     if (buy) {
-      buy.disabled = g.scooter.owned;
-      buy.textContent = g.scooter.owned ? "Already yours" : "Buy it for $0";
+      buy.disabled = g.scooter.owned || g.coinCount < SCOOTER_PRICE;
+      buy.textContent = g.scooter.owned ? "Already yours" : "Buy it for $20";
     }
     var note = document.getElementById("shopNote");
-    if (note) note.textContent = g.scooter.owned ? "You own the pink scooter. It is parked outside on the street." : "";
+    if (note) {
+      if (g.scooter.owned) note.textContent = "You own the pink scooter. It is parked outside on the street.";
+      else if (g.coinCount < SCOOTER_PRICE) note.textContent = "You need 20 coins. You have " + g.coinCount + ". Beat dungeon monsters to earn more.";
+      else note.textContent = "You have " + g.coinCount + " coins.";
+    }
   }
   function closeShop() {
     g.shopOpen = false;
@@ -1916,6 +1959,8 @@
   }
   function buyScooter() {
     if (g.scooter.owned) return;
+    if (g.coinCount < SCOOTER_PRICE) return;
+    g.coinCount -= SCOOTER_PRICE;
     g.scooter.owned = true;
     g.scooter.riding = false;
     g.scooter.x = SCOOTER_X;
@@ -1954,19 +1999,20 @@
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
-    // The headlight: a soft warm light ahead of the scooter, in the
+    // The headlight: a soft warm glow ahead of the scooter, in the
     // direction they are facing. It is the scooter's light, not the
-    // characters glowing.
+    // characters glowing. A round glow whose gradient fades all the
+    // way to transparent at its edge, so there is no hard rim.
     var hx = x + g.facing * w * 0.52;
     var hy = feetY - h * 0.62;
     ctx.save();
-    var grad = ctx.createRadialGradient(hx, hy, 4, hx, hy, w * 0.95);
-    grad.addColorStop(0, "rgba(255, 238, 175, 0.34)");
-    grad.addColorStop(0.55, "rgba(255, 236, 170, 0.14)");
+    var grad = ctx.createRadialGradient(hx, hy, 4, hx, hy, w * 0.8);
+    grad.addColorStop(0, "rgba(255, 238, 175, 0.20)");
+    grad.addColorStop(0.5, "rgba(255, 236, 170, 0.08)");
     grad.addColorStop(1, "rgba(255, 236, 170, 0)");
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.ellipse(hx, hy, w * 0.95, w * 0.42, 0, 0, Math.PI * 2);
+    ctx.arc(hx, hy, w * 0.8, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     shadow(x, feetY, w);
@@ -3680,8 +3726,6 @@
       if (mBtn) { mBtn.hidden = false; mBtn.textContent = g.mirror.manifesting ? "Manifesting..." : "Manifest"; }
       var mcBtn = document.getElementById("mirrorCloseBtn");
       if (mcBtn) mcBtn.hidden = false;
-      var tBtn2 = document.getElementById("talkBtn");
-      if (tBtn2) tBtn2.hidden = true;
       var eBtn2 = document.getElementById("actionList");
       if (eBtn2) eBtn2.hidden = true;
       var aBtn2 = document.getElementById("attackBtn");
@@ -3696,8 +3740,6 @@
     if (g.map.active) {
       // The map is open: the world is blurred behind it. Nothing moves
       // until she closes it.
-      var tBtnM = document.getElementById("talkBtn");
-      if (tBtnM) tBtnM.hidden = true;
       var eBtnM = document.getElementById("actionList");
       if (eBtnM) eBtnM.hidden = true;
       var aBtnM = document.getElementById("attackBtn");
@@ -3708,8 +3750,6 @@
     if (g.photo.active) {
       // Looking at the framed photo: the popup blurs the game behind
       // it. Nothing moves until she puts it back.
-      var tBtnP = document.getElementById("talkBtn");
-      if (tBtnP) tBtnP.hidden = true;
       var eBtnP = document.getElementById("actionList");
       if (eBtnP) eBtnP.hidden = true;
       var aBtnP = document.getElementById("attackBtn");
@@ -3720,8 +3760,6 @@
     if (g.shopOpen) {
       // Gunner's shop is open: the panel is over the game. Nothing
       // moves until she buys or closes it.
-      var tBtnS = document.getElementById("talkBtn");
-      if (tBtnS) tBtnS.hidden = true;
       var eBtnS = document.getElementById("actionList");
       if (eBtnS) eBtnS.hidden = true;
       var aBtnS = document.getElementById("attackBtn");
@@ -3789,33 +3827,6 @@
       } else {
         rayChoices.hidden = true;
       }
-    }
-    var talkBtn = document.getElementById("talkBtn");
-    if (talkBtn) {
-      var nearOwner = ownerNear();
-      var nearKid = kidNear();
-      if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
-      else if (g.ownerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.kidTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.eveTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.alexisTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.priyaTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.diegoTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.kianTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.yutoTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.adlerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
-      else if (nearKid) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + KIDS[nearKid].name; }
-      else if (eveNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Eve"; }
-      else if (alexisNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Alexis"; }
-      else if (priyaNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Priya"; }
-      else if (diegoNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Diego"; }
-      else if (kianNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Dr. Kian"; }
-      else if (yutoNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Yuto"; }
-      else if (adlerNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Mayor Adler"; }
-      else if (rayNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Ray"; }
-      else talkBtn.hidden = true;
     }
     var shopBtn = document.getElementById("shopBtn");
     if (shopBtn) {
@@ -4267,8 +4278,6 @@
     pointerDownAt = 0;
   }
   canvas.addEventListener("pointerup", pointerEnd);
-  var talkBtn = document.getElementById("talkBtn");
-  if (talkBtn) talkBtn.addEventListener("click", function (e) { e.stopPropagation(); pressT(); });
   var rayChoices = document.getElementById("rayChoices");
   if (rayChoices) {
     var rBtns = rayChoices.querySelectorAll("button");
