@@ -25,7 +25,8 @@
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
     arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
     garden: { w: 1179, h: 393, frames: null, floor: 0.81, depth: 0.03 },
-    cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 }
+    cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
+    quarry: { w: 2172, h: 724, frames: null, floor: 0.87, depth: 0.04 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -93,6 +94,12 @@
   var arcadeImg = loadImg("assets/shop-arcade.jpg");
   var gardenImg = loadImg("assets/bg-garden.jpg");
   var cisternImg = loadImg("assets/bg-cistern.jpg");
+  var quarryImg = loadImg("assets/bg-quarry.jpg");
+  // The midair descent: Ray and Sylvia jumping down to the quarry,
+  // holding hands. Shown full screen while they fall through the
+  // secret passage under the arcade floor.
+  var descentImg = loadImg("assets/descent.jpg");
+  var rayCrouchImg = loadImg("assets/ray-crouch.png");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
   ROOMS.subway.frames = [subwayImg];
@@ -103,6 +110,7 @@
   ROOMS.arcade.frames = [arcadeImg];
   ROOMS.garden.frames = [gardenImg];
   ROOMS.cistern.frames = [cisternImg];
+  ROOMS.quarry.frames = [quarryImg];
 
   var keys = { up: false, down: false, left: false, right: false, fast: false };
   var g = {
@@ -148,7 +156,8 @@
     // The framed photo on the nightstand: active while she is looking
     // at it, popped up over a blurred game.
     photo: { active: false },
-    map: { active: false }
+    map: { active: false },
+    inspect: { active: false, t: 0 }
   };
   // Her affirmations, said to the mirror with her eyes shut. She is
   // girl bossy but shy, and every one of them is optimistic: her life
@@ -280,7 +289,7 @@
     g.talk.idx = idx; g.talk.open = true;
   }
   function pressT() {
-    if (g.kiss.active || g.climb.active) return;
+    if (g.kiss.active || g.climb.active || g.inspect.active) return;
     if (g.talk.open) { talkLine(); return; }
     if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
     if (g.kidTalk.open) { kidTalkLine(g.kidTalk.key); return; }
@@ -338,7 +347,7 @@
     k.dir = g.px < k.x ? -1 : 1; // face Sylvia
   }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.inspect.active || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -356,7 +365,8 @@
     salon: { left: "shopping" },
     arcade: { left: "shopping" },
     garden: { left: "cistern" },
-    cistern: { left: "shopping", right: "garden" }
+    cistern: { left: "shopping", right: "garden" },
+    quarry: { left: "arcade" }
   };
   // The staircases that go up: the bar's stone stairs on the right
   // climb to the Forgotten subway, and the subway's wide stairs on
@@ -397,6 +407,7 @@
     if (g.room === "garden" && to === "cistern") return "Go back to the Flooded Cistern";
     if (g.room === "cistern" && to === "garden") return "Go to the Swamp Garden";
     if (to === "cistern") return "Go to the Flooded Cistern";
+    if (to === "arcade") return "Back to the arcade";
     if (to === "chamber") return "Enter your chamber";
     if (to === "subway") return "Go up to the Forgotten subway";
     if (to === "shopping") return "Back to the street";
@@ -479,7 +490,8 @@
     arcade:   { x: 0.55,  y: 0.60 },
     subway:   { x: 0.18,  y: 0.385 },
     garden:   { x: 0.925, y: 0.455 },
-    cistern:  { x: 0.70,  y: 0.60 }
+    cistern:  { x: 0.70,  y: 0.60 },
+    quarry:   { x: 0.13,  y: 0.78 }
   };
   var MAP_ROOM_NAMES = {
     chamber: "Silvia & Ray's Room",
@@ -491,7 +503,8 @@
     arcade: "The Arcade",
     subway: "Forgotten Subway Platform",
     garden: "Swamp Garden",
-    cistern: "Flooded Cistern"
+    cistern: "Flooded Cistern",
+    quarry: "Crystal Quarry"
   };
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
@@ -510,6 +523,74 @@
     g.map.active = false;
     var pop = document.getElementById("mapPopup");
     if (pop) pop.hidden = true;
+  }
+  // The secret under the arcade floor: one of the dark arches in the
+  // floor is a hidden passage down to the Crystal Quarry. Walk over
+  // it and press E to inspect it. They crouch down to look, then
+  // jump down together, holding hands, and land in the quarry.
+  var INSPECT_X = 1080, INSPECT_RANGE = 90;
+  function inspectNear() {
+    return g.room === "arcade" && Math.abs(g.px - INSPECT_X) < INSPECT_RANGE;
+  }
+  function drawInspectPrompt() {
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.inspect.active) return;
+    if (!inspectNear()) return;
+    var x = INSPECT_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to inspect";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 12, y - 18, tw + 24, 26, 13);
+    else ctx.rect(x - tw / 2 - 12, y - 18, tw + 24, 26);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y);
+    ctx.restore();
+  }
+  function startInspect() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.inspect.active) return;
+    if (!inspectNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
+    g.inspect.active = true; g.inspect.t = 0;
+    // Face the secret spot while they crouch down to look at it.
+    g.facing = g.px < INSPECT_X ? 1 : -1;
+    g.ray.dir = g.ray.x < INSPECT_X ? 1 : -1;
+  }
+  function updateInspect() {
+    g.inspect.t += 1;
+    var t = g.inspect.t;
+    if (t < 60) {
+      // They crouch down and inspect the secret spot.
+      g.camX = clampCam(INSPECT_X * scale() - g.w * 0.38);
+      return;
+    }
+    if (t >= 150) {
+      // They land in the Crystal Quarry.
+      g.inspect.active = false;
+      g.room = "quarry";
+      g.px = 110; g.facing = 1; g.depth = 0;
+      g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+      g.camX = 0;
+      return;
+    }
+    // Midair: they are falling, holding hands. The descent art fills
+    // the screen and drifts down as they drop.
+  }
+  function drawDescent() {
+    if (!descentImg || !descentImg.complete || descentImg.naturalWidth === 0) return;
+    ctx.save();
+    ctx.fillStyle = "#0a060f";
+    ctx.fillRect(0, 0, g.w, g.h);
+    var s = Math.min(g.w / descentImg.naturalWidth, g.h / descentImg.naturalHeight);
+    var dw = descentImg.naturalWidth * s;
+    var dh = descentImg.naturalHeight * s;
+    var drift = (g.inspect.t - 60) / 90 * 40;
+    ctx.drawImage(descentImg, (g.w - dw) / 2, (g.h - dh) / 2 + drift - 20, dw, dh);
+    ctx.restore();
   }
   function manifest() {
     if (!g.mirror.active) return;
@@ -654,7 +735,7 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.inspect.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
@@ -713,11 +794,12 @@
     if (beerDoorNear()) { enterBarFromBeerDoor(); return; }
     var shop = shopNear();
     if (shop) { enterShop(shop); return; }
+    if (inspectNear()) { startInspect(); return; }
     if (atDoor()) switchRoom();
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || !kissNear()) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
   }
 
@@ -786,6 +868,26 @@
 
   function drawSylvia() {
     if (g.climb.active && g.climb.sylHidden) return;
+    if (g.inspect.active) {
+      // Inspecting the secret spot: she crouches down to look at it.
+      // Once they jump, she is in the descent art, not on the floor.
+      if (g.inspect.t >= 60) return;
+      var iimg = sylviaCrouchImg;
+      if (!iimg || !iimg.complete || iimg.naturalWidth === 0) iimg = sylviaIdleImg;
+      if (!iimg || !iimg.complete || iimg.naturalWidth === 0) return;
+      var it = (g.depth + depthRange()) / depthRange();
+      var ih = sylviaH() * 0.62 * (0.92 + 0.08 * it);
+      var iw = ih * (iimg.naturalWidth / iimg.naturalHeight);
+      var ifeet = groundY() + g.depth;
+      var ix = g.px * scale() - g.camX;
+      shadow(ix, ifeet, iw);
+      ctx.save();
+      ctx.translate(ix, ifeet - ih / 2);
+      if (g.facing === -1) ctx.scale(-1, 1);
+      ctx.drawImage(iimg, -iw / 2, -ih / 2, iw, ih);
+      ctx.restore();
+      return;
+    }
     if (g.climb.active) {
       // Climbing a staircase: she walks up in her side walk frames,
       // rising as she goes. Out the window she waits, then climbs in
@@ -868,6 +970,27 @@
     var r = g.ray;
     if (r.inBed) return; // under the covers with her
     if (g.climb.active && g.climb.rayHidden) return;
+    if (g.inspect.active) {
+      // Inspecting the secret spot: he crouches down beside her.
+      // Once they jump, he is in the descent art, not on the floor.
+      if (g.inspect.t >= 60) return;
+      var riimg = rayCrouchImg;
+      if (!riimg || !riimg.complete || riimg.naturalWidth === 0) riimg = rayIdleImg;
+      if (!riimg || !riimg.complete || riimg.naturalWidth === 0) return;
+      var rit = (r.depth + depthRange()) / depthRange();
+      var rih = rayH() * 0.62 * (0.92 + 0.08 * rit);
+      var riw = rih * (riimg.naturalWidth / riimg.naturalHeight);
+      var rifeet = groundY() + r.depth - 6;
+      var rix = r.x * scale() - g.camX;
+      if (rix < -riw || rix > g.w + riw) return;
+      shadow(rix, rifeet, riw);
+      ctx.save();
+      ctx.translate(rix, rifeet - rih / 2);
+      if (r.dir === -1) ctx.scale(-1, 1);
+      ctx.drawImage(riimg, -riw / 2, -rih / 2, riw, rih);
+      ctx.restore();
+      return;
+    }
     if (g.climb.active) {
       // Climbing a staircase: he walks up in his walk frames, right
       // behind her. Out the window he runs to it and climbs up in his
@@ -1457,6 +1580,7 @@
   }
   function draw() {
     if (g.mirror.active) { drawMirror(); return; }
+    if (g.inspect.active && g.inspect.t >= 60) { drawDescent(); return; }
     drawBg();
     drawHp();
     drawVickyPrompt();
@@ -1468,6 +1592,7 @@
     drawStairPrompt();
     drawBeerDoorPrompt();
     drawShopPrompt();
+    drawInspectPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); return; }
     drawRay();
@@ -1570,6 +1695,7 @@
       else if (stairsNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = STAIRS[stairsNear()].btn; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
       else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
+      else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Inspect"; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
     }
@@ -1577,6 +1703,14 @@
       // Climbing out the window: the climb drives them both, and
       // nothing else moves until they are through.
       updateClimb();
+      draw();
+      return;
+    }
+    if (g.inspect.active) {
+      // Inspecting the secret spot, then jumping down to the quarry.
+      // The inspect drives them both, and nothing else moves until
+      // they land.
+      updateInspect();
       draw();
       return;
     }
@@ -1750,6 +1884,7 @@
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
+    if (g.inspect.active) return;
     if (setKey(e.code, true)) {
       var r = canvas.getBoundingClientRect();
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
