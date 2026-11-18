@@ -42,14 +42,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=52" forces a fresh download after the energy bar, day
-  // count and save system. Energy drains 1 point every 15 seconds
-  // while she is awake (about 25 minutes a bar) and refills on
-  // sleep; at zero she walks slower and cannot run. Waking up
-  // starts the next day. Progress autosaves to localStorage and
-  // the title screen offers Continue or New Game.
-  // A browser that cached ?v=51 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=52"; return img; }
+  // "?v=53" forces a fresh download after Char's fashion shop
+  // (the red gown and Ray's bandana), the energy bar moving
+  // beside the health bar, and the wardrobe that lets her wear
+  // what she buys. A browser that cached ?v=52 picks up the
+  // new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=53"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -74,6 +72,11 @@
   var rayReachImg = loadImg("assets/ray-reach.png");
   var rayTalkImg = loadImg("assets/ray-talk.png");
   var rayTalkShyImg = loadImg("assets/ray-talk-shy.png");
+  // Char's fashion: the red gown for Sylvia (front and side views)
+  // and the black bandana for Ray, worn as a headband.
+  var gownFrontImg = loadImg("assets/gown-red-front.png");
+  var gownSideImg = loadImg("assets/gown-red-side.png");
+  var bandanaImg = loadImg("assets/bandana-headband.png");
   var sylviaClimbImg = loadImg("assets/sylvia-pose-sneak.png");
   // The golden mirror at the chamber vanity: she blinks, and when
   // she manifests she shuts her eyes and says an affirmation.
@@ -429,6 +432,12 @@
     // animation frame. The shop is open while the shop panel shows.
     scooter: { owned: false, riding: false, x: 280, frame: 0, room: "shopping" },
     shopOpen: false,
+    // Char's fashion shop: the Ruby Satin Evening Gown for Sylvia
+    // and a black bandana for Ray, bought with gold coins in the
+    // clothing store. Owned once bought; On while she is wearing
+    // it. fashionOpen is true while the fashion panel shows.
+    fashion: { gownOwned: false, gownOn: false, bandanaOwned: false, bandanaOn: false },
+    fashionOpen: false,
     map: { active: false },
     inspect: { active: false, t: 0, arch: 0, phase: "look" },
     // The portal tunnel: active while they pass through the tunnel
@@ -1882,7 +1891,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -1945,6 +1954,10 @@
   // an edge door carries it into the next room. Get off to climb
   // stairs or to go through a shop, bar, or iron door.
   var SCOOTER_X = 280, SCOOTER_RANGE = 110, SCOOTER_PRICE = 20;
+  // Char's fashion prices, in gold coins: the gown is the dear one,
+  // the bandana is cheaper, so both are reachable after a few
+  // dungeon runs. (The scooter stays $20.)
+  var GOWN_PRICE = 15, BANDANA_PRICE = 10;
   function scooterNear() {
     return g.scooter.room === g.room && g.scooter.owned && !g.scooter.riding && Math.abs(g.px - g.scooter.x) < SCOOTER_RANGE;
   }
@@ -2002,6 +2015,71 @@
     if (buy) { buy.disabled = true; buy.textContent = "Already yours"; }
     var note = document.getElementById("shopNote");
     if (note) note.textContent = "You own the pink scooter. It is parked outside on the street.";
+    saveGame();
+  }
+  // Char's fashion shop: the Ruby Satin Evening Gown for Sylvia
+  // and a black bandana for Ray, bought with gold coins in the
+  // clothing store. Buying adds it to the wardrobe and puts it on
+  // right away; the button then toggles Wear and Take off. The two
+  // pieces layer: one dress, one bandana, both at once.
+  function openFashion() {
+    if (g.fashionOpen) return;
+    g.fashionOpen = true;
+    g.ownerTalk.open = false;
+    var panel = document.getElementById("fashionPanel");
+    if (panel) panel.hidden = false;
+    refreshFashionPanel();
+  }
+  function closeFashion() {
+    g.fashionOpen = false;
+    var panel = document.getElementById("fashionPanel");
+    if (panel) panel.hidden = true;
+  }
+  function refreshFashionPanel() {
+    var gownBtn = document.getElementById("fashionGownBtn");
+    if (gownBtn) {
+      if (!g.fashion.gownOwned) {
+        gownBtn.disabled = g.coinCount < GOWN_PRICE;
+        gownBtn.textContent = "Buy it for " + GOWN_PRICE + " coins";
+      } else {
+        gownBtn.disabled = false;
+        gownBtn.textContent = g.fashion.gownOn ? "Take it off" : "Wear it";
+      }
+    }
+    var bandBtn = document.getElementById("fashionBandanaBtn");
+    if (bandBtn) {
+      if (!g.fashion.bandanaOwned) {
+        bandBtn.disabled = g.coinCount < BANDANA_PRICE;
+        bandBtn.textContent = "Buy it for " + BANDANA_PRICE + " coins";
+      } else {
+        bandBtn.disabled = false;
+        bandBtn.textContent = g.fashion.bandanaOn ? "Take it off" : "Wear it";
+      }
+    }
+    var note = document.getElementById("fashionNote");
+    if (note) note.textContent = "You have " + g.coinCount + " coins. Beat dungeon monsters to earn more.";
+  }
+  function fashionAction(item) {
+    if (item === "gown") {
+      if (!g.fashion.gownOwned) {
+        if (g.coinCount < GOWN_PRICE) return;
+        g.coinCount -= GOWN_PRICE;
+        g.fashion.gownOwned = true;
+        g.fashion.gownOn = true;
+      } else {
+        g.fashion.gownOn = !g.fashion.gownOn;
+      }
+    } else {
+      if (!g.fashion.bandanaOwned) {
+        if (g.coinCount < BANDANA_PRICE) return;
+        g.coinCount -= BANDANA_PRICE;
+        g.fashion.bandanaOwned = true;
+        g.fashion.bandanaOn = true;
+      } else {
+        g.fashion.bandanaOn = !g.fashion.bandanaOn;
+      }
+    }
+    refreshFashionPanel();
     saveGame();
   }
   // The wishing fountain in the Secret Garden. The fountain's
@@ -2253,7 +2331,8 @@
         day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
         room: g.room, px: g.px, depth: g.depth, facing: g.facing,
         scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
-        fountainWished: g.fountainWished, proposed: g.proposed
+        fountainWished: g.fountainWished, proposed: g.proposed,
+        fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
       }));
     } catch (e) { /* storage unavailable: the game still plays */ }
   }
@@ -2285,6 +2364,12 @@
     g.scooter.x = (typeof s.scooterX === "number") ? s.scooterX : SCOOTER_X;
     g.fountainWished = !!s.fountainWished;
     g.proposed = !!s.proposed;
+    if (s.fashion) {
+      g.fashion.gownOwned = !!s.fashion.gownOwned;
+      g.fashion.gownOn = !!s.fashion.gownOn;
+      g.fashion.bandanaOwned = !!s.fashion.bandanaOwned;
+      g.fashion.bandanaOn = !!s.fashion.bandanaOn;
+    }
     g.monsters = []; g.coins = [];
     g.lastRoom = null;
     g.camX = 0;
@@ -2562,6 +2647,29 @@
     // attacks the way she is facing. Front and back views are never flipped.
     if (g.facing === -1 && img !== sylviaIdleImg && !keys.up && !keys.down) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    // Char's red gown, when she is wearing it. Front view (standing
+    // still, or walking toward the camera) gets the front gown, laid
+    // from her shoulders to her feet; the side walk gets the side
+    // gown, stretched a little wider so its skirt covers her legs.
+    // It stays off for the back walk and the kick, where the dress
+    // would hide the pose. It flips with her, inside this transform.
+    if (g.fashion.gownOn && !g.attack.active && !keys.up && !g.homeWalk.active) {
+      var gownImg = null, gownTop = 0, gownH = 0, gownW = 0;
+      if (keys.down || !moving) {
+        gownImg = gownFrontImg;
+        gownH = h * 0.90;
+        gownTop = -h / 2 + h * 0.12;
+        if (gownImg && gownImg.complete && gownImg.naturalWidth > 0)
+          gownW = gownH * (gownImg.naturalWidth / gownImg.naturalHeight);
+      } else {
+        gownImg = gownSideImg;
+        gownH = h * 0.79;
+        gownTop = -h / 2 + h * 0.22;
+        gownW = w * 1.07;
+      }
+      if (gownImg && gownImg.complete && gownImg.naturalWidth > 0 && gownW > 0)
+        ctx.drawImage(gownImg, -gownW / 2, gownTop, gownW, gownH);
+    }
     ctx.restore();
   }
 
@@ -2613,7 +2721,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.shopOpen) return;
+    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
@@ -2757,6 +2865,13 @@
       ctx.save();
       ctx.translate(tx, tfeet - th / 2);
       ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
+      // The bandana, on his talking pose too: a wider band, since
+      // the portrait shows his head bigger than the walk frames do.
+      if (g.fashion.bandanaOn && bandanaImg && bandanaImg.complete && bandanaImg.naturalWidth > 0) {
+        var bw2 = tw * 0.45;
+        var bh2 = bw2 * (bandanaImg.naturalHeight / bandanaImg.naturalWidth);
+        ctx.drawImage(bandanaImg, -bw2 / 2, -th * 0.44 - bh2 / 2, bw2, bh2);
+      }
       ctx.restore();
       return;
     }
@@ -2815,6 +2930,14 @@
     if (sideView && img === rayPunchImg) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    // Ray's black bandana, when he is wearing it: a headband across
+    // his forehead, just above his eyes. It flips with him, inside
+    // this transform, so the knot stays at the back of his head.
+    if (g.fashion.bandanaOn && bandanaImg && bandanaImg.complete && bandanaImg.naturalWidth > 0) {
+      var bw = w * 0.30;
+      var bh = bw * (bandanaImg.naturalHeight / bandanaImg.naturalWidth);
+      ctx.drawImage(bandanaImg, -bw / 2, -h * 0.45 - bh / 2, bw, bh);
+    }
     ctx.restore();
   }
 
@@ -3785,18 +3908,23 @@
     ctx.fillText(String(g.coinCount), 184, 27);
     ctx.restore();
   }
-  // Energy bar and day count, under the hearts. The bar is gold
-  // and drains slowly; when it is low it pulses to nudge her
-  // toward bed. The day sits at the top right.
+  // Energy bar and day count. The bar sits beside the health bar
+  // on the top row, just after the coin count, so the health and
+  // energy read as one strip. The day sits on a second row at the
+  // top right. The bar is gold and drains slowly; when it is low
+  // it pulses to nudge her toward bed.
   function drawEnergyAndDay() {
     ctx.save();
     ctx.font = "700 11px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.fillText("EN", 14, 47);
-    var bx = 36, by = 38, bw = 140, bh = 10;
+    // The coin count ends around x 210, so the energy label starts
+    // just after it and the bar sits beside the hearts and coins.
+    ctx.fillText("EN", 220, 27);
+    var bx = 238, by = 14, bh = 16;
+    var bw = Math.max(50, Math.min(100, g.w - 252));
     ctx.fillStyle = "rgba(0,0,0,0.45)";
-    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 5);
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 8);
     else ctx.rect(bx, by, bw, bh);
     ctx.fill();
     var frac = Math.max(0, Math.min(1, g.energy / g.energyMax));
@@ -3804,7 +3932,7 @@
     ctx.globalAlpha = pulse;
     ctx.fillStyle = g.energy <= 20 ? "#ff9e3e" : "#ffd23e";
     if (frac > 0) {
-      if (ctx.roundRect) ctx.roundRect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2, 4);
+      if (ctx.roundRect) ctx.roundRect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2, 7);
       else ctx.rect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2);
       ctx.fill();
     }
@@ -3812,7 +3940,7 @@
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText("Day " + g.day, g.w - 14, 27);
+    ctx.fillText("Day " + g.day, g.w - 14, 47);
     ctx.restore();
   }
   function drawStairPrompt() {
@@ -4169,6 +4297,18 @@
       draw();
       return;
     }
+    if (g.fashionOpen) {
+      // Char's fashion shop is open: the panel is over the game.
+      // Nothing moves until she buys, wears, or closes it.
+      var eBtnF = document.getElementById("actionList");
+      if (eBtnF) eBtnF.hidden = true;
+      var aBtnF = document.getElementById("attackBtn");
+      if (aBtnF) aBtnF.hidden = true;
+      var fBtnF = document.getElementById("fashionBtn");
+      if (fBtnF) fBtnF.hidden = true;
+      draw();
+      return;
+    }
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
     if (g.ownerTalk.open) {
       var otk = g.ownerTalk.key;
@@ -4233,6 +4373,12 @@
       // Gunner's shop: only while his talk bubble is open, so she
       // talks to him first, then opens his shop from the chat.
       shopBtn.hidden = !(g.ownerTalk.open && g.ownerTalk.key === "gunner" && !g.shopOpen);
+    }
+    var fashionBtn = document.getElementById("fashionBtn");
+    if (fashionBtn) {
+      // Char's fashion shop: only while her talk bubble is open, so
+      // she talks to Char first, then opens the shop from the chat.
+      fashionBtn.hidden = !(g.ownerTalk.open && g.ownerTalk.key === "char" && !g.fashionOpen);
     }
     updateActionList();
     if (g.climb.active) {
@@ -4740,6 +4886,14 @@
   if (shopBuyBtn) shopBuyBtn.addEventListener("click", function (e) { e.stopPropagation(); buyScooter(); });
   var shopCloseBtn = document.getElementById("shopCloseBtn");
   if (shopCloseBtn) shopCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeShop(); });
+  var fashionBtn = document.getElementById("fashionBtn");
+  if (fashionBtn) fashionBtn.addEventListener("click", function (e) { e.stopPropagation(); openFashion(); });
+  var fashionGownBtn = document.getElementById("fashionGownBtn");
+  if (fashionGownBtn) fashionGownBtn.addEventListener("click", function (e) { e.stopPropagation(); fashionAction("gown"); });
+  var fashionBandanaBtn = document.getElementById("fashionBandanaBtn");
+  if (fashionBandanaBtn) fashionBandanaBtn.addEventListener("click", function (e) { e.stopPropagation(); fashionAction("bandana"); });
+  var fashionCloseBtn = document.getElementById("fashionCloseBtn");
+  if (fashionCloseBtn) fashionCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeFashion(); });
   // The title screen: Continue when a save exists, New Game always.
   // The world waits behind it until she picks one.
   var titleScreen = document.getElementById("titleScreen");
