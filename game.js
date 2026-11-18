@@ -42,16 +42,13 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=48" forces a fresh download after the white-background
-  // cleanup: the enclosed white pockets are cleared from the
-  // scooter ride frames, Adler's walk-04, Alexis's idle, and the
-  // parked scooter's grab rail. The v=33 fringe cleanup only
-  // handled the thin semi-transparent edge; these were solid white
-  // background trapped inside the figure, which the border
-  // flood-fill could not reach. Eve's silver dress and Alexis's fur
-  // stole are clothing, not background, and are left untouched. A
-  // browser that cached ?v=47 picks up the new sprites.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=48"; return img; }
+  // "?v=49" forces a fresh download after the proposal cutscene
+  // on the Surface: walking all the way to the right of the
+  // outside, Ray gets down on one knee and proposes. Short romantic
+  // lines, Sylvia surprised, she says yes, and it ends with a kiss.
+  // The four proposal frames are Erika's art, already transparent.
+  // A browser that cached ?v=48 picks up the new code and art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=49"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -62,6 +59,7 @@
   var rayWalkImgs = RAY_WALK.map(loadImg);
   var rayIdleImg = loadImg(RAY_IDLE_SRC);
   var kissImg = loadImg("assets/kiss.png");
+  var proposeImgs = ["assets/propose-01.png", "assets/propose-02.png", "assets/propose-03.png", "assets/propose-04.png"].map(loadImg);
   var sylviaStanceImg = loadImg("assets/sylvia-stance.png");
   var sylviaKickImg = loadImg("assets/sylvia-kick.png");
   var sylviaCrouchImg = loadImg("assets/sylvia-crouch.png");
@@ -394,6 +392,13 @@
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
     homeWalk: { active: false, t: 0 },
+    // The proposal on the Surface: once, when they walk all the way
+    // to the right edge of the outside, Ray proposes. proposal holds
+    // the cutscene (step 0 Ray asks, 1 Sylvia surprised, 2 she says
+    // yes, 3 the kiss). proposed stays true after so it only ever
+    // happens once.
+    proposal: { active: false, step: 0, t: 0 },
+    proposed: false,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
     // Climbing out the chamber window, or up a staircase: Ray goes
@@ -785,6 +790,7 @@
     g.talk.idx = idx; g.talk.open = true;
   }
   function pressT() {
+    if (g.proposal.active) { advanceProposal(); return; }
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding) return;
     if (g.propRead.open) { closePropRead(); return; }
     if (g.talk.open) { talkLine(); return; }
@@ -1236,6 +1242,7 @@
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
     g.embrace.active = false; g.sleeping = false; g.ray.inBed = false;
+    g.proposal.active = false;
     // Jumping away on the map leaves the scooter parked back at the
     // street entrance, so it is never left riding in another room.
     if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; g.scooter.room = "shopping"; }
@@ -1736,7 +1743,7 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
@@ -1798,6 +1805,7 @@
   function wakeUp() { g.sleeping = false; g.ray.inBed = false; }
   function tryEnter() {
     if (g.embrace.active) return;
+    if (g.proposal.active) { advanceProposal(); return; }
     if (g.sleeping) { wakeUp(); return; }
     if (g.photo.active) { closePhoto(); return; }
     if (g.propRead.open) { closePropRead(); return; }
@@ -1858,7 +1866,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -2513,6 +2521,129 @@
     ctx.restore();
     var my = feetY - h - 22 + Math.sin(g.kiss.t * 0.12) * 4;
     drawHeart(mx, my, 11 + Math.sin(g.kiss.t * 0.2) * 2, "#ff5c8a");
+  }
+
+  // The proposal on the Surface. When they walk all the way to the
+  // right edge of the outside, Ray gets down on one knee. The four
+  // proposal frames are Erika's art (Ray kneeling with the ring,
+  // Sylvia surprised), drawn together as one picture, and the lines
+  // are short and romantic: he asks, she is surprised, she says
+  // yes, then they kiss.
+  var PROPOSAL_LINES = [
+    { who: "RAY", lines: ["Sylvia. We made it out together.", "I want every sunrise after this one with you.", "Will you marry me?"] },
+    { who: "SYLVIA", lines: ["Ray... is that a ring?", "Are you really asking me?"] },
+    { who: "SYLVIA", lines: ["Yes! Yes, a thousand times, yes!"] },
+    { who: "", lines: ["She said yes!"] }
+  ];
+  function surfaceEdgeNear() {
+    return g.room === "surface" && g.px >= room().w - 90;
+  }
+  function startProposal() {
+    if (g.proposed || g.proposal.active) return;
+    if (g.sleeping || g.kiss.active || g.embrace.active) return;
+    if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
+    if (g.photo.active || g.map.active || g.shopOpen) return;
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open) return;
+    g.proposal.active = true;
+    g.proposal.step = 0;
+    g.proposal.t = 0;
+    // Ray stands beside her for the moment.
+    g.ray.x = g.px - 70;
+    g.ray.dir = 1;
+    g.ray.depth = g.depth;
+  }
+  function advanceProposal() {
+    if (!g.proposal.active) return;
+    g.proposal.step += 1;
+    g.proposal.t = 0;
+    if (g.proposal.step > 3) endProposal();
+  }
+  function endProposal() {
+    g.proposal.active = false;
+    g.proposed = true;
+  }
+  function drawProposal() {
+    // Steps 0-2: the proposal art (Ray kneeling, Sylvia surprised),
+    // cycling gently through the four frames. Step 3: the kiss.
+    var feetY = groundY() + g.depth - 6;
+    var cx = g.w / 2;
+    if (g.proposal.step < 3) {
+      var frame = proposeImgs[Math.floor(g.proposal.t / 20) % 4];
+      if (frame && frame.complete && frame.naturalWidth > 0) {
+        var h = g.h * 0.62;
+        var w = h * (frame.naturalWidth / frame.naturalHeight);
+        shadow(cx, feetY, w);
+        ctx.drawImage(frame, cx - w / 2, feetY - h, w, h);
+      }
+    } else {
+      if (kissImg && kissImg.complete && kissImg.naturalWidth > 0) {
+        var kh = g.h * 0.62;
+        var kw = kh * (kissImg.naturalWidth / kissImg.naturalHeight);
+        shadow(cx, feetY, kw);
+        ctx.drawImage(kissImg, cx - kw / 2, feetY - kh, kw, kh);
+      }
+      var hy = feetY - g.h * 0.62 - 24 + Math.sin(g.proposal.t * 0.12) * 4;
+      drawHeart(cx - 34, hy, 10 + Math.sin(g.proposal.t * 0.2) * 2, "#ff5c8a");
+      drawHeart(cx + 30, hy - 10, 8 + Math.sin(g.proposal.t * 0.2 + 1) * 2, "#ff7aa2");
+      drawHeart(cx, hy - 22, 12 + Math.sin(g.proposal.t * 0.2 + 2) * 2, "#ff5c8a");
+    }
+    // The line, in a white bubble at the top, like the talk bubbles.
+    var step = PROPOSAL_LINES[g.proposal.step];
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    var nameW = step.who ? ctx.measureText(step.who).width : 0;
+    ctx.font = "16px 'Open Sans', sans-serif";
+    var lineW = 0;
+    for (var i = 0; i < step.lines.length; i++) {
+      lineW = Math.max(lineW, ctx.measureText(step.lines[i]).width);
+    }
+    var bw = Math.max(nameW, lineW) + 36;
+    var bh = (step.who ? 24 : 6) + step.lines.length * 22 + 18;
+    var bx = cx - bw / 2;
+    var by = 56;
+    ctx.fillStyle = "rgba(255,255,255,0.96)";
+    ctx.strokeStyle = "#d9c7ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill();
+    ctx.stroke();
+    // Tail pointing down toward the two of them.
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, by + bh);
+    ctx.lineTo(cx + 10, by + bh);
+    ctx.lineTo(cx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    var ty = by + 20;
+    if (step.who) {
+      ctx.fillStyle = "#7a4fd0";
+      ctx.font = "700 13px 'Open Sans', sans-serif";
+      ctx.fillText(step.who, cx, ty);
+      ty += 22;
+    }
+    ctx.fillStyle = "#222";
+    ctx.font = "16px 'Open Sans', sans-serif";
+    for (var j = 0; j < step.lines.length; j++) {
+      ctx.fillText(step.lines[j], cx, ty);
+      ty += 22;
+    }
+    // The nudge to continue.
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    var hint = g.proposal.step < 3 ? "Press E to continue" : "Press E to finish";
+    var hw = ctx.measureText(hint).width;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cx - hw / 2 - 10, by + bh + 22, hw + 20, 24, 12);
+    else ctx.rect(cx - hw / 2 - 10, by + bh + 22, hw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(hint, cx, by + bh + 39);
+    ctx.restore();
   }
 
   function drawRay() {
@@ -3835,6 +3966,7 @@
     drawGardenDoorPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
+    if (g.proposal.active) { drawProposal(); return; }
     if (g.scooter.riding) drawScooterRide();
     else drawRay();
     drawChar();
@@ -4020,6 +4152,13 @@
       draw();
       return;
     }
+    if (g.proposal.active) {
+      // The proposal cutscene on the Surface: the art and the lines
+      // play, and nothing else moves until it is done.
+      g.proposal.t += 1;
+      draw();
+      return;
+    }
     if (g.kiss.active) {
       g.kiss.t += 1;
       // Face each other and lean in until cheek to cheek.
@@ -4052,6 +4191,10 @@
     // E needed. Stairs still need E to climb. Riding the scooter
     // through an edge carries it along (switchRoom moves its room).
     if ((keys.left && doorSide() === "left") || (keys.right && doorSide() === "right")) switchRoom();
+    // The end of the road: walking all the way to the right of the
+    // Surface, the outside, starts the proposal cutscene. It only
+    // ever happens once, and not while riding the scooter.
+    if (!g.proposed && !g.proposal.active && !g.scooter.riding && keys.right && surfaceEdgeNear()) startProposal();
     // The garden door is E-gated like a portal, so walking into it
     // does nothing on its own. Press E (or tap Go home) to go home.
     if (keys.left || keys.right || keys.up || keys.down) g.walk += keys.fast ? 0.6 : 0.3;
@@ -4396,9 +4539,9 @@
   window.addEventListener("keydown", function (e) {
     if (e.code === "KeyK") { tryKiss(); return; }
     if (e.code === "KeyH") { tryAttack(); return; }
-    if (e.code === "KeyE") { tryEnter(); return; }
+    if (e.code === "KeyE") { if (g.proposal.active) { advanceProposal(); return; } tryEnter(); return; }
     if (e.code === "KeyI") { startInspect(); return; }
-    if (e.code === "KeyT") { pressT(); return; }
+    if (e.code === "KeyT") { if (g.proposal.active) { advanceProposal(); return; } pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
     if (e.code === "Digit1" || e.code === "Digit2" || e.code === "Digit3" || e.code === "Digit4") {
       if (g.rayTalk.open && g.rayTalk.step === 0) {
@@ -4446,7 +4589,10 @@
     if (e && e.clientX !== undefined && pointerDownAt) {
       var dt = Date.now() - pointerDownAt;
       var moved = Math.max(Math.abs(e.clientX - pointerDownX), Math.abs(e.clientY - pointerDownY));
-      if (dt < 250 && moved < 12) tryAttack();
+      if (dt < 250 && moved < 12) {
+        if (g.proposal.active) { advanceProposal(); pointerDownAt = 0; return; }
+        tryAttack();
+      }
     }
     pointerDownAt = 0;
   }
