@@ -39,11 +39,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=18" forces a fresh download after a light rim is added around
-  // Sylvia and Ray so they read as standing clearly in front of a
-  // dark doorway instead of melting into it, so a browser that cached
-  // ?v=17 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=18"; return img; }
+  // "?v=19" forces a fresh download after the glow and the light rim
+  // are removed entirely, so the characters no longer emit any light,
+  // so a browser that cached ?v=18 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=19"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1427,36 +1426,6 @@
     ctx.fill();
   }
 
-  function glow(x, feetY, w, h) {
-    // A soft warm glow behind a character, so they never vanish into
-    // a dark doorway. The dungeon door and the tunnel doors are so
-    // dark that Ray in his black tank and Sylvia in the shadows just
-    // blend away. This lifts them off the background just enough to
-    // always read clearly, without changing the art.
-    ctx.save();
-    ctx.translate(x, feetY - h * 0.5);
-    var r = w * 0.95;
-    var g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-    g.addColorStop(0, "rgba(255, 232, 180, 0.55)");
-    g.addColorStop(0.5, "rgba(255, 222, 165, 0.28)");
-    g.addColorStop(1, "rgba(255, 222, 165, 0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r, r * (h / w) * 0.9, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-  function rim() {
-    // A light rim hugging the sprite's outline, so a dark character
-    // reads as standing clearly IN FRONT of a dark doorway instead of
-    // melting into it. The glow behind is a soft backdrop; this rim is
-    // the crisp edge that says the character is in front, not inside
-    // the door. Call it after ctx.save(), before drawImage(); the
-    // matching ctx.restore() turns it off again.
-    ctx.shadowColor = "rgba(255, 240, 205, 0.95)";
-    ctx.shadowBlur = 14;
-  }
-
   function drawSylvia() {
     if (g.climb.active && g.climb.sylHidden) return;
     if (g.inspect.active) {
@@ -1472,11 +1441,9 @@
       var ifeet = groundY() + g.depth;
       var ix = g.px * scale() - g.camX;
       shadow(ix, ifeet, iw);
-      glow(ix, ifeet, iw, ih);
       ctx.save();
       ctx.translate(ix, ifeet - ih / 2);
       if (g.facing === -1) ctx.scale(-1, 1);
-      rim();
       ctx.drawImage(iimg, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
       return;
@@ -1496,11 +1463,9 @@
       var cfeet = groundY() + g.depth + g.climb.sylY;
       var cx = g.px * scale() - g.camX;
       shadow(cx, cfeet, cw);
-      glow(cx, cfeet, cw, ch);
       ctx.save();
       ctx.translate(cx, cfeet - ch / 2);
       if (g.climb.kind === "stairs" && g.facing === -1) ctx.scale(-1, 1);
-      rim();
       ctx.drawImage(cimg, -cw / 2, -ch / 2, cw, ch);
       ctx.restore();
       return;
@@ -1523,14 +1488,12 @@
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
     shadow(x, feetY, w);
-    glow(x, feetY, w, h);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
     // Her stance and kick face right too, so they flip as well, and she
     // attacks the way she is facing. Front and back views are never flipped.
     if (g.facing === -1 && img !== sylviaIdleImg && !keys.up && !keys.down) ctx.scale(-1, 1);
-    rim();
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -1554,11 +1517,9 @@
     var feetY = groundY() - 6;
     var mx = (g.px + g.ray.x) / 2 * scale() - g.camX;
     shadow(mx, feetY, w);
-    glow(mx, feetY, w, h);
     ctx.save();
     ctx.translate(mx, feetY - h / 2);
     if (g.px > g.ray.x) ctx.scale(-1, 1);
-    rim();
     ctx.drawImage(kissImg, -w / 2, -h / 2, w, h);
     ctx.restore();
     var my = feetY - h - 22 + Math.sin(g.kiss.t * 0.12) * 4;
@@ -1583,11 +1544,9 @@
       var rix = r.x * scale() - g.camX;
       if (rix < -riw || rix > g.w + riw) return;
       shadow(rix, rifeet, riw);
-      glow(rix, rifeet, riw, rih);
       ctx.save();
       ctx.translate(rix, rifeet - rih / 2);
       if (r.dir === -1) ctx.scale(-1, 1);
-      rim();
       ctx.drawImage(riimg, -riw / 2, -rih / 2, riw, rih);
       ctx.restore();
       return;
@@ -1606,10 +1565,8 @@
       var tx = r.x * scale() - g.camX;
       if (tx < -tw || tx > g.w + tw) return;
       shadow(tx, tfeet, tw);
-      glow(tx, tfeet, tw, th);
       ctx.save();
       ctx.translate(tx, tfeet - th / 2);
-      rim();
       ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
       ctx.restore();
       return;
@@ -1631,14 +1588,12 @@
       var rx = r.x * scale() - g.camX;
       if (rx < -rw || rx > g.w + rw) return;
       shadow(rx, rfeet, rw);
-      glow(rx, rfeet, rw, rh);
       ctx.save();
       ctx.translate(rx, rfeet - rh / 2);
       // The reach faces right, so flip it when he reaches left for
       // her. The walk frames face right, flip when he runs left.
       if (g.climb.kind === "window" && g.climb.t > 80) ctx.scale(-1, 1);
       else if (r.dir === -1) ctx.scale(-1, 1);
-      rim();
       ctx.drawImage(rimg, -rw / 2, -rh / 2, rw, rh);
       ctx.restore();
       return;
@@ -1663,7 +1618,6 @@
     var x = r.x * scale() - g.camX;
     if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
-    glow(x, feetY, w, h);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Ray's frames face right, so flip them when he faces left.
@@ -1673,7 +1627,6 @@
     var sideView = r.fight.active || r.vdir === 0;
     if (sideView && img === rayPunchImg) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
-    rim();
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -1807,10 +1760,8 @@
     var x = g.px * scale() - g.camX;
     if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
-    glow(x, feetY, w, h);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
-    rim();
     ctx.drawImage(embraceImg, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
