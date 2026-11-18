@@ -49,10 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=79" forces a fresh download: the fountain's last answer stays
-  // vague about the levels, and the world map blurs places she has
-  // not visited yet. A browser that cached ?v=78 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=79"; return img; }
+  // "?v=80" forces a fresh download: the map fog is softer, like
+  // clouds, and the zones are wider so no label fragment peeks out,
+  // and the map's text box fogs with the Surface. A browser that
+  // cached ?v=79 picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=80"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1412,13 +1413,14 @@
     dungeon2: { x: 0.80, y: 0.78, w: 0.16, h: 0.08 },
     dungeon3: { x: 0.82, y: 0.84, w: 0.16, h: 0.08 },
     dungeon4: { x: 0.84, y: 0.90, w: 0.16, h: 0.08 },
-    cistern: { x: 0.58, y: 0.50, w: 0.17, h: 0.20 },
-    garden: { x: 0.75, y: 0.36, w: 0.20, h: 0.22 },
-    upper1: { x: 0.38, y: 0.26, w: 0.20, h: 0.18 },
-    upper2: { x: 0.46, y: 0.18, w: 0.20, h: 0.14 },
+    cistern: { x: 0.58, y: 0.50, w: 0.24, h: 0.20 },
+    garden: { x: 0.75, y: 0.36, w: 0.22, h: 0.22 },
+    upper1: { x: 0.38, y: 0.26, w: 0.28, h: 0.18 },
+    upper2: { x: 0.46, y: 0.18, w: 0.26, h: 0.16 },
     upper3: { x: 0.54, y: 0.10, w: 0.20, h: 0.12 },
     earthen: { x: 0.60, y: 0.06, w: 0.14, h: 0.10 },
-    surface: { x: 0.68, y: 0.02, w: 0.26, h: 0.12 }
+    surface: { x: 0.68, y: 0.02, w: 0.30, h: 0.14 },
+    surfaceText: { x: 0.68, y: 0.14, w: 0.28, h: 0.18, for: "surface" }
   };
   var mapFogEls = {};
   function markVisited(room) {
@@ -1441,7 +1443,7 @@
         wrap.appendChild(el);
         mapFogEls[room] = el;
       }
-      el.hidden = !!g.visited[room];
+      el.hidden = !!g.visited[r.for || room];
     });
   }
   function openMap() {
