@@ -24,7 +24,7 @@
     clothing: { w: 1983, h: 793, frames: null, floor: 0.80, depth: 0.05 },
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
     arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
-    garden: { w: 1179, h: 393, frames: null, floor: 0.77, depth: 0.05 }
+    garden: { w: 1179, h: 393, frames: null, floor: 0.81, depth: 0.03 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
