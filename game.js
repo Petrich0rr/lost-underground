@@ -39,11 +39,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=24" forces a fresh download after Eve is added (Sylvia's
-  // best friend, Char's granddaughter, wandering the Shopping
-  // District street with funny lines and a laugh), so a browser that
-  // cached ?v=23 picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=24"; return img; }
+  // "?v=25" forces a fresh download after the tunnels vanish is
+  // fixed: the iron-door and portal prompts called a roundRect that
+  // did not exist, and the error stopped the draw before the
+  // characters, so they vanished in the portal range. Both prompts
+  // now use ctx.roundRect with a ctx.rect fallback, like the rest.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=25"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1158,7 +1159,8 @@
     var label = "Press E to go through the iron door";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(20,10,30,0.72)";
-    roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
+    else ctx.rect(x - tw / 2 - 10, y - 13, tw + 20, 26);
     ctx.fill();
     ctx.fillStyle = "#fff";
     ctx.fillText(label, x, y + 5);
@@ -1194,7 +1196,8 @@
     var label = "Press E to go back home";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(20,10,30,0.72)";
-    roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
+    else ctx.rect(x - tw / 2 - 10, y - 13, tw + 20, 26);
     ctx.fill();
     ctx.fillStyle = "#fff";
     ctx.fillText(label, x, y + 5);
