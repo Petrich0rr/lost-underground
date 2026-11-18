@@ -39,15 +39,13 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=31" forces a fresh download after the stuck-NPC fix: when
-  // a rotating NPC (Alexis, Priya, Diego, Kian, Yuto) changed rooms
-  // they spawned at x=110, below the wander left bound of 150, and
-  // the bounds check only flipped their direction, so they
-  // oscillated between x=110.0 and x=110.8 forever and looked
-  // frozen. Spawns are now x=200, and the bounds check clamps x
-  // back inside and forces the direction inward. A browser that
-  // cached ?v=30 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=31"; return img; }
+  // "?v=32" forces a fresh download after the bar floor props are
+  // removed: Erika does not want any objects on the floor in the bar.
+  // The bar entry is gone from PROPS (drawProps and propNear both
+  // return early when PROPS[g.room] is missing), so the bar floor is
+  // clean; the subway, cistern, quarry, tunnels and dungeon keep
+  // their junk. A browser that cached ?v=31 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=32"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -223,13 +221,6 @@
   // readable: walk up and press E or I to inspect it. The papers
   // can hint at the way up; the rest is just trash down here.
   var PROPS = {
-    bar: [
-      { img: propBucketImg, x: 180, d: 0.9, h: 52, name: "Rusty bucket", text: "A rusty bucket. It has seen better days." },
-      { img: propPaperImg, x: 300, d: 0.6, h: 32, name: "Crumpled paper", text: "A crumpled paper ball. Someone wrote I HATE IT HERE on it, then crossed it out and wrote I hate it here again, smaller." },
-      { img: propCanImg, x: 420, d: 0.8, h: 34, name: "Crushed can", text: "A crushed can. Someone was very thirsty down here once." },
-      { img: propGlassImg, x: 720, d: 0.5, h: 32, name: "Broken glass", text: "Broken green glass. Careful where you step." },
-      { img: propLanternImg, x: 950, d: 0.7, h: 60, name: "Old lantern", text: "A lantern with a blue flame. It still burns, somehow." }
-    ],
     subway: [
       { img: propNewspaperImg, x: 300, d: 0.6, h: 48, name: "Soggy newspaper", text: "A soggy newspaper. The headline is smudged, but one line is still clear: THE SURFACE IS REAL. Three floors up, and the sky is waiting." },
       { img: propTakeoutImg, x: 650, d: 0.8, h: 50, name: "Takeout box", text: "An old takeout box. Whatever was in it has long since given up." },
