@@ -676,8 +676,9 @@
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
-    // Front and back views are never flipped.
-    if (g.facing === -1 && img !== sylviaIdleImg && !g.attack.active && !keys.up && !keys.down) ctx.scale(-1, 1);
+    // Her stance and kick face right too, so they flip as well, and she
+    // attacks the way she is facing. Front and back views are never flipped.
+    if (g.facing === -1 && img !== sylviaIdleImg && !keys.up && !keys.down) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -764,11 +765,11 @@
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Ray's frames face right, so flip them when he faces left.
-    // When fighting he faces the same way Sylvia does, so his punch
-    // goes the same direction as her kick, not back toward her.
-    // Front and back views are never flipped.
+    // His punch goes the same way Sylvia faces, so it matches her kick.
+    // His walk frames flip by the way he is actually moving, so he never
+    // moonwalks while running to her side. Front and back views are never flipped.
     var sideView = r.fight.active || r.vdir === 0;
-    if (sideView && r.fight.active) { if (g.facing === -1) ctx.scale(-1, 1); }
+    if (sideView && img === rayPunchImg) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
