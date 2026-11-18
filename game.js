@@ -39,10 +39,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=13" forces a fresh download after the inspection panel
-  // loses its blue background and goes translucent, so a browser
-  // that cached ?v=12 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=13"; return img; }
+  // "?v=14" forces a fresh download after every room gets its own
+  // little intro line at the top when she walks in, so a browser
+  // that cached ?v=13 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=14"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -241,6 +241,9 @@
     // bubble shows what it says. The papers can hint at the way up;
     // the rest is just trash down here.
     propRead: { open: false, name: "", text: "", x: 0 },
+    // The room she was in last tick, so a room change shows the
+    // little intro line for the new place.
+    lastRoom: null,
     hp: 100, hpMax: 100,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
@@ -948,10 +951,59 @@
     ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
+  // A little line when she walks into a new room, so each place
+  // gets its own first impression. No box, no border, just the words
+  // at the top of the screen for a few seconds, then they fade.
+  var ROOM_INTRO = {
+    bar: "This place reeks of cheap beer and old smoke.",
+    chamber: "Our room. Small, warm, and ours.",
+    subway: "It's very dark here. And very, very quiet.",
+    shopping: "It's beautiful here, but it could be better.",
+    repair: "It smells like oil and rust in here.",
+    clothing: "Char's shop. It smells like perfume and big dreams.",
+    salon: "Mikey's place. Hairspray, gossip, and good lighting.",
+    arcade: "The arcade never really turns off.",
+    cistern: "The water is still. Too still.",
+    quarry: "Pretty crystals. And a little bit wrong.",
+    tunnels: "The tunnels smell like damp earth and old metal.",
+    dungeon: "Something bad happened here. You can feel it.",
+    upper1: "Upper Level 1. Blue, cold, and the air feels thinner.",
+    upper2: "Upper Level 2. Violet and quiet. Too quiet.",
+    upper3: "Upper Level 3. White and bright. And it watches you."
+  };
+  var roomIntroTimer = null;
+  function showRoomIntro() {
+    var el = document.getElementById("roomIntro");
+    if (!el) return;
+    var line = ROOM_INTRO[g.room];
+    if (!line) return;
+    // If she is reading a piece of junk, the panel wins and the
+    // intro waits for the next room.
+    if (g.propRead.open) return;
+    el.textContent = line;
+    el.hidden = false;
+    el.classList.remove("show");
+    void el.offsetWidth;
+    el.classList.add("show");
+    if (roomIntroTimer) clearTimeout(roomIntroTimer);
+    roomIntroTimer = setTimeout(function() {
+      el.classList.remove("show");
+      setTimeout(function() { el.hidden = true; }, 600);
+    }, 5000);
+  }
+  function hideRoomIntro() {
+    var el = document.getElementById("roomIntro");
+    if (!el) return;
+    if (roomIntroTimer) clearTimeout(roomIntroTimer);
+    el.classList.remove("show");
+    el.hidden = true;
+  }
   function showPropPanel() {
     // The inspection words live in a DOM panel at the top of the
     // screen, not a canvas bubble: a frosted blue panel with a cool
     // glowing border, bigger text, so it reads clearly and stands out.
+    // The room intro steps aside while she reads.
+    hideRoomIntro();
     var panel = document.getElementById("propPanel");
     if (!panel) return;
     document.getElementById("propPanelName").textContent = g.propRead.name.toUpperCase();
@@ -2223,6 +2275,9 @@
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
+    // A new room means a new first impression: show the little
+    // intro line for the place she just walked into.
+    if (g.room !== g.lastRoom) { g.lastRoom = g.room; showRoomIntro(); }
     if (g.mirror.active) {
       // Looking in the mirror: she blinks once in a while, and
       // while she manifests she keeps her eyes shut on an
