@@ -42,11 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=59" forces a fresh download after the extra characters
-  // were re-cut and re-saved as clean transparent PNGs, so no white
-  // edge remains around them. A browser that cached ?v=58 picks up
-  // the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=59"; return img; }
+  // "?v=60" forces a fresh download after the white background
+  // pockets were cleared from Eve, Priya, Alexis and Diego hair
+  // and the fur gap. A browser that cached ?v=59 picks up the
+  // new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=60"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
