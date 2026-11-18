@@ -39,10 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=14" forces a fresh download after every room gets its own
-  // little intro line at the top when she walks in, so a browser
-  // that cached ?v=13 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=14"; return img; }
+  // "?v=15" forces a fresh download after the dungeon door stops
+  // going to the Flooded Cistern and instead takes them straight
+  // back home, with no tunnel image pop up, so a browser that
+  // cached ?v=14 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=15"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -133,10 +134,6 @@
   // holding hands. Shown full screen while they fall through the
   // secret passage under the arcade floor.
   var descentImg = loadImg("assets/descent.jpg");
-  // The portal tunnel: a dark tunnel mouth with wooden beams and
-  // fallen rocks. Shown full screen while they pass through it on
-  // the way up from the Ancient Dungeon to the Flooded Cistern.
-  var portalTunnelImg = loadImg("assets/portal-tunnel.jpg");
   var rayCrouchImg = loadImg("assets/ray-crouch.png");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
@@ -1114,9 +1111,10 @@
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
   }
-  // The portal tunnel in the Ancient Dungeon: the big cracked stone
-  // door on the far right. Going through it takes them up to the
-  // Flooded Cistern, through the dark tunnel mouth.
+  // The way home in the Ancient Dungeon: the big cracked stone
+  // door on the far right, the dark tunnel mouth. Going through it
+  // takes them straight back home to their room. No tunnel image,
+  // no pop up, just the door and home.
   var PORTAL_X = 1955, PORTAL_RANGE = 110;
   function portalNear() {
     return g.room === "dungeon" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
@@ -1129,7 +1127,7 @@
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to go through the tunnel";
+    var label = "Press E to go back home";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(20,10,30,0.72)";
     roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
@@ -1142,29 +1140,11 @@
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
-    g.portal.active = true; g.portal.t = 0;
-  }
-  function updatePortal() {
-    g.portal.t += 1;
-    if (g.portal.t >= 90) {
-      // They come out of the tunnel up in the Flooded Cistern.
-      g.portal.active = false;
-      g.room = "cistern";
-      g.px = 110; g.facing = 1; g.depth = 0;
-      g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
-      g.camX = 0;
-    }
-  }
-  function drawPortal() {
-    if (!portalTunnelImg || !portalTunnelImg.complete || portalTunnelImg.naturalWidth === 0) return;
-    ctx.save();
-    ctx.fillStyle = "#060a08";
-    ctx.fillRect(0, 0, g.w, g.h);
-    var s = Math.min(g.w / portalTunnelImg.naturalWidth, g.h / portalTunnelImg.naturalHeight);
-    var dw = portalTunnelImg.naturalWidth * s;
-    var dh = portalTunnelImg.naturalHeight * s;
-    ctx.drawImage(portalTunnelImg, (g.w - dw) / 2, (g.h - dh) / 2, dw, dh);
-    ctx.restore();
+    // Straight back home to their room, no tunnel image, no wait.
+    g.room = "chamber";
+    g.px = 110; g.facing = 1; g.depth = 0;
+    g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    g.camX = 0;
   }
   function manifest() {
     if (!g.mirror.active) return;
@@ -2240,7 +2220,6 @@
   function draw() {
     if (g.mirror.active) { drawMirror(); return; }
     if (g.inspect.active && g.inspect.phase === "drop") { drawDescent(); return; }
-    if (g.portal.active) { drawPortal(); return; }
     drawBg();
     drawProps();
     drawArchGlow();
@@ -2398,7 +2377,7 @@
       else if (propNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.propRead.open ? "Put it down" : "Inspect"; }
       else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.inspect.active ? "Go down" : "Inspect"; }
       else if (ironDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Iron door"; }
-      else if (portalNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Through the tunnel"; }
+      else if (portalNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go home"; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
       else enterBtn.hidden = true;
     }
@@ -2414,13 +2393,6 @@
       // The inspect drives them both, and nothing else moves until
       // they land.
       updateInspect();
-      draw();
-      return;
-    }
-    if (g.portal.active) {
-      // Passing through the portal tunnel up to the Flooded Cistern.
-      // The tunnel art fills the screen until they come out.
-      updatePortal();
       draw();
       return;
     }
