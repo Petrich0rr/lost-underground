@@ -31,7 +31,9 @@
     dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 },
     upper1: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
     upper2: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
-    upper3: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 }
+    upper3: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
+    earthen: { w: 2172, h: 724, frames: null, floor: 0.85, depth: 0.05 },
+    surface: { w: 2172, h: 724, frames: null, floor: 0.74, depth: 0.02 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -40,12 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=38" forces a fresh download after the Secret Garden floor
-  // is fixed: the walkway surface is at 0.76-0.80, but the floor was
-  // 0.72, so their feet were above the walkway and they floated.
-  // Floor 0.77, depth 0.02 puts their feet on the stone. A browser
-  // that cached ?v=37 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=38"; return img; }
+  // "?v=39" forces a fresh download after the Earthen Tunnel and
+  // the Surface are added: the tunnel after Upper Level 3, and the
+  // outside after the tunnel, sunlight and open sky at last. A
+  // browser that cached ?v=38 picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=39"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -184,6 +185,8 @@
   var upper1Img = loadImg("assets/bg-upper1.jpg");
   var upper2Img = loadImg("assets/bg-upper2.jpg");
   var upper3Img = loadImg("assets/bg-upper3.jpg");
+  var earthenImg = loadImg("assets/bg-earthen-tunnel.jpg");
+  var surfaceImg = loadImg("assets/bg-surface.jpg");
   // Random junk scattered around the underground: papers that can
   // hint at the way up, and the rest just trash. They only appear
   // in the deep underground rooms, never in the chamber, the shops
@@ -234,6 +237,8 @@
   ROOMS.upper1.frames = [upper1Img];
   ROOMS.upper2.frames = [upper2Img];
   ROOMS.upper3.frames = [upper3Img];
+  ROOMS.earthen.frames = [earthenImg];
+  ROOMS.surface.frames = [surfaceImg];
   // Scattered junk on the floor of the deep underground rooms.
   // x is world px, d is depth across the floor band (0 back, 1
   // front), h is the height in canvas px. name and text make a prop
@@ -1014,7 +1019,9 @@
     dungeon: { left: "tunnels" },
     upper1: { left: "subway" },
     upper2: { left: "upper1" },
-    upper3: { left: "upper2" }
+    upper3: { left: "upper2", right: "earthen" },
+    earthen: { left: "upper3", right: "surface" },
+    surface: { left: "earthen" }
   };
   // The staircases that go up: the bar's stone stairs on the right
   // climb to the Forgotten subway, the subway's wide stairs on the
@@ -1061,6 +1068,9 @@
     if (g.room === "upper3" && to === "upper2") return "Go back down to Upper Level 2";
     if (to === "cistern") return "Go to the Flooded Cistern";
     if (to === "garden") return "Go to the Secret Garden";
+    if (to === "earthen") return "Go to the Earthen Tunnel";
+    if (to === "surface") return "Go to the Surface";
+    if (to === "upper3") return "Back to Upper Level 3";
     if (g.room === "dungeon" && to === "tunnels") return "Back to the Old Service Tunnels";
     if (to === "tunnels") return "Go to the Old Service Tunnels";
     if (to === "quarry") return "Back to the Crystal Quarry";
@@ -1153,7 +1163,9 @@
     dungeon:  { x: 0.86,  y: 0.76 },
     upper1:   { x: 0.42,  y: 0.28 },
     upper2:   { x: 0.52,  y: 0.22 },
-    upper3:   { x: 0.62,  y: 0.16 }
+    upper3:   { x: 0.62,  y: 0.16 },
+    earthen:  { x: 0.67,  y: 0.11 },
+    surface:  { x: 0.74,  y: 0.06 }
   };
   var MAP_ROOM_NAMES = {
     chamber: "Silvia & Ray's Room",
@@ -1171,7 +1183,9 @@
     dungeon: "Ancient Dungeon",
     upper1: "Upper Level 1",
     upper2: "Upper Level 2",
-    upper3: "Upper Level 3"
+    upper3: "Upper Level 3",
+    earthen: "The Earthen Tunnel",
+    surface: "The Surface"
   };
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
@@ -1373,7 +1387,9 @@
     dungeon: "Something bad happened here. You can feel it.",
     upper1: "Upper Level 1. Blue, cold, and the air feels thinner.",
     upper2: "Upper Level 2. Violet and quiet. Too quiet.",
-    upper3: "Upper Level 3. White and bright. And it watches you."
+    upper3: "Upper Level 3. White and bright. And it watches you.",
+    earthen: "A cramped earthen tunnel. The air smells like soil and roots. Almost there.",
+    surface: "The sun. The sky. We finally made it out."
   };
   var roomIntroTimer = null;
   function showRoomIntro() {
