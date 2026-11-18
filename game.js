@@ -42,12 +42,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=40" forces a fresh download after the Bell Ghost is made
-  // to fly higher: it was floating at base lift 0.04h with a 0.03h
-  // bob, so it dipped to almost touching the floor. Now it floats at
-  // base 0.11h with a 0.05h bob, staying 0.06h-0.16h up in the air.
-  // A browser that cached ?v=39 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=40"; return img; }
+  // "?v=41" forces a fresh download after the climb to the Earthen
+  // Tunnel becomes stairs from Upper Level 3 (no more right-edge
+  // door), and the Surface spawn moves to the top of the stone steps
+  // instead of the left edge of the screen. A browser that cached
+  // ?v=40 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=41"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1020,7 +1020,7 @@
     dungeon: { left: "tunnels" },
     upper1: { left: "subway" },
     upper2: { left: "upper1" },
-    upper3: { left: "upper2", right: "earthen" },
+    upper3: { left: "upper2" },
     earthen: { left: "upper3", right: "surface" },
     surface: { left: "earthen" }
   };
@@ -1034,7 +1034,8 @@
     bar: { baseX: 1070, topX: 1150, to: "subway", label: "Go up the stairs to the Forgotten subway", btn: "Up the stairs" },
     subway: { baseX: 1980, topX: 2120, to: "upper1", label: "Go up the stairs to Upper Level 1", btn: "Up the stairs" },
     upper1: { baseX: 1900, topX: 2100, to: "upper2", label: "Go up the stairs to Upper Level 2", btn: "Up the stairs" },
-    upper2: { baseX: 1900, topX: 2100, to: "upper3", label: "Go up the stairs to Upper Level 3", btn: "Up the stairs" }
+    upper2: { baseX: 1900, topX: 2100, to: "upper3", label: "Go up the stairs to Upper Level 3", btn: "Up the stairs" },
+    upper3: { baseX: 1900, topX: 2100, to: "earthen", label: "Go up the stairs to the Earthen Tunnel", btn: "Up the stairs" }
   };
   var STAIR_RANGE = 90;
   function stairsNear() {
@@ -1069,7 +1070,7 @@
     if (g.room === "upper3" && to === "upper2") return "Go back down to Upper Level 2";
     if (to === "cistern") return "Go to the Flooded Cistern";
     if (to === "garden") return "Go to the Secret Garden";
-    if (to === "earthen") return "Go to the Earthen Tunnel";
+    if (to === "earthen") return "Go back down to the Earthen Tunnel";
     if (to === "surface") return "Go to the Surface";
     if (to === "upper3") return "Back to Upper Level 3";
     if (g.room === "dungeon" && to === "tunnels") return "Back to the Old Service Tunnels";
@@ -1738,6 +1739,11 @@
       // Walking out of a shop puts you on the street in front of its door.
       g.px = SHOPS[from].doorX; g.facing = 1;
       g.ray.x = SHOPS[from].doorX - 60; g.ray.dir = 1;
+    } else if (from === "earthen" && to === "surface") {
+      // Coming out of the tunnel, they start at the top of the stone
+      // steps that climb out onto the terrace, not at the left edge.
+      g.px = SURFACE_STAIRS_X; g.facing = 1;
+      g.ray.x = SURFACE_STAIRS_X - 60; g.ray.dir = 1;
     } else if (enterRight) {
       g.px = room().w - 110; g.facing = -1;
       g.ray.x = room().w - 60; g.ray.dir = -1;
@@ -1748,10 +1754,15 @@
     resize();
     if (SHOPS[from] && to === "shopping") {
       g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
+    } else if (from === "earthen" && to === "surface") {
+      g.camX = 0;
     } else {
       g.camX = (from === "shopping" && to === "chamber") || enterRight ? Math.max(0, worldW() - g.w) : 0;
     }
   }
+  // Where you come out on the Surface: the top of the stone steps
+  // that climb out of the tunnel, not the left edge of the screen.
+  var SURFACE_STAIRS_X = 600;
   // The bed in the chamber (world x, in the 1672-wide room).
   // Walking up to it offers a sleep, and sleeping recovers her HP.
   var BED_X = 826, BED_RANGE = 180;
