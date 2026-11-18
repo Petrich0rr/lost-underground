@@ -27,7 +27,8 @@
     garden: { w: 1179, h: 393, frames: null, floor: 0.81, depth: 0.03 },
     cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
     quarry: { w: 2172, h: 724, frames: null, floor: 0.87, depth: 0.04 },
-    tunnels: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 }
+    tunnels: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
+    dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -97,6 +98,7 @@
   var cisternImg = loadImg("assets/bg-cistern.jpg");
   var quarryImg = loadImg("assets/bg-quarry.jpg");
   var tunnelsImg = loadImg("assets/bg-tunnels.jpg");
+  var dungeonImg = loadImg("assets/bg-dungeon.jpg");
   // The midair descent: Ray and Sylvia jumping down to the quarry,
   // holding hands. Shown full screen while they fall through the
   // secret passage under the arcade floor.
@@ -114,6 +116,7 @@
   ROOMS.cistern.frames = [cisternImg];
   ROOMS.quarry.frames = [quarryImg];
   ROOMS.tunnels.frames = [tunnelsImg];
+  ROOMS.dungeon.frames = [dungeonImg];
 
   var keys = { up: false, down: false, left: false, right: false, fast: false };
   var g = {
@@ -370,7 +373,8 @@
     garden: { left: "cistern" },
     cistern: { left: "shopping", right: "garden" },
     quarry: { left: "arcade", right: "tunnels" },
-    tunnels: { left: "quarry" }
+    tunnels: { left: "quarry", right: "dungeon" },
+    dungeon: { left: "tunnels" }
   };
   // The staircases that go up: the bar's stone stairs on the right
   // climb to the Forgotten subway, and the subway's wide stairs on
@@ -411,7 +415,9 @@
     if (g.room === "garden" && to === "cistern") return "Go back to the Flooded Cistern";
     if (g.room === "cistern" && to === "garden") return "Go to the Swamp Garden";
     if (to === "cistern") return "Go to the Flooded Cistern";
+    if (g.room === "dungeon" && to === "tunnels") return "Back to the Old Service Tunnels";
     if (to === "tunnels") return "Go to the Old Service Tunnels";
+    if (to === "dungeon") return "Go to the Ancient Dungeon";
     if (to === "quarry") return "Back to the Crystal Quarry";
     if (to === "arcade") return "Back to the arcade";
     if (to === "chamber") return "Enter your chamber";
@@ -498,7 +504,8 @@
     garden:   { x: 0.925, y: 0.455 },
     cistern:  { x: 0.70,  y: 0.60 },
     quarry:   { x: 0.13,  y: 0.78 },
-    tunnels:  { x: 0.50,  y: 0.80 }
+    tunnels:  { x: 0.50,  y: 0.80 },
+    dungeon:  { x: 0.86,  y: 0.76 }
   };
   var MAP_ROOM_NAMES = {
     chamber: "Silvia & Ray's Room",
@@ -512,7 +519,8 @@
     garden: "Swamp Garden",
     cistern: "Flooded Cistern",
     quarry: "Crystal Quarry",
-    tunnels: "Old Service Tunnels"
+    tunnels: "Old Service Tunnels",
+    dungeon: "Ancient Dungeon"
   };
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
