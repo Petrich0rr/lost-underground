@@ -49,11 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=67" forces a fresh download: the health hearts are pink
-  // heart images now, not canvas fills, so the fifth heart can never
-  // pick up the energy bar's color again. A browser that cached
-  // ?v=66 picks up the fix.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=67"; return img; }
+  // "?v=68" forces a fresh download: when her health or her energy
+  // runs out, Sylvia collapses, Ray carries her home, and Dr. Kian
+  // is waiting in the chamber before he walks out. A browser that
+  // cached ?v=67 picks up the rescue.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=68"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -69,6 +69,7 @@
   proposeSurpriseImgs = ["assets/propose-surprise-01.png", "assets/propose-surprise-02.png", "assets/propose-surprise-03.png"].map(loadImg);
   proposeYesImg = loadImg("assets/propose-yes.png");
   proposeEmbraceImg = loadImg("assets/propose-embrace.png");
+  var rescueImgs = ["assets/rescue-01.png", "assets/rescue-02.png", "assets/rescue-03.png", "assets/rescue-04.png", "assets/rescue-05.png", "assets/rescue-06.png", "assets/rescue-07.png", "assets/rescue-08.png"].map(loadImg);
   var sylviaStanceImg = loadImg("assets/sylvia-stance.png");
   var sylviaKickImg = loadImg("assets/sylvia-kick.png");
   var sylviaCrouchImg = loadImg("assets/sylvia-crouch.png");
@@ -454,6 +455,11 @@
     // happens once.
     proposal: { active: false, step: 0, t: 0 },
     proposed: false,
+    // The rescue: when her health or her energy runs out, Sylvia
+    // collapses and Ray carries her home. Dr. Kian is waiting in
+    // the chamber, says his piece, then walks out. phase is carry
+    // (the animation), kian (his lines), or leave (he walks out).
+    rescue: { active: false, phase: "carry", t: 0, line: 0, kianX: 900 },
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
     // Climbing out the chamber window, or up a staircase: Ray goes
@@ -755,6 +761,12 @@
     "Sleep is the best medicine I know. Your body heals while you rest. Do not skip it.",
     "One day we will all see the sun again. Until then, I will keep everyone healthy. That is my promise."
   ];
+  var KIAN_RESCUE_LINES = [
+    "Ray carried you all the way home. You were out cold, Sylvia.",
+    "You need rest. Real rest. No more pushing yourself until you drop.",
+    "Be careful down there. The dungeon does not forgive, and neither does exhaustion.",
+    "I will be going now. Sleep, eat something, and take it slow tomorrow."
+  ];
   function kianNear() { return g.room === g.kian.room && Math.abs(g.px - g.kian.x) < 150; }
   function kianTalkLine() {
     var first = !g.kianTalk.open;
@@ -885,6 +897,7 @@
   }
   function pressT() {
     if (g.proposal.active) { advanceProposal(); return; }
+    if (g.rescue.active) { advanceRescue(); return; }
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding) return;
     if (g.propRead.open) { closePropRead(); return; }
     if (g.talk.open) { talkLine(); return; }
@@ -1973,6 +1986,7 @@
     saveGame();
   }
   function tryEnter() {
+    if (g.rescue.active) { advanceRescue(); return; }
     if (g.embrace.active) return;
     if (g.proposal.active) { advanceProposal(); return; }
     if (g.sleeping) { wakeUp(); return; }
@@ -3091,6 +3105,7 @@
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
     if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
+    if (g.rescue.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
@@ -3110,6 +3125,145 @@
     g.proposal.active = false;
     g.proposed = true;
     saveGame();
+  }
+  function startRescue() {
+    if (g.rescue.active) return;
+    if (g.sleeping || g.proposal.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.kiss.active || g.embrace.active || g.mirror.active || g.map.active || g.photo.active) return;
+    if (g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
+    if (g.portal.active) return;
+    g.rescue.active = true;
+    g.rescue.phase = "carry";
+    g.rescue.t = 0;
+    g.rescue.line = 0;
+    if (g.scooter.riding) { g.scooter.riding = false; g.scooter.room = g.room; g.scooter.x = g.px; }
+  }
+  function updateRescue() {
+    if (!g.rescue.active) return;
+    g.rescue.t += 1;
+    if (g.rescue.phase === "carry") {
+      if (g.rescue.t >= 240) {
+        clearMonsters();
+        g.room = "chamber";
+        g.px = 950; g.facing = -1; g.depth = 0;
+        g.ray.x = 1020; g.ray.dir = -1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+        g.hp = g.hpMax; g.energy = g.energyMax; g.monsterHits = 0; g.hurtT = 0;
+        g.camX = 0;
+        g.rescue.phase = "kian";
+        g.rescue.t = 0;
+        g.rescue.line = 0;
+        g.rescue.kianX = 900;
+        saveGame();
+      }
+    } else if (g.rescue.phase === "leave") {
+      g.rescue.kianX -= 1.4;
+      if (g.rescue.kianX <= 40 || g.rescue.t > 300) endRescue();
+    }
+  }
+  function advanceRescue() {
+    if (!g.rescue.active) return;
+    if (g.rescue.phase === "carry") { g.rescue.t = 240; return; }
+    if (g.rescue.phase === "kian") {
+      g.rescue.line += 1;
+      g.rescue.t = 0;
+      if (g.rescue.line >= KIAN_RESCUE_LINES.length) {
+        g.rescue.phase = "leave";
+        g.rescue.t = 0;
+      }
+    }
+  }
+  function endRescue() {
+    g.rescue.active = false;
+    g.rescue.phase = "carry";
+    g.rescue.t = 0;
+    g.rescue.line = 0;
+    saveGame();
+  }
+  function drawRescue() {
+    ctx.fillStyle = "rgba(5,4,12,0.94)";
+    ctx.fillRect(0, 0, g.w, g.h);
+    var frame = rescueImgs[Math.floor(g.rescue.t / 15) % rescueImgs.length];
+    if (frame && frame.complete && frame.naturalWidth > 0) {
+      var h = g.h * 0.62;
+      var w = h * (frame.naturalWidth / frame.naturalHeight);
+      var cx = g.w / 2;
+      var feetY = groundY() + g.depth - 6;
+      shadow(cx, feetY, w);
+      ctx.drawImage(frame, cx - w / 2, feetY - h, w, h);
+    }
+    ctx.save();
+    ctx.font = "italic 17px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillText("Ray carries Sylvia home...", g.w / 2, g.h - 28);
+    ctx.restore();
+  }
+  function drawRescueKian() {
+    if (!g.rescue.active) return;
+    if (g.rescue.phase !== "kian" && g.rescue.phase !== "leave") return;
+    if (g.room !== "chamber") return;
+    var img = g.rescue.phase === "leave" ? kianWalkImgs[Math.floor(g.time / 12) % kianWalkImgs.length] : kianTalkImg;
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var h = rayH();
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var x = g.rescue.kianX * scale() - g.camX;
+    var feetY = groundY();
+    ctx.save();
+    if (g.rescue.phase === "leave") {
+      ctx.translate(x, feetY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -w / 2, -h, w, h);
+    } else {
+      ctx.drawImage(img, x - w / 2, feetY - h, w, h);
+    }
+    ctx.restore();
+  }
+  function drawRescueBubble() {
+    if (!g.rescue.active || g.rescue.phase !== "kian") return;
+    var line = KIAN_RESCUE_LINES[g.rescue.line];
+    if (!line) return;
+    var cx = g.w / 2;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    var nameW = ctx.measureText("DR. KIAN").width;
+    ctx.font = "16px 'Open Sans', sans-serif";
+    var lineW = ctx.measureText(line).width;
+    var maxW = Math.min(440, g.w - 60);
+    var bw = Math.min(maxW, Math.max(nameW, lineW)) + 36;
+    var bh = 24 + 22 + 18;
+    var bx = cx - bw / 2;
+    var by = 56;
+    ctx.fillStyle = "rgba(255,255,255,0.96)";
+    ctx.strokeStyle = "#d9c7ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, by + bh);
+    ctx.lineTo(cx + 10, by + bh);
+    ctx.lineTo(cx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#7a5fd0";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.fillText("DR. KIAN", cx, by + 20);
+    ctx.fillStyle = "#222";
+    ctx.font = "16px 'Open Sans', sans-serif";
+    // Wrap the line if it is wider than the bubble.
+    var words = line.split(" ");
+    var lines = [], cur = "";
+    for (var i = 0; i < words.length; i++) {
+      var test = cur ? cur + " " + words[i] : words[i];
+      if (ctx.measureText(test).width > bw - 36 && cur) { lines.push(cur); cur = words[i]; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], cx, by + 42 + j * 20);
+    ctx.restore();
   }
   function drawProposal() {
     // One picture per beat now: step 0 Ray kneels down, then holds
@@ -4685,6 +4839,7 @@
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); return; }
     if (g.proposal.active) { drawProposal(); return; }
+    if (g.rescue.active && g.rescue.phase === "carry") { drawRescue(); return; }
     if (g.scooter.riding) drawScooterRide();
     else drawRay();
     drawChar();
@@ -4712,6 +4867,8 @@
     drawYutoTalk();
     drawAdlerTalk();
     drawMikaTalk();
+    drawRescueKian();
+    drawRescueBubble();
     drawRayTalk();
     drawFountainMsg();
     drawChestMsg();
@@ -4918,6 +5075,13 @@
       draw();
       return;
     }
+    if (g.rescue.active) {
+      // The rescue: the carry animation, then Dr. Kian in the
+      // chamber, then he walks out. Nothing else moves until it ends.
+      updateRescue();
+      draw();
+      return;
+    }
     if (g.kiss.active) {
       g.kiss.t += 1;
       // Face each other and lean in until cheek to cheek.
@@ -4943,6 +5107,9 @@
     // 15 seconds, so a full bar lasts about 25 minutes. It does not
     // drain while she sleeps, or while a menu or cutscene holds her.
     if (!g.sleeping) g.energy = Math.max(0, g.energy - 1 / 900);
+    // Out of health or out of energy, she collapses and Ray carries
+    // her home. Either one reaching zero starts the rescue.
+    if ((g.hp <= 0 || g.energy <= 0) && !g.rescue.active) startRescue();
     // Out of energy she walks slower and cannot run (Space does
     // nothing). The scooter still goes its own speed.
     var tired = g.energy <= 0 && !g.scooter.riding;
@@ -5399,6 +5566,7 @@
       var moved = Math.max(Math.abs(e.clientX - pointerDownX), Math.abs(e.clientY - pointerDownY));
       if (dt < 250 && moved < 12) {
         if (g.proposal.active) { advanceProposal(); pointerDownAt = 0; return; }
+    if (g.rescue.active) { advanceRescue(); pointerDownAt = 0; return; }
         tryAttack();
       }
     }
