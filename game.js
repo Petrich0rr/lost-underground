@@ -49,12 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=74" forces a fresh download: the rescue is Sylvia fainting
-  // and Ray catching and carrying her, and a dungeon level only opens
-  // the way deeper once its monsters are all gone, which is also
-  // when X shows himself at the bottom. A browser that cached ?v=73
-  // picks up both.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=74"; return img; }
+  // "?v=75" forces a fresh download: when monsters are about, Ray
+  // runs ahead of Sylvia and fights them himself, right away, instead
+  // of waiting for her to attack. A browser that cached ?v=74 picks
+  // up the new bodyguard.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=75"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1187,7 +1186,19 @@
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
-  function fightTargetX() { return g.px + g.facing * 70; }
+  function fightTargetX() {
+    // When monsters are about, he runs at the nearest one, ahead of
+    // her, instead of a fixed point in front of her.
+    if (isDungeonRoom(g.room) && g.monsters.length > 0) {
+      var best = null, bestD = 1e9;
+      for (var i = 0; i < g.monsters.length; i++) {
+        var d = Math.abs(g.monsters[i].x - g.px);
+        if (d < bestD) { bestD = d; best = g.monsters[i]; }
+      }
+      if (best) return best.x;
+    }
+    return g.px + g.facing * 70;
+  }
   // Doors: the bar's left edge leads to the chamber. Each room's door
   // back is on the side you came in through. Going UP uses the stairs,
   // not the edge: walk to the staircase and press E to climb it.
@@ -5389,8 +5400,10 @@
       if (g.attack.t === 8) hitMonsters(g.px, g.facing, g.depth);
       if (g.attack.t >= 30) g.attack.active = false;
     }
-    // Ray: fights with Sylvia when she attacks, follows her when she
-    // gets far away (or into another room), wanders when they are close.
+    // Ray: when monsters are about he does not wait for her to
+    // attack, he runs ahead of her and fights them himself. Otherwise
+    // he fights with her when she attacks, follows her when she gets
+    // far away (or into another room), and wanders when they are close.
     var r = g.ray;
     if (g.scooter.riding) {
       // On the scooter together: he rides on the back, and the
@@ -5403,6 +5416,12 @@
     } else if (g.rayTalk.open) {
       // Talking to her: he stands still and faces her.
       r.dir = g.px < r.x ? -1 : 1;
+    } else if (!r.fight.active && isDungeonRoom(g.room) && g.monsters.length > 0 && !g.kiss.active && !g.embrace.active && !g.climb.active && !g.proposal.active && !g.rescue.active) {
+      // Monsters are about: he runs ahead of her and fights them
+      // himself, right away, and keeps going while any are left.
+      r.fight.active = true;
+      r.fight.t = 0;
+      r.pause = 0;
     } else if (r.fight.active) {
       r.fight.t += 1;
       // His punch lands mid-fight: monsters in front of him take a hit.
