@@ -42,15 +42,14 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=51" forces a fresh download after the white fringe
-  // cleanup, round 4. v=50 only eroded the four NPCs Erika
-  // cropped last time; Priya, Kian and Yuto had the same 1px
-  // opaque light-grey rim and were never touched, and Eve idle
-  // still had a light ring around the arm-torso gap. Same
-  // targeted erosion on all three plus Eve idle. White clothing
-  // (Kian's lab coat, Priya's sneakers) is untouched.
-  // A browser that cached ?v=50 picks up the new sprites.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=51"; return img; }
+  // "?v=52" forces a fresh download after the energy bar, day
+  // count and save system. Energy drains 1 point every 15 seconds
+  // while she is awake (about 25 minutes a bar) and refills on
+  // sleep; at zero she walks slower and cannot run. Waking up
+  // starts the next day. Progress autosaves to localStorage and
+  // the title screen offers Continue or New Game.
+  // A browser that cached ?v=51 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=52"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -385,6 +384,14 @@
     // little intro line for the new place.
     lastRoom: null,
     hp: 100, hpMax: 100,
+    // Energy: Sylvia's stamina for the day. It drains very slowly
+    // while she is awake (about 25 minutes to empty) and refills
+    // when she sleeps. At zero she walks slower and cannot run.
+    // day counts the mornings since she got lost down here; it
+    // goes up by one every time she wakes up. started stays false
+    // on the title screen, so the world waits until she picks
+    // Continue or New Game.
+    energy: 100, energyMax: 100, day: 1, started: false,
     // Dungeon monsters and coins: the monsters live only in the
     // Ancient Dungeon and are spawned fresh each time she enters it.
     // A monster drops 1 coin when it dies, picked up by walking over
@@ -1786,6 +1793,7 @@
     } else {
       g.camX = (from === "shopping" && to === "chamber") || enterRight ? Math.max(0, worldW() - g.w) : 0;
     }
+    saveGame();
   }
   // Where you come out on the Surface: the top of the stone steps
   // that climb out of the tunnel, not the left edge of the screen.
@@ -1804,7 +1812,13 @@
     g.ray.fight.active = false; g.ray.pause = 0;
     g.ray.x = BED_X + 30; g.ray.depth = g.depth; g.ray.inBed = true;
   }
-  function wakeUp() { g.sleeping = false; g.ray.inBed = false; }
+  function wakeUp() {
+    g.sleeping = false; g.ray.inBed = false;
+    // Waking up starts a new day, fully rested, and saves.
+    g.day += 1;
+    g.energy = g.energyMax;
+    saveGame();
+  }
   function tryEnter() {
     if (g.embrace.active) return;
     if (g.proposal.active) { advanceProposal(); return; }
@@ -1988,6 +2002,7 @@
     if (buy) { buy.disabled = true; buy.textContent = "Already yours"; }
     var note = document.getElementById("shopNote");
     if (note) note.textContent = "You own the pink scooter. It is parked outside on the street.";
+    saveGame();
   }
   // The wishing fountain in the Secret Garden. The fountain's
   // central column is at world x 1475 in the 2172-wide room (measured
@@ -2010,6 +2025,7 @@
     g.coinCount += FOUNTAIN_COINS;
     g.fountainMsg = "+5 coins! The garden heard your wish.";
     g.fountainMsgT = 180;
+    saveGame();
   }
   function drawFountainGlow() {
     // A soft golden shimmer over the fountain basin, so it is easy
@@ -2222,6 +2238,58 @@
   function sylviaH() { return g.h * (g.room === "chamber" ? 0.40 : 0.36); }
   function rayH() { return sylviaH() * 172 / 148; }
 
+  // Saving: the whole run lives in one localStorage slot, so the
+  // game remembers the day, her health and energy, her coins, where
+  // she is, the scooter, the fountain wish and the proposal. It
+  // saves on its own whenever she wakes up, changes rooms, buys the
+  // scooter, makes a wish, or finishes the proposal, so closing the
+  // tab never loses a day. NPCs wander on their own, so their spots
+  // are not saved; they start fresh where they belong.
+  var SAVE_KEY = "lostUndergroundSaveV1";
+  function saveGame() {
+    if (!g.started) return;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
+        room: g.room, px: g.px, depth: g.depth, facing: g.facing,
+        scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
+        fountainWished: g.fountainWished, proposed: g.proposed
+      }));
+    } catch (e) { /* storage unavailable: the game still plays */ }
+  }
+  function loadSave() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function clearSave() {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* no-op */ }
+  }
+  // Put a saved run back into the world: her spot, her day, her
+  // coins and the scooter, and Ray beside her. Monsters and loose
+  // coins are not saved; the dungeon spawns fresh when she enters.
+  function applySave(s) {
+    if (!s) return;
+    g.day = s.day || 1;
+    g.hp = (typeof s.hp === "number") ? s.hp : g.hpMax;
+    g.energy = (typeof s.energy === "number") ? s.energy : g.energyMax;
+    g.coinCount = s.coinCount || 0;
+    g.room = s.room || "chamber";
+    g.px = (typeof s.px === "number") ? s.px : 950;
+    g.depth = s.depth || 0;
+    g.facing = s.facing || 1;
+    g.ray.x = g.px + 70; g.ray.depth = g.depth; g.ray.dir = g.facing;
+    g.scooter.owned = !!s.scooterOwned;
+    g.scooter.room = s.scooterRoom || "shopping";
+    g.scooter.x = (typeof s.scooterX === "number") ? s.scooterX : SCOOTER_X;
+    g.fountainWished = !!s.fountainWished;
+    g.proposed = !!s.proposed;
+    g.monsters = []; g.coins = [];
+    g.lastRoom = null;
+    g.camX = 0;
+    resize();
+  }
   function resize() {
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var w = wrap.clientWidth;
@@ -2564,6 +2632,7 @@
   function endProposal() {
     g.proposal.active = false;
     g.proposed = true;
+    saveGame();
   }
   function drawProposal() {
     // Steps 0-2: the proposal art (Ray kneeling, Sylvia surprised),
@@ -3716,6 +3785,36 @@
     ctx.fillText(String(g.coinCount), 184, 27);
     ctx.restore();
   }
+  // Energy bar and day count, under the hearts. The bar is gold
+  // and drains slowly; when it is low it pulses to nudge her
+  // toward bed. The day sits at the top right.
+  function drawEnergyAndDay() {
+    ctx.save();
+    ctx.font = "700 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillText("EN", 14, 47);
+    var bx = 36, by = 38, bw = 140, bh = 10;
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 5);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill();
+    var frac = Math.max(0, Math.min(1, g.energy / g.energyMax));
+    var pulse = g.energy <= 20 ? 0.55 + 0.45 * Math.sin(g.time * 0.15) : 1;
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = g.energy <= 20 ? "#ff9e3e" : "#ffd23e";
+    if (frac > 0) {
+      if (ctx.roundRect) ctx.roundRect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2, 4);
+      else ctx.rect(bx + 1, by + 1, Math.max(2, (bw - 2) * frac), bh - 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("Day " + g.day, g.w - 14, 27);
+    ctx.restore();
+  }
   function drawStairPrompt() {
     if (g.kiss.active || g.talk.open || g.climb.active) return;
     var key = stairsNear();
@@ -3950,6 +4049,7 @@
     drawFountainGlow();
     drawGardenDoorGlow();
     drawHp();
+    drawEnergyAndDay();
     drawVickyPrompt();
     drawDoorPrompt();
     drawBedPrompt();
@@ -4002,6 +4102,9 @@
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
+    // The title screen: the world waits until she picks Continue
+    // or New Game. The chamber still draws behind it.
+    if (!g.started) { draw(); return; }
     // A new room means a new first impression: show the little
     // intro line for the place she just walked into.
     if (g.room !== g.lastRoom) { g.lastRoom = g.room; showRoomIntro(); }
@@ -4175,12 +4278,21 @@
       return;
     }
     if (g.sleeping) {
-      // Resting recovers her HP while the sleep gif plays.
+      // Resting recovers her HP and her energy while the sleep gif
+      // plays. Waking up tops her energy off and starts a new day.
       if (g.hp < g.hpMax) g.hp = Math.min(g.hpMax, g.hp + 0.5);
+      if (g.energy < g.energyMax) g.energy = Math.min(g.energyMax, g.energy + 0.5);
       // A movement key wakes her up, and then walks as normal.
       if (keys.left || keys.right || keys.up || keys.down) wakeUp();
     }
-    var speed = g.scooter.riding ? (keys.fast ? 10 : 7) : (keys.fast ? 4.4 : 2.2);
+    // Energy drains very slowly while she is awake: 1 point every
+    // 15 seconds, so a full bar lasts about 25 minutes. It does not
+    // drain while she sleeps, or while a menu or cutscene holds her.
+    if (!g.sleeping) g.energy = Math.max(0, g.energy - 1 / 900);
+    // Out of energy she walks slower and cannot run (Space does
+    // nothing). The scooter still goes its own speed.
+    var tired = g.energy <= 0 && !g.scooter.riding;
+    var speed = g.scooter.riding ? (keys.fast ? 10 : 7) : (tired ? 1.1 : (keys.fast ? 4.4 : 2.2));
     if (keys.left) { g.px -= speed; g.facing = -1; }
     if (keys.right) { g.px += speed; g.facing = 1; }
     if (keys.up) { g.depth -= speed * 0.5; }
@@ -4628,6 +4740,40 @@
   if (shopBuyBtn) shopBuyBtn.addEventListener("click", function (e) { e.stopPropagation(); buyScooter(); });
   var shopCloseBtn = document.getElementById("shopCloseBtn");
   if (shopCloseBtn) shopCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeShop(); });
+  // The title screen: Continue when a save exists, New Game always.
+  // The world waits behind it until she picks one.
+  var titleScreen = document.getElementById("titleScreen");
+  var continueBtn = document.getElementById("continueBtn");
+  var newGameBtn = document.getElementById("newGameBtn");
+  var saveInfo = document.getElementById("saveInfo");
+  function startGame() {
+    g.started = true;
+    if (titleScreen) titleScreen.hidden = true;
+    saveGame();
+  }
+  if (titleScreen) {
+    var existing = loadSave();
+    if (continueBtn) {
+      if (existing) {
+        continueBtn.hidden = false;
+        if (saveInfo) saveInfo.textContent = "Day " + (existing.day || 1) + " · " + (existing.coinCount || 0) + " coins" + (existing.proposed ? " · engaged" : "");
+      } else {
+        continueBtn.hidden = true;
+        if (saveInfo) saveInfo.textContent = "No saved game yet.";
+      }
+      continueBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var sv = loadSave();
+        if (sv) applySave(sv);
+        startGame();
+      });
+    }
+    if (newGameBtn) newGameBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      clearSave();
+      startGame();
+    });
+  }
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
