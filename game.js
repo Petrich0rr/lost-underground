@@ -42,11 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=58" forces a fresh download after the prop image display,
-  // the scooter coming home every morning, and the chests becoming
-  // a daily roll (0 to 2 per area, some days none). A browser that
-  // cached ?v=57 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=58"; return img; }
+  // "?v=59" forces a fresh download after the extra characters
+  // were re-cut and re-saved as clean transparent PNGs, so no white
+  // edge remains around them. A browser that cached ?v=58 picks up
+  // the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=59"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -4223,16 +4223,19 @@
       var cx = 44 + i * 24, cy = 22;
       drawHeart(cx, cy, 9, full ? "#ff5b8f" : half ? "#ff9ebb" : "rgba(255,255,255,0.25)");
     }
-    // Coins beside the hearts: a little gold coin and the count.
+    // Coins live on their own second row now, clear of the hearts:
+    // the gold coin used to sit right after the fifth heart and read
+    // as a yellow heart. It sits at x 70 so it clears the round map
+    // button at the top left.
     var coinImg = coinImgs[0];
     if (coinImg && coinImg.complete && coinImg.naturalWidth > 0) {
       var ch2 = 18;
       var cw2 = ch2 * (coinImg.naturalWidth / coinImg.naturalHeight);
-      ctx.drawImage(coinImg, 160, 13, cw2, ch2);
+      ctx.drawImage(coinImg, 70, 40, cw2, ch2);
     }
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "700 13px 'Open Sans', sans-serif";
-    ctx.fillText(String(g.coinCount), 184, 27);
+    ctx.fillText(String(g.coinCount), 94, 54);
     ctx.restore();
   }
   // Energy bar and day count. The bar sits beside the health bar
@@ -4245,8 +4248,9 @@
     ctx.font = "700 11px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
-    // The coin count ends around x 210, so the energy label starts
-    // just after it and the bar sits beside the hearts and coins.
+    // The energy label starts just after the hearts, and the bar
+    // sits beside them on the top row. The coin count lives on the
+    // second row now, clear of the hearts.
     ctx.fillText("E", 220, 27);
     var bx = 238, by = 14, bh = 16;
     var bw = Math.max(50, Math.min(100, g.w - 252));
