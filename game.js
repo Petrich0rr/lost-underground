@@ -42,11 +42,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=60" forces a fresh download after the white background
-  // pockets were cleared from Eve, Priya, Alexis and Diego hair
-  // and the fur gap. A browser that cached ?v=59 picks up the
-  // new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=60"; return img; }
+  // "?v=61" forces a fresh download: the coin is back beside the
+  // hearts, and the half heart is a saturated pink so it can never
+  // read as gold. A browser that cached ?v=60 picks up the fix.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=61"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -4221,21 +4220,20 @@
       var full = g.hp >= (i + 1) * 20;
       var half = !full && g.hp > i * 20;
       var cx = 44 + i * 24, cy = 22;
-      drawHeart(cx, cy, 9, full ? "#ff5b8f" : half ? "#ff9ebb" : "rgba(255,255,255,0.25)");
+      drawHeart(cx, cy, 9, full ? "#ff5b8f" : half ? "#ff4d8a" : "rgba(255,255,255,0.25)");
     }
-    // Coins live on their own second row now, clear of the hearts:
-    // the gold coin used to sit right after the fifth heart and read
-    // as a yellow heart. It sits at x 70 so it clears the round map
-    // button at the top left.
+    // Coins sit beside the hearts on the top row, small and set well
+    // apart from the fifth heart so the gold coin never reads as a
+    // yellow heart.
     var coinImg = coinImgs[0];
     if (coinImg && coinImg.complete && coinImg.naturalWidth > 0) {
-      var ch2 = 18;
+      var ch2 = 14;
       var cw2 = ch2 * (coinImg.naturalWidth / coinImg.naturalHeight);
-      ctx.drawImage(coinImg, 70, 40, cw2, ch2);
+      ctx.drawImage(coinImg, 175, 15, cw2, ch2);
     }
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "700 13px 'Open Sans', sans-serif";
-    ctx.fillText(String(g.coinCount), 94, 54);
+    ctx.fillText(String(g.coinCount), 194, 27);
     ctx.restore();
   }
   // Energy bar and day count. The bar sits beside the health bar
