@@ -49,11 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=77" forces a fresh download: the energy bar drains faster
-  // now, a full bar in about 10 minutes instead of 25, so it
-  // actually moves while she plays. A browser that cached ?v=76
-  // picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=77"; return img; }
+  // "?v=78" forces a fresh download: the wishing fountain gives 100
+  // coins, then offers one secret for 100 coins, one question, once
+  // ever. A browser that cached ?v=77 picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=78"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -467,6 +466,7 @@
     // hit. kissHealT is the cooldown before a kiss can heal again.
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
+    fountainSecret: null, secretOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
     dungeonMsg: "", dungeonMsgT: 0,
     chestLayout: [], chestDay: 1,
@@ -2129,7 +2129,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -2153,6 +2153,7 @@
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
       if (inspectNear()) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
       if (fountainNear() && !g.fountainWished) acts.push({ id: "fountain", label: "Make a wish", run: makeWish });
+      if (fountainNear() && g.fountainWished && !g.fountainSecret) acts.push({ id: "fountain", label: "Ask the fountain", run: makeWish });
       if (chestNear()) acts.push({ id: "chest", label: "Open the chest", run: openChest });
       if (gardenDoorNear()) acts.push({ id: "homedoor", label: "Go home", run: startHomeWalk });
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
@@ -2344,27 +2345,91 @@
   // wish: five gold coins rise from the fountain, one time only, to
   // help save for the $20 scooter. A soft golden shimmer marks it so
   // it is easy to find.
-  var FOUNTAIN_X = 1475, FOUNTAIN_RANGE = 110, FOUNTAIN_COINS = 5;
+  var FOUNTAIN_X = 1475, FOUNTAIN_RANGE = 110, FOUNTAIN_COINS = 100, SECRET_PRICE = 100;
   function fountainNear() {
     return g.room === "garden" && Math.abs(g.px - FOUNTAIN_X) < FOUNTAIN_RANGE;
   }
   function makeWish() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open) return;
-    if (g.fountainWished) {
-      g.fountainMsg = "Your wish already came true.";
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.secretOpen) return;
+    // First wish: the garden gives 100 coins. After that, the fountain
+    // offers one secret, for 100 coins, one question, once ever.
+    if (!g.fountainWished) {
+      g.fountainWished = true;
+      g.coinCount += FOUNTAIN_COINS;
+      g.fountainMsg = "+100 coins! The garden heard your wish.";
+      g.fountainMsgT = 180;
+      saveGame();
+      return;
+    }
+    if (g.fountainSecret) {
+      g.fountainMsg = "The fountain has told you its one secret.";
       g.fountainMsgT = 120;
       return;
     }
-    g.fountainWished = true;
-    g.coinCount += FOUNTAIN_COINS;
-    g.fountainMsg = "+5 coins! The garden heard your wish.";
-    g.fountainMsgT = 180;
+    openSecret();
+  }
+  // The fountain's one secret. Three questions, and it answers the one
+  // she picks, but only once ever. The fountain does not know their
+  // names, and its answers never use them.
+  var SECRET_QUESTIONS = {
+    why: "Why doesn't anyone try to go up?",
+    rumours: "Is it really bright and sunny up there?",
+    how: "How do we get out?"
+  };
+  var SECRET_ANSWERS = {
+    why: "Because the ones who tried never came back, and the ones who stayed told the story until it became a warning. The way up is long and dark, and fear is a heavier chain than any locked door.",
+    rumours: "Yes. The sky is wider than any room you have ever stood in, and the sun is warmer than any lamp. It is real. I have seen it in the dreams of the water.",
+    how: "Up. Past the subway, past the three Upper Levels, through the earthen tunnel, and out onto the terrace. The way is open. It is the courage that is locked, not the door."
+  };
+  function openSecret() {
+    g.secretOpen = true;
+    refreshSecretPanel();
+    var p = document.getElementById("secretPanel");
+    if (p) p.hidden = false;
+  }
+  function closeSecret() {
+    g.secretOpen = false;
+    var p = document.getElementById("secretPanel");
+    if (p) p.hidden = true;
+  }
+  function refreshSecretPanel() {
+    var q1 = document.getElementById("secretQ1");
+    var q2 = document.getElementById("secretQ2");
+    var q3 = document.getElementById("secretQ3");
+    var txt = document.getElementById("secretText");
+    var note = document.getElementById("secretNote");
+    var closeBtn = document.getElementById("secretCloseBtn");
+    var qs = document.getElementById("secretQuestions");
+    if (!q1 || !txt || !note || !closeBtn || !qs) return;
+    if (g.fountainSecret) {
+      // The one secret is spent: show the answer she picked.
+      qs.hidden = true;
+      txt.textContent = SECRET_ANSWERS[g.fountainSecret];
+      note.textContent = "";
+      closeBtn.textContent = "Close";
+      return;
+    }
+    qs.hidden = false;
+    txt.textContent = "It will answer one question, but only once ever. It asks 100 coins in return.";
+    var afford = g.coinCount >= SECRET_PRICE;
+    q1.disabled = !afford;
+    q2.disabled = !afford;
+    q3.disabled = !afford;
+    note.textContent = afford ? "You have " + g.coinCount + " coins." : "You have " + g.coinCount + " coins. You need 100.";
+    closeBtn.textContent = "Not now";
+  }
+  function askSecret(q) {
+    if (g.fountainSecret) return;
+    if (g.coinCount < SECRET_PRICE) return;
+    g.coinCount -= SECRET_PRICE;
+    g.fountainSecret = q;
+    refreshSecretPanel();
     saveGame();
   }
   function drawFountainGlow() {
     // A soft golden shimmer over the fountain basin, so it is easy
     // to find. It fades out once the wish is made.
-    if (g.room !== "garden" || g.fountainWished) return;
+    if (g.room !== "garden" || g.fountainSecret) return;
     var pulse = 0.20 + 0.12 * Math.sin(Date.now() / 500);
     var x = FOUNTAIN_X * scale() - g.camX;
     var y = groundY() - 6;
@@ -2382,14 +2447,14 @@
     ctx.restore();
   }
   function drawFountainPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding) return;
-    if (!fountainNear() || g.fountainWished) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding || g.secretOpen) return;
+    if (!fountainNear() || g.fountainSecret) return;
     var x = g.px * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to make a wish";
+    var label = g.fountainWished ? "Press E to ask the fountain" : "Press E to make a wish";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.beginPath();
@@ -2737,7 +2802,7 @@
       day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
       room: g.room, px: g.px, depth: g.depth, facing: g.facing,
       scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
-      fountainWished: g.fountainWished, proposed: g.proposed,
+      fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, proposed: g.proposed,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
       fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
@@ -2825,6 +2890,7 @@
     g.scooter.room = s.scooterRoom || "shopping";
     g.scooter.x = (typeof s.scooterX === "number") ? s.scooterX : SCOOTER_X;
     g.fountainWished = !!s.fountainWished;
+    g.fountainSecret = s.fountainSecret || null;
     if (s.chestDay === s.day && Array.isArray(s.chestLayout)) {
       g.chestDay = s.chestDay;
       g.chestLayout = s.chestLayout.slice();
@@ -3236,7 +3302,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
+    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
     if (g.rescue.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
@@ -5204,6 +5270,20 @@
       draw();
       return;
     }
+    if (g.secretOpen) {
+      // The fountain's secret panel is open: the panel is over the
+      // game. Nothing moves until she asks or walks away.
+      var eBtnSecret = document.getElementById("actionList");
+      if (eBtnSecret) eBtnSecret.hidden = true;
+      var aBtnSecret = document.getElementById("attackBtn");
+      if (aBtnSecret) aBtnSecret.hidden = true;
+      var sBtnSecret = document.getElementById("shopBtn");
+      if (sBtnSecret) sBtnSecret.hidden = true;
+      var fBtnSecret = document.getElementById("fashionBtn");
+      if (fBtnSecret) fBtnSecret.hidden = true;
+      draw();
+      return;
+    }
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
     if (g.ownerTalk.open) {
       var otk = g.ownerTalk.key;
@@ -5796,7 +5876,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.secretOpen) { closeSecret(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
@@ -5886,6 +5966,14 @@
   if (sleepConfirmBtn) sleepConfirmBtn.addEventListener("click", function (e) { e.stopPropagation(); confirmSleep(); });
   var sleepCancelBtn = document.getElementById("sleepCancelBtn");
   if (sleepCancelBtn) sleepCancelBtn.addEventListener("click", function (e) { e.stopPropagation(); closeSleepConfirm(); });
+  var secretQ1 = document.getElementById("secretQ1");
+  if (secretQ1) secretQ1.addEventListener("click", function (e) { e.stopPropagation(); askSecret("why"); });
+  var secretQ2 = document.getElementById("secretQ2");
+  if (secretQ2) secretQ2.addEventListener("click", function (e) { e.stopPropagation(); askSecret("rumours"); });
+  var secretQ3 = document.getElementById("secretQ3");
+  if (secretQ3) secretQ3.addEventListener("click", function (e) { e.stopPropagation(); askSecret("how"); });
+  var secretCloseBtn = document.getElementById("secretCloseBtn");
+  if (secretCloseBtn) secretCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeSecret(); });
   // The title screen: Continue when a save exists, New Game always.
   // The world waits behind it until she picks one.
   var titleScreen = document.getElementById("titleScreen");
