@@ -25,7 +25,7 @@
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
     arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
     cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
-    garden: { w: 2172, h: 724, frames: null, floor: 0.72, depth: 0.04 },
+    garden: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
     quarry: { w: 2172, h: 724, frames: null, floor: 0.87, depth: 0.04 },
     tunnels: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
     dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 },
@@ -40,11 +40,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=37" forces a fresh download after the monsters are made a
-  // bit smaller but jump much higher, and the iron door prompt now
-  // says Dungeon instead of iron door. A browser that cached ?v=36
-  // picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=37"; return img; }
+  // "?v=38" forces a fresh download after the Secret Garden floor
+  // is fixed: the walkway surface is at 0.76-0.80, but the floor was
+  // 0.72, so their feet were above the walkway and they floated.
+  // Floor 0.77, depth 0.02 puts their feet on the stone. A browser
+  // that cached ?v=37 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=38"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
