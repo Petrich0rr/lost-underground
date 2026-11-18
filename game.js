@@ -37,10 +37,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=4" forces a fresh download after the climb animation and
-  // Sylvia's new walk cycle, so a browser that cached the old
-  // sprites picks up the new ones.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=4"; return img; }
+  // "?v=5" forces a fresh download after the two-step arcade
+  // inspect, so a browser that cached the old auto-jump version
+  // under ?v=4 picks up the new hold-and-decide flow.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=5"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
