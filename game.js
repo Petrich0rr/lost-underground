@@ -39,10 +39,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=19" forces a fresh download after the glow and the light rim
-  // are removed entirely, so the characters no longer emit any light,
-  // so a browser that cached ?v=18 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=19"; return img; }
+  // "?v=20" forces a fresh download after the tunnels background is
+  // brightened so Ray no longer vanishes into the dark doorways, so a
+  // browser that cached ?v=19 picks up the new code and the new art.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=20"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
