@@ -39,10 +39,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=20" forces a fresh download after the tunnels background is
-  // brightened so Ray no longer vanishes into the dark doorways, so a
-  // browser that cached ?v=19 picks up the new code and the new art.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=20"; return img; }
+  // "?v=21" forces a fresh download after the off-screen culling
+  // checks are removed from the character draws, so Sylvia and Ray
+  // can no longer vanish when their computed screen position goes
+  // off-screen in the tunnels, so a browser that cached ?v=20 picks
+  // up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=21"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1542,7 +1544,6 @@
       var riw = rih * (riimg.naturalWidth / riimg.naturalHeight);
       var rifeet = groundY() + r.depth - 6;
       var rix = r.x * scale() - g.camX;
-      if (rix < -riw || rix > g.w + riw) return;
       shadow(rix, rifeet, riw);
       ctx.save();
       ctx.translate(rix, rifeet - rih / 2);
@@ -1563,7 +1564,6 @@
       var tw = th * (timg.naturalWidth / timg.naturalHeight);
       var tfeet = groundY() + r.depth - 6;
       var tx = r.x * scale() - g.camX;
-      if (tx < -tw || tx > g.w + tw) return;
       shadow(tx, tfeet, tw);
       ctx.save();
       ctx.translate(tx, tfeet - th / 2);
@@ -1586,7 +1586,6 @@
       var rw = rh * (rimg.naturalWidth / rimg.naturalHeight);
       var rfeet = groundY() + r.depth - 6 + g.climb.rayY;
       var rx = r.x * scale() - g.camX;
-      if (rx < -rw || rx > g.w + rw) return;
       shadow(rx, rfeet, rw);
       ctx.save();
       ctx.translate(rx, rfeet - rh / 2);
@@ -1616,7 +1615,6 @@
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + r.depth - 6;
     var x = r.x * scale() - g.camX;
-    if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
@@ -1647,7 +1645,6 @@
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + o.depth - 6;
     var x = o.x * scale() - g.camX;
-    if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
@@ -1674,7 +1671,6 @@
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + m.depth - 6;
     var x = m.x * scale() - g.camX;
-    if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
@@ -1701,7 +1697,6 @@
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + n.depth - 6;
     var x = n.x * scale() - g.camX;
-    if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
@@ -1735,7 +1730,6 @@
       var w = h * (img.naturalWidth / img.naturalHeight);
       var feetY = groundY() - 6;
       var x = k.x * scale() - g.camX;
-      if (x < -w || x > g.w + w) continue;
       shadow(x, feetY, w);
       ctx.save();
       ctx.translate(x, feetY - h / 2);
@@ -1758,7 +1752,6 @@
     var w = h * (embraceImg.naturalWidth / embraceImg.naturalHeight);
     var feetY = groundY() + g.depth - 6;
     var x = g.px * scale() - g.camX;
-    if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
