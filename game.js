@@ -42,11 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=57" forces a fresh download after Mika joins the game:
-  // a warm Filipina girl who lives in the Flooded Cistern and is
-  // mostly sitting down. A browser that cached ?v=56 picks up the
-  // new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=57"; return img; }
+  // "?v=58" forces a fresh download after the prop image display,
+  // the scooter coming home every morning, and the chests becoming
+  // a daily roll (0 to 2 per area, some days none). A browser that
+  // cached ?v=57 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=58"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -403,7 +403,7 @@
     // Reading a piece of junk on the floor: open while the little
     // bubble shows what it says. The papers can hint at the way up;
     // the rest is just trash down here.
-    propRead: { open: false, name: "", text: "", x: 0 },
+    propRead: { open: false, name: "", text: "", x: 0, img: "" },
     // The room she was in last tick, so a room change shows the
     // little intro line for the new place.
     lastRoom: null,
@@ -425,6 +425,7 @@
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
+    chestLayout: [], chestDay: 1,
     homeWalk: { active: false, t: 0 },
     // The proposal on the Surface: once, when they walk all the way
     // to the right edge of the outside, Ray proposes. proposal holds
@@ -1437,7 +1438,7 @@
   }
   function readProp(p) {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
-    g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x;
+    g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x; g.propRead.img = p.img ? p.img.src : "";
     // Crouch down to read it, the same as pressing I.
     g.inspect.active = true; g.inspect.phase = "look"; g.inspect.arch = null; g.inspect.t = 0;
     g.facing = g.px < p.x ? 1 : -1;
@@ -1530,10 +1531,20 @@
     document.getElementById("propPanelName").textContent = g.propRead.name.toUpperCase();
     document.getElementById("propPanelText").textContent = g.propRead.text;
     panel.hidden = false;
+    // The item itself, big, below the text box, so she sees what she
+    // is reading about.
+    var imgBox = document.getElementById("propImage");
+    var imgEl = document.getElementById("propImageImg");
+    if (imgBox && imgEl && g.propRead.img) {
+      imgEl.src = g.propRead.img;
+      imgBox.hidden = false;
+    }
   }
   function hidePropPanel() {
     var panel = document.getElementById("propPanel");
     if (panel) panel.hidden = true;
+    var imgBox = document.getElementById("propImage");
+    if (imgBox) imgBox.hidden = true;
   }
   function startInspect() {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding) return;
@@ -1880,9 +1891,16 @@
   }
   function wakeUp() {
     g.sleeping = false; g.ray.inBed = false;
-    // Waking up starts a new day, fully rested, and saves.
+    // Waking up starts a new day, fully rested, and saves. A new day
+    // means a fresh roll of treasure chests, and the scooter always
+    // comes home: every morning it is parked back at the Shopping
+    // District, its home spot, no matter where she left it.
     g.day += 1;
     g.energy = g.energyMax;
+    rollChests();
+    g.scooter.riding = false;
+    g.scooter.room = "shopping";
+    g.scooter.x = SCOOTER_X;
     saveGame();
   }
   function tryEnter() {
@@ -2232,29 +2250,58 @@
     ctx.fillText(g.fountainMsg, x, y);
     ctx.restore();
   }
-  // Treasure chests: inspect one and it opens, granting a random
-  // 3 to 20 gold coins, once each. 2 to 3 per room, in the Forgotten
-  // subway, the Crystal Quarry, the Secret Garden and the Old
-  // Service Tunnels.
+  // Treasure chests: every morning a fresh set appears, 0 to 2 per
+  // area, at random spots, so some days a place has none at all.
+  // Inspect one and it opens, granting a random 3 to 20 gold coins,
+  // once per chest per day. The spots below are the candidates; the
+  // ones with a chest today live in g.chestLayout.
   var CHEST_RANGE = 110;
-  var CHESTS = [
+  var CHEST_SPOTS = [
     { id: "subway-0", room: "subway", x: 450, d: 0.5 },
     { id: "subway-1", room: "subway", x: 850, d: 0.7 },
-    { id: "subway-2", room: "subway", x: 1450, d: 0.6 },
+    { id: "subway-2", room: "subway", x: 1150, d: 0.6 },
+    { id: "subway-3", room: "subway", x: 1450, d: 0.6 },
     { id: "quarry-0", room: "quarry", x: 500, d: 0.6 },
-    { id: "quarry-1", room: "quarry", x: 1600, d: 0.7 },
+    { id: "quarry-1", room: "quarry", x: 900, d: 0.5 },
+    { id: "quarry-2", room: "quarry", x: 1250, d: 0.7 },
+    { id: "quarry-3", room: "quarry", x: 1600, d: 0.7 },
     { id: "garden-0", room: "garden", x: 350, d: 0.6 },
-    { id: "garden-1", room: "garden", x: 1800, d: 0.5 },
+    { id: "garden-1", room: "garden", x: 700, d: 0.5 },
+    { id: "garden-2", room: "garden", x: 1000, d: 0.7 },
+    { id: "garden-3", room: "garden", x: 1800, d: 0.5 },
     { id: "tunnels-0", room: "tunnels", x: 200, d: 0.6 },
-    { id: "tunnels-1", room: "tunnels", x: 850, d: 0.5 },
-    { id: "tunnels-2", room: "tunnels", x: 1570, d: 0.8 }
+    { id: "tunnels-1", room: "tunnels", x: 450, d: 0.5 },
+    { id: "tunnels-2", room: "tunnels", x: 850, d: 0.5 },
+    { id: "tunnels-3", room: "tunnels", x: 1570, d: 0.8 }
   ];
+  function chestActive(c) {
+    // A chest spot only has a chest today if it is in today's layout.
+    return g.chestLayout.indexOf(c.id) !== -1;
+  }
+  function rollChests() {
+    // Roll today's chests: each of the four areas gets 0, 1 or 2,
+    // at random spots. Some days a place has none at all.
+    var layout = [];
+    var rooms = ["subway", "quarry", "garden", "tunnels"];
+    for (var r = 0; r < rooms.length; r++) {
+      var spots = CHEST_SPOTS.filter(function (c) { return c.room === rooms[r]; });
+      var n = Math.floor(Math.random() * 3); // 0, 1 or 2
+      for (var i = spots.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = spots[i]; spots[i] = spots[j]; spots[j] = tmp;
+      }
+      for (var k = 0; k < n; k++) layout.push(spots[k].id);
+    }
+    g.chestLayout = layout;
+    g.chestDay = g.day;
+    g.chestsOpened = {};
+  }
   function chestNear() {
     // Nearest unopened chest in this room, within range.
     var best = null, bestD = 1e9;
-    for (var i = 0; i < CHESTS.length; i++) {
-      var c = CHESTS[i];
-      if (c.room !== g.room || g.chestsOpened[c.id]) continue;
+    for (var i = 0; i < CHEST_SPOTS.length; i++) {
+      var c = CHEST_SPOTS[i];
+      if (c.room !== g.room || !chestActive(c) || g.chestsOpened[c.id]) continue;
       var dx = Math.abs(g.px - c.x);
       if (dx < CHEST_RANGE && dx < bestD) { best = c; bestD = dx; }
     }
@@ -2269,12 +2316,13 @@
     g.chestOpen = { id: c.id, t: 0 };
   }
   function drawChests() {
-    // Chests in this room. Unopened ones sit closed; the one opening
-    // cycles its frames; opened ones stay open with the coins showing.
+    // Chests in this room, today only. Unopened ones sit closed; the
+    // one opening cycles its frames; opened ones stay open with the
+    // coins showing.
     var dr = depthRange();
-    for (var i = 0; i < CHESTS.length; i++) {
-      var c = CHESTS[i];
-      if (c.room !== g.room) continue;
+    for (var i = 0; i < CHEST_SPOTS.length; i++) {
+      var c = CHEST_SPOTS[i];
+      if (c.room !== g.room || !chestActive(c)) continue;
       var img = chestImgs[0];
       if (g.chestsOpened[c.id]) img = chestImgs[3];
       else if (g.chestOpen && g.chestOpen.id === c.id) img = chestImgs[Math.min(3, Math.floor(g.chestOpen.t / 12))];
@@ -2289,9 +2337,9 @@
   function drawChestGlow() {
     // A soft golden shimmer under unopened chests, so they are easy
     // to find. It fades out once a chest is opened.
-    for (var i = 0; i < CHESTS.length; i++) {
-      var c = CHESTS[i];
-      if (c.room !== g.room || g.chestsOpened[c.id]) continue;
+    for (var i = 0; i < CHEST_SPOTS.length; i++) {
+      var c = CHEST_SPOTS[i];
+      if (c.room !== g.room || !chestActive(c) || g.chestsOpened[c.id]) continue;
       var pulse = 0.20 + 0.12 * Math.sin(Date.now() / 500 + i);
       var x = c.x * scale() - g.camX;
       var y = groundY() - depthRange() * (1 - c.d);
@@ -2517,6 +2565,7 @@
         scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
         fountainWished: g.fountainWished, proposed: g.proposed,
         chestsOpened: Object.keys(g.chestsOpened),
+        chestLayout: g.chestLayout, chestDay: g.chestDay,
         fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
       }));
     } catch (e) { /* storage unavailable: the game still plays */ }
@@ -2548,8 +2597,16 @@
     g.scooter.room = s.scooterRoom || "shopping";
     g.scooter.x = (typeof s.scooterX === "number") ? s.scooterX : SCOOTER_X;
     g.fountainWished = !!s.fountainWished;
-    g.chestsOpened = {};
-    (s.chestsOpened || []).forEach(function (id) { g.chestsOpened[id] = true; });
+    if (s.chestDay === s.day && Array.isArray(s.chestLayout)) {
+      g.chestDay = s.chestDay;
+      g.chestLayout = s.chestLayout.slice();
+      g.chestsOpened = {};
+      (s.chestsOpened || []).forEach(function (id) { g.chestsOpened[id] = true; });
+    } else {
+      // Old save without chest data, or the day moved on: roll a
+      // fresh set for today.
+      rollChests();
+    }
     g.proposed = !!s.proposed;
     if (s.fashion) {
       g.fashion.gownOwned = !!s.fashion.gownOwned;
@@ -5262,6 +5319,7 @@
     if (newGameBtn) newGameBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       clearSave();
+      rollChests();
       startGame();
     });
   }
