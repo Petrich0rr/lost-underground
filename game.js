@@ -42,12 +42,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=53" forces a fresh download after Char's fashion shop
-  // (the red gown and Ray's bandana), the energy bar moving
-  // beside the health bar, and the wardrobe that lets her wear
-  // what she buys. A browser that cached ?v=52 picks up the
-  // new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=53"; return img; }
+  // "?v=54" forces a fresh download after the sleep confirm, the
+  // mayor of the whole underground city (he does not know about
+  // the way out), and the energy label shortening to E. A browser
+  // that cached ?v=53 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=54"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -150,7 +149,7 @@
   var yutoTalkImg = loadImg("assets/yuto-talk.png");
   var yutoSurprisedImg = loadImg("assets/yuto-surprised.png");
   var yutoLaughImg = loadImg("assets/yuto-laugh.png");
-  // Mayor Adler, the politician who guards the bar. He looks evil
+  // Mayor Adler, the mayor of the whole underground city. He looks evil
   // but is actually a sweetheart who just does not know how to
   // speak. He is trying his best. He is constantly in the bar and
   // walks slow with his cane. Four walk frames (facing right), a
@@ -356,7 +355,7 @@
     // down to his next move; laughT and surprisedT are his talk
     // poses, like the others'.
     yuto: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, room: "shopping", roomT: 3000, laughT: 0, surprisedT: 0 },
-    // Mayor Adler, the politician who guards the bar. He looks evil
+    // Mayor Adler, the mayor of the whole underground city. He looks evil
     // but is actually a sweetheart who just does not know how to
     // speak. He is trying his best. He is constantly in the bar, so
     // he never changes rooms (no roomT); he just walks slow with his
@@ -432,6 +431,9 @@
     // animation frame. The shop is open while the shop panel shows.
     scooter: { owned: false, riding: false, x: 280, frame: 0, room: "shopping" },
     shopOpen: false,
+    // True while the sleep confirm panel shows: she has to say yes
+    // before sleeping, because sleeping moves to the next day.
+    sleepConfirmOpen: false,
     // Char's fashion shop: the Ruby Satin Evening Gown for Sylvia
     // and a black bandana for Ray, bought with gold coins in the
     // clothing store. Owned once bought; On while she is wearing
@@ -761,17 +763,17 @@
       g.yuto.surprisedT = 0;
     }
   }
-  // Mayor Adler, the politician who guards the bar. He looks evil
+  // Mayor Adler, the mayor of the whole underground city. He looks evil
   // but is actually a sweetheart who just does not know how to
   // speak. He is trying his best.
   var ADLER_LINES = [
     "Hmph. State your business, young lady. ...Ah. It is Sylvia, is it not? Yes. Well. Carry on, then.",
-    "I am the Mayor. I guard this bar. It is a very important job. Someone must do it. ...It is me. I do it.",
+    "I am the Mayor. Of the whole underground city. Every tunnel, every shop, every... bar stool. It is a very important job. Someone must do it. ...It is me. I do it.",
     "You look like trouble. Good trouble, I think. I am still deciding. Do not rush me.",
     "I did not smile at you. That was... a facial malfunction. Pay it no mind.",
-    "Ray tells me you two are looking for a way out. Hmph. The surface. I have heard of it. It sounds drafty.",
+    "I signed seventeen decrees this morning. Seventeen. ...I do not remember what they said. But they were signed. Officially.",
     "I gave a speech once. It lasted four hours. Nobody stayed. I consider it a success. I spoke very clearly.",
-    "If anyone bothers you in my bar, you tell me. I will... I will have strong words with them. Very strong. The strongest.",
+    "If anyone bothers you down here, you tell me. I will... I will have strong words with them. Very strong. The strongest.",
     "I am not evil. I have been told my face says otherwise. My face is wrong. I am working on it.",
     "Ahem. As Mayor, I officially declare you... welcome here. There. I said it. Do not make a fuss.",
     "My cane is not a weapon. It is a walking stick. ...Though it could be a weapon. If it had to be. It does not have to be. Please stop looking at it."
@@ -1836,7 +1838,7 @@
     if (g.propRead.open) { closePropRead(); return; }
     if (g.scooter.riding) { dismountScooter(); return; }
     if (photoNear()) { openPhoto(); return; }
-    if (bedNear()) { goToBed(); return; }
+    if (bedNear()) { openSleepConfirm(); return; }
     if (vanityNear()) { enterMirror(); return; }
     if (windowNear()) { climbOutWindow(); return; }
     if (stairsNear()) { climbStairs(); return; }
@@ -1891,7 +1893,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -1902,7 +1904,7 @@
     } else {
       addTalkActions(acts);
       if (photoNear()) acts.push({ id: "photo", label: "Look at the photo", run: openPhoto });
-      if (bedNear()) acts.push({ id: "bed", label: "Go to bed", run: goToBed });
+      if (bedNear()) acts.push({ id: "bed", label: "Go to bed", run: openSleepConfirm });
       if (vanityNear()) acts.push({ id: "mirror", label: "Look in the mirror", run: enterMirror });
       if (windowNear()) acts.push({ id: "window", label: "Climb out the window", run: climbOutWindow });
       var st = stairsNear();
@@ -2003,6 +2005,22 @@
     var panel = document.getElementById("shopPanel");
     if (panel) panel.hidden = true;
   }
+  // Sleeping asks first, because it moves to the next day. The panel
+  // names the day she will wake up on; saying yes puts her to bed.
+  function openSleepConfirm() {
+    if (g.sleepConfirmOpen) return;
+    g.sleepConfirmOpen = true;
+    var panel = document.getElementById("sleepPanel");
+    if (panel) panel.hidden = false;
+    var txt = document.getElementById("sleepText");
+    if (txt) txt.textContent = "You will wake up on Day " + (g.day + 1) + " with full health and energy.";
+  }
+  function closeSleepConfirm() {
+    g.sleepConfirmOpen = false;
+    var panel = document.getElementById("sleepPanel");
+    if (panel) panel.hidden = true;
+  }
+  function confirmSleep() { closeSleepConfirm(); goToBed(); }
   function buyScooter() {
     if (g.scooter.owned) return;
     if (g.coinCount < SCOOTER_PRICE) return;
@@ -2721,7 +2739,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen) return;
+    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
@@ -3258,7 +3276,7 @@
     ctx.restore();
   }
 
-  // Mayor Adler, the politician who guards the bar. He looks evil
+  // Mayor Adler, the mayor of the whole underground city. He looks evil
   // but is actually a sweetheart who just does not know how to
   // speak. He is trying his best. He is constantly in the bar. He
   // is a guy, so he is drawn at Ray's height. While talking he
@@ -3920,7 +3938,7 @@
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     // The coin count ends around x 210, so the energy label starts
     // just after it and the bar sits beside the hearts and coins.
-    ctx.fillText("EN", 220, 27);
+    ctx.fillText("E", 220, 27);
     var bx = 238, by = 14, bh = 16;
     var bw = Math.max(50, Math.min(100, g.w - 252));
     ctx.fillStyle = "rgba(0,0,0,0.45)";
@@ -4306,6 +4324,20 @@
       if (aBtnF) aBtnF.hidden = true;
       var fBtnF = document.getElementById("fashionBtn");
       if (fBtnF) fBtnF.hidden = true;
+      draw();
+      return;
+    }
+    if (g.sleepConfirmOpen) {
+      // The sleep confirm is open: the panel is over the game.
+      // Nothing moves until she says yes or not yet.
+      var eBtnSleep = document.getElementById("actionList");
+      if (eBtnSleep) eBtnSleep.hidden = true;
+      var aBtnSleep = document.getElementById("attackBtn");
+      if (aBtnSleep) aBtnSleep.hidden = true;
+      var sBtnSleep = document.getElementById("shopBtn");
+      if (sBtnSleep) sBtnSleep.hidden = true;
+      var fBtnSleep = document.getElementById("fashionBtn");
+      if (fBtnSleep) fBtnSleep.hidden = true;
       draw();
       return;
     }
@@ -4809,7 +4841,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
@@ -4894,6 +4926,10 @@
   if (fashionBandanaBtn) fashionBandanaBtn.addEventListener("click", function (e) { e.stopPropagation(); fashionAction("bandana"); });
   var fashionCloseBtn = document.getElementById("fashionCloseBtn");
   if (fashionCloseBtn) fashionCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeFashion(); });
+  var sleepConfirmBtn = document.getElementById("sleepConfirmBtn");
+  if (sleepConfirmBtn) sleepConfirmBtn.addEventListener("click", function (e) { e.stopPropagation(); confirmSleep(); });
+  var sleepCancelBtn = document.getElementById("sleepCancelBtn");
+  if (sleepCancelBtn) sleepCancelBtn.addEventListener("click", function (e) { e.stopPropagation(); closeSleepConfirm(); });
   // The title screen: Continue when a save exists, New Game always.
   // The world waits behind it until she picks one.
   var titleScreen = document.getElementById("titleScreen");
