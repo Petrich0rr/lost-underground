@@ -49,11 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=72" forces a fresh download: X the hooded stranger waits
-  // at the bottom of the dungeon, and each dungeon level has its own
-  // monster with its own toughness, damage and coin reward. A browser
-  // that cached ?v=71 picks up both.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=72"; return img; }
+  // "?v=73" forces a fresh download: the proposal's first beat is
+  // a smooth six-frame kneel-down now, Ray slowly getting down on one
+  // knee before he holds out the ring. A browser that cached ?v=72
+  // picks up the new sequence.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=73"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -64,8 +64,7 @@
   var rayWalkImgs = RAY_WALK.map(loadImg);
   var rayIdleImg = loadImg(RAY_IDLE_SRC);
   var kissImg = loadImg("assets/kiss.png");
-  var proposeStandImg = loadImg("assets/propose-stand.png");
-  var proposeKneelImg = loadImg("assets/propose-kneel.png");
+  var proposeKneelImgs = ["assets/propose-kneel-01.png", "assets/propose-kneel-02.png", "assets/propose-kneel-03.png", "assets/propose-kneel-04.png", "assets/propose-kneel-05.png", "assets/propose-kneel-06.png"].map(loadImg);
   proposeAskImg = loadImg("assets/propose-ask.png");
   proposeSurpriseImgs = ["assets/propose-surprise-01.png", "assets/propose-surprise-02.png", "assets/propose-surprise-03.png"].map(loadImg);
   proposeYesImg = loadImg("assets/propose-yes.png");
@@ -3205,7 +3204,7 @@
   }
   function advanceProposal() {
     if (!g.proposal.active) return;
-    if (g.proposal.step === 0 && g.proposal.t < 50) { g.proposal.t = 50; return; }
+    if (g.proposal.step === 0 && g.proposal.t < 90) { g.proposal.t = 90; return; }
     g.proposal.step += 1;
     g.proposal.t = 0;
     if (g.proposal.step > 3) endProposal();
@@ -3355,17 +3354,18 @@
     ctx.restore();
   }
   function drawProposal() {
-    // One picture per beat now: step 0 Ray stands, then gets down,
-    // then holds out the ring (silent until the ring is out); step 1
-    // Sylvia's surprised reaction cycles;
+    // One picture per beat now: step 0 Ray slowly gets down on one
+    // knee over six frames, then holds out the ring (silent until the
+    // ring is out); step 1 Sylvia's surprised reaction cycles;
     // step 2 they stand together happy, step 3 the embrace, with
     // hearts above it.
     var feetY = groundY() + g.depth - 6;
     var cx = g.w / 2;
     if (g.proposal.step === 0) {
-      // Ray stands, then gets down on one knee, then holds out the
-      // ring and stays there. He does not talk until the ring is out.
-      var frame = g.proposal.t < 25 ? proposeStandImg : g.proposal.t < 50 ? proposeKneelImg : proposeAskImg;
+      // Ray slowly gets down on one knee, one smooth frame at a time,
+      // then holds out the ring and stays there. He does not talk
+      // until the ring is out.
+      var frame = g.proposal.t < 90 ? proposeKneelImgs[Math.min(5, Math.floor(g.proposal.t / 15))] : proposeAskImg;
       if (frame && frame.complete && frame.naturalWidth > 0) {
         var h = g.h * 0.62;
         var w = h * (frame.naturalWidth / frame.naturalHeight);
@@ -3401,9 +3401,9 @@
       drawHeart(cx, hy - 22, 12 + Math.sin(g.proposal.t * 0.2 + 2) * 2, "#ff5c8a");
     }
     // The line, in a white bubble at the top, like the talk bubbles.
-    // He does not talk while he is standing and getting down, so the
-    // bubble stays hidden until the ring is out (step 0, t >= 50).
-    if (g.proposal.step === 0 && g.proposal.t < 50) return;
+    // He does not talk while he is getting down, so the bubble stays
+    // hidden until the ring is out (step 0, t >= 90).
+    if (g.proposal.step === 0 && g.proposal.t < 90) return;
     var step = PROPOSAL_LINES[g.proposal.step];
     ctx.save();
     ctx.textAlign = "center";
