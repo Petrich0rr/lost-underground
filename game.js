@@ -49,11 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=75" forces a fresh download: when monsters are about, Ray
-  // runs ahead of Sylvia and fights them himself, right away, instead
-  // of waiting for her to attack. A browser that cached ?v=74 picks
-  // up the new bodyguard.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=75"; return img; }
+  // "?v=76" forces a fresh download: X never uses their names, and
+  // when he shows himself at the bottom both of them turn and face
+  // him, shocked. A browser that cached ?v=75 picks up both.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=76"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -878,7 +877,7 @@
     "Do not trust the quiet down here. The quiet is where the old things listen.",
     "You carry the sun in your pocket and you do not know it yet. Keep walking up.",
     "The mayor does not know I am here. Nobody knows I am here. That is how I like it.",
-    "Ray. You look at her like she is the way out. She is. But the way out is not a door.",
+    "You look at her like she is the way out. She is. But the way out is not a door.",
     "I know every secret this city keeps. Ask me one. I may answer. I may not.",
     "Age? I stopped counting when the first tunnel collapsed. That was a long time ago.",
     "When you reach the top, do not look back. The dark follows those who hesitate."
@@ -5738,12 +5737,16 @@
       }
     }
     if (g.strangerTalk.open) st.dir = g.px < st.x ? -1 : 1; // face Sylvia
-    // The first time Sylvia gets close to X, she is surprised: nobody
-    // has ever seen him before. (Ray has no surprised pose, so he just
-    // stands there.)
-    if (!g.xSeen && g.room === "dungeon4" && dungeonCleared() && Math.abs(g.px - st.x) < 300) {
+    // The first time the Court is cleared and X shows himself, they
+    // are both shocked and turn to face the direction he is in. Sylvia
+    // shows her surprised pose. Ray has no surprised pose, so he turns
+    // and stands still facing him.
+    if (!g.xSeen && g.room === "dungeon4" && dungeonCleared()) {
       g.xSeen = true;
       g.sylviaSurprisedT = 90;
+      g.facing = g.px < st.x ? 1 : -1;
+      g.ray.dir = st.x < g.ray.x ? -1 : 1;
+      g.ray.pause = 90;
     }
     if (g.sylviaSurprisedT > 0) g.sylviaSurprisedT -= 1;
     // When she is standing still and he wanders up right behind
