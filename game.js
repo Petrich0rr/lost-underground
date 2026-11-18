@@ -24,11 +24,13 @@
     clothing: { w: 1983, h: 793, frames: null, floor: 0.80, depth: 0.05 },
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
     arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
-    garden: { w: 1179, h: 393, frames: null, floor: 0.81, depth: 0.03 },
     cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 },
     quarry: { w: 2172, h: 724, frames: null, floor: 0.87, depth: 0.04 },
     tunnels: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.04 },
-    dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 }
+    dungeon: { w: 2172, h: 724, frames: null, floor: 0.84, depth: 0.04 },
+    upper1: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
+    upper2: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 },
+    upper3: { w: 2172, h: 724, frames: null, floor: 0.82, depth: 0.03 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -37,10 +39,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=8" forces a fresh download after the reply options move
-  // around Sylvia's head and change every time, so a browser that
-  // cached ?v=7 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=8"; return img; }
+  // "?v=9" forces a fresh download after the Upper Levels replace
+  // the garden and the map becomes a jump-to-room shortcut, so a
+  // browser that cached ?v=8 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=9"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -96,11 +98,13 @@
   var clothingImg = loadImg("assets/shop-clothing.jpg");
   var salonImg = loadImg("assets/shop-salon.jpg");
   var arcadeImg = loadImg("assets/shop-arcade.jpg");
-  var gardenImg = loadImg("assets/bg-garden.jpg");
   var cisternImg = loadImg("assets/bg-cistern.jpg");
   var quarryImg = loadImg("assets/bg-quarry.jpg");
   var tunnelsImg = loadImg("assets/bg-tunnels.jpg");
   var dungeonImg = loadImg("assets/bg-dungeon.jpg");
+  var upper1Img = loadImg("assets/bg-upper1.jpg");
+  var upper2Img = loadImg("assets/bg-upper2.jpg");
+  var upper3Img = loadImg("assets/bg-upper3.jpg");
   // The midair descent: Ray and Sylvia jumping down to the quarry,
   // holding hands. Shown full screen while they fall through the
   // secret passage under the arcade floor.
@@ -118,11 +122,13 @@
   ROOMS.clothing.frames = [clothingImg];
   ROOMS.salon.frames = [salonImg];
   ROOMS.arcade.frames = [arcadeImg];
-  ROOMS.garden.frames = [gardenImg];
   ROOMS.cistern.frames = [cisternImg];
   ROOMS.quarry.frames = [quarryImg];
   ROOMS.tunnels.frames = [tunnelsImg];
   ROOMS.dungeon.frames = [dungeonImg];
+  ROOMS.upper1.frames = [upper1Img];
+  ROOMS.upper2.frames = [upper2Img];
+  ROOMS.upper3.frames = [upper3Img];
 
   var keys = { up: false, down: false, left: false, right: false, fast: false };
   var g = {
@@ -244,7 +250,7 @@
     "The canal floods the lower gears twice a year. I have the waders ready.",
     "The stairs up? I oiled the hinges myself. They will hold.",
     "Vicky's bar runs on my repairs. She pays me in pie. Fair trade.",
-    "The garden above the subway? Beautiful place. The waterfall keeps my gears wet, but I cannot complain.",
+    "The Upper Levels above the subway? Beautiful place. The stairs keep my gears busy, but I cannot complain.",
     "The arcade machines break more than anything else down here. The kids play hard."
   ];
   function ownerLines(key) {
@@ -527,19 +533,25 @@
     clothing: { left: "shopping" },
     salon: { left: "shopping" },
     arcade: { left: "shopping" },
-    garden: { left: "cistern" },
-    cistern: { left: "shopping", right: "garden" },
+    cistern: { left: "shopping" },
     quarry: { left: "arcade", right: "tunnels" },
     tunnels: { left: "quarry" },
-    dungeon: { left: "tunnels" }
+    dungeon: { left: "tunnels" },
+    upper1: { left: "subway" },
+    upper2: { left: "upper1" },
+    upper3: { left: "upper2" }
   };
   // The staircases that go up: the bar's stone stairs on the right
-  // climb to the Forgotten subway, and the subway's wide stairs on
-  // the right climb to the garden. Walk to the foot of the stairs
-  // and press E, and they climb up together.
+  // climb to the Forgotten subway, the subway's wide stairs on the
+  // right climb to Upper Level 1, and each Upper Level's stairs on
+  // the right climb to the next one up. Walk to the foot of the
+  // stairs and press E, and they climb up together. To come back
+  // down, walk to the left edge of an Upper Level.
   var STAIRS = {
     bar: { baseX: 1070, topX: 1150, to: "subway", label: "Go up the stairs to the Forgotten subway", btn: "Up the stairs" },
-    subway: { baseX: 1980, topX: 2120, to: "garden", label: "Go up the stairs to the garden", btn: "Up the stairs" }
+    subway: { baseX: 1980, topX: 2120, to: "upper1", label: "Go up the stairs to Upper Level 1", btn: "Up the stairs" },
+    upper1: { baseX: 1900, topX: 2100, to: "upper2", label: "Go up the stairs to Upper Level 2", btn: "Up the stairs" },
+    upper2: { baseX: 1900, topX: 2100, to: "upper3", label: "Go up the stairs to Upper Level 3", btn: "Up the stairs" }
   };
   var STAIR_RANGE = 90;
   function stairsNear() {
@@ -569,8 +581,9 @@
   function doorLabel() {
     var to = EXITS[g.room][doorSide()];
     if (g.room === "shopping" && to === "chamber") return "Climb back in the window";
-    if (g.room === "garden" && to === "cistern") return "Go back to the Flooded Cistern";
-    if (g.room === "cistern" && to === "garden") return "Go to the Swamp Garden";
+    if (g.room === "upper1" && to === "subway") return "Go back down to the Forgotten subway";
+    if (g.room === "upper2" && to === "upper1") return "Go back down to Upper Level 1";
+    if (g.room === "upper3" && to === "upper2") return "Go back down to Upper Level 2";
     if (to === "cistern") return "Go to the Flooded Cistern";
     if (g.room === "dungeon" && to === "tunnels") return "Back to the Old Service Tunnels";
     if (to === "tunnels") return "Go to the Old Service Tunnels";
@@ -657,11 +670,13 @@
     salon:    { x: 0.49,  y: 0.57 },
     arcade:   { x: 0.55,  y: 0.60 },
     subway:   { x: 0.18,  y: 0.385 },
-    garden:   { x: 0.925, y: 0.455 },
     cistern:  { x: 0.70,  y: 0.60 },
     quarry:   { x: 0.13,  y: 0.78 },
     tunnels:  { x: 0.50,  y: 0.80 },
-    dungeon:  { x: 0.86,  y: 0.76 }
+    dungeon:  { x: 0.86,  y: 0.76 },
+    upper1:   { x: 0.42,  y: 0.28 },
+    upper2:   { x: 0.52,  y: 0.22 },
+    upper3:   { x: 0.62,  y: 0.16 }
   };
   var MAP_ROOM_NAMES = {
     chamber: "Silvia & Ray's Room",
@@ -672,11 +687,13 @@
     salon: "The Style Studio",
     arcade: "The Arcade",
     subway: "Forgotten Subway Platform",
-    garden: "Swamp Garden",
     cistern: "Flooded Cistern",
     quarry: "Crystal Quarry",
     tunnels: "Old Service Tunnels",
-    dungeon: "Ancient Dungeon"
+    dungeon: "Ancient Dungeon",
+    upper1: "Upper Level 1",
+    upper2: "Upper Level 2",
+    upper3: "Upper Level 3"
   };
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
@@ -695,6 +712,36 @@
     g.map.active = false;
     var pop = document.getElementById("mapPopup");
     if (pop) pop.hidden = true;
+  }
+  // Dev shortcut: jump straight to a room from the world map. Tap
+  // anywhere on the map and they go to the room nearest that spot.
+  // For developing and testing, so she can hop around without
+  // walking the whole route every time.
+  function teleportToRoom(roomKey) {
+    if (!ROOMS[roomKey]) return;
+    closeMap();
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.rayTalk.open = false;
+    g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
+    g.climb.active = false; g.portal.active = false; g.kiss.active = false;
+    g.embrace.active = false; g.sleeping = false; g.ray.inBed = false;
+    g.room = roomKey;
+    g.px = 110; g.facing = 1; g.depth = 0;
+    g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    g.camX = 0;
+  }
+  function mapJump(e) {
+    var wrap = document.getElementById("mapWrap");
+    if (!wrap) return;
+    var r = wrap.getBoundingClientRect();
+    var fx = (e.clientX - r.left) / r.width;
+    var fy = (e.clientY - r.top) / r.height;
+    var best = null, bestD = Infinity;
+    for (var k in MAP_PINS) {
+      var p = MAP_PINS[k];
+      var d = (p.x - fx) * (p.x - fx) + (p.y - fy) * (p.y - fy);
+      if (d < bestD) { bestD = d; best = k; }
+    }
+    if (best) teleportToRoom(best);
   }
   // The secret under the arcade floor: three dark arches in the
   // floor are hidden passages down to the Crystal Quarry. Walk over
@@ -2366,6 +2413,8 @@
   if (mapBtn) mapBtn.addEventListener("click", function (e) { e.stopPropagation(); openMap(); });
   var mapPopup = document.getElementById("mapPopup");
   if (mapPopup) mapPopup.addEventListener("click", function (e) { e.stopPropagation(); closeMap(); });
+  var mapWrap = document.getElementById("mapWrap");
+  if (mapWrap) mapWrap.addEventListener("click", function (e) { e.stopPropagation(); mapJump(e); });
   canvas.addEventListener("pointercancel", pointerEnd);
   canvas.addEventListener("pointerleave", pointerEnd);
 })();
