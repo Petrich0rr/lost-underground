@@ -24,7 +24,8 @@
     clothing: { w: 1983, h: 793, frames: null, floor: 0.80, depth: 0.05 },
     salon: { w: 1774, h: 887, frames: null, floor: 0.78, depth: 0.05 },
     arcade: { w: 2172, h: 724, frames: null, floor: 0.83, depth: 0.05 },
-    garden: { w: 1179, h: 393, frames: null, floor: 0.81, depth: 0.03 }
+    garden: { w: 1179, h: 393, frames: null, floor: 0.81, depth: 0.03 },
+    cistern: { w: 2172, h: 724, frames: null, floor: 0.77, depth: 0.02 }
   };
   function room() { return ROOMS[g.room]; }
   var SYLVIA_WALK = ["assets/sylvia-walk-01.png", "assets/sylvia-walk-02.png", "assets/sylvia-walk-03.png", "assets/sylvia-walk-04.png", "assets/sylvia-walk-05.png", "assets/sylvia-walk-06.png", "assets/sylvia-walk-07.png", "assets/sylvia-walk-08.png"];
@@ -91,6 +92,7 @@
   var salonImg = loadImg("assets/shop-salon.jpg");
   var arcadeImg = loadImg("assets/shop-arcade.jpg");
   var gardenImg = loadImg("assets/bg-garden.jpg");
+  var cisternImg = loadImg("assets/bg-cistern.jpg");
   ROOMS.bar.frames = bgImgs;
   ROOMS.chamber.frames = [chamberImg];
   ROOMS.subway.frames = [subwayImg];
@@ -100,6 +102,7 @@
   ROOMS.salon.frames = [salonImg];
   ROOMS.arcade.frames = [arcadeImg];
   ROOMS.garden.frames = [gardenImg];
+  ROOMS.cistern.frames = [cisternImg];
 
   var keys = { up: false, down: false, left: false, right: false, fast: false };
   var g = {
@@ -347,12 +350,13 @@
     bar: { left: "chamber" },
     chamber: { right: "bar" },
     subway: { left: "bar" },
-    shopping: { left: "chamber" },
+    shopping: { left: "chamber", right: "cistern" },
     repair: { left: "shopping" },
     clothing: { left: "shopping" },
     salon: { left: "shopping" },
     arcade: { left: "shopping" },
-    garden: { left: "subway" }
+    garden: { left: "cistern" },
+    cistern: { left: "shopping", right: "garden" }
   };
   // The staircases that go up: the bar's stone stairs on the right
   // climb to the Forgotten subway, and the subway's wide stairs on
@@ -390,10 +394,11 @@
   function doorLabel() {
     var to = EXITS[g.room][doorSide()];
     if (g.room === "shopping" && to === "chamber") return "Climb back in the window";
-    if (g.room === "garden" && to === "subway") return "Go back down to the subway";
+    if (g.room === "garden" && to === "cistern") return "Go back to the Flooded Cistern";
+    if (g.room === "cistern" && to === "garden") return "Go to the Swamp Garden";
+    if (to === "cistern") return "Go to the Flooded Cistern";
     if (to === "chamber") return "Enter your chamber";
     if (to === "subway") return "Go up to the Forgotten subway";
-    if (to === "garden") return "Go up to the garden";
     if (to === "shopping") return "Back to the street";
     return "Back to the bar";
   }
@@ -473,7 +478,8 @@
     salon:    { x: 0.49,  y: 0.57 },
     arcade:   { x: 0.55,  y: 0.60 },
     subway:   { x: 0.18,  y: 0.385 },
-    garden:   { x: 0.925, y: 0.455 }
+    garden:   { x: 0.925, y: 0.455 },
+    cistern:  { x: 0.70,  y: 0.60 }
   };
   var MAP_ROOM_NAMES = {
     chamber: "Silvia & Ray's Room",
@@ -484,7 +490,8 @@
     salon: "The Style Studio",
     arcade: "The Arcade",
     subway: "Forgotten Subway Platform",
-    garden: "Swamp Garden"
+    garden: "Swamp Garden",
+    cistern: "Flooded Cistern"
   };
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
