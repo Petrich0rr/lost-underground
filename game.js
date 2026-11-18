@@ -560,7 +560,9 @@
     var ax = inspectArch();
     if (ax === null) return;
     var x = ax * scale() - g.camX;
-    var y = groundY() - sylviaH() - 34;
+    // The prompt sits down at the floor, right over the dark arch,
+    // not up above her head, so it points at the spot to inspect.
+    var y = groundY() + 30;
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
