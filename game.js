@@ -37,9 +37,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=7" forces a fresh download after the Ray talk crash fix,
-  // so a browser that cached ?v=6 picks up the working code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=7"; return img; }
+  // "?v=8" forces a fresh download after the reply options move
+  // around Sylvia's head and change every time, so a browser that
+  // cached ?v=7 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=8"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -154,7 +155,7 @@
     // Talking to Ray: open while the conversation runs. step 0 is
     // Ray's opening line (Sylvia's turn to pick a reply), step 1 is
     // Sylvia's line showing, step 2 is Ray's reply showing.
-    rayTalk: { open: false, step: 0, rayIdx: -1, choice: -1, sylIdx: -1, replyIdx: -1 },
+    rayTalk: { open: false, step: 0, rayIdx: -1, choice: -1, sylIdx: -1, replyIdx: -1, choiceLines: [-1, -1, -1, -1] },
     hp: 100, hpMax: 100,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
@@ -486,15 +487,19 @@
     do { idx = Math.floor(Math.random() * RAY_LINES.length); }
     while (RAY_LINES.length > 1 && idx === g.rayTalk.rayIdx);
     g.rayTalk.rayIdx = idx; g.rayTalk.open = true; g.rayTalk.step = 0; g.rayTalk.choice = -1;
+    // Fresh reply options every time: one random line from each
+    // tone, shown on the four buttons around Sylvia's head.
+    for (var ci = 0; ci < SYLVIA_CHOICES.length; ci++) {
+      g.rayTalk.choiceLines[ci] = Math.floor(Math.random() * SYLVIA_CHOICES[ci].lines.length);
+    }
     g.ray.dir = g.px < g.ray.x ? -1 : 1; // face Sylvia
   }
   function pickRayChoice(i) {
     if (!g.rayTalk.open || g.rayTalk.step !== 0) return;
     if (i < 0 || i >= SYLVIA_CHOICES.length) return;
-    var sylLines = SYLVIA_CHOICES[i].lines;
     var repLines = RAY_REPLIES[i];
     g.rayTalk.choice = i;
-    g.rayTalk.sylIdx = Math.floor(Math.random() * sylLines.length);
+    g.rayTalk.sylIdx = g.rayTalk.choiceLines[i]; // the line she saw on the button
     g.rayTalk.replyIdx = Math.floor(Math.random() * repLines.length);
     g.rayTalk.step = 1; // Sylvia's line is showing; T for Ray's reply
   }
@@ -1271,9 +1276,9 @@
     }
     if (g.rayTalk.open) {
       // Talking to her: he shows his talking pose. Arms crossed and
-      // serious by default, bashful and blushing when the conversation
-      // is about a shy topic. Front view, never flipped.
-      var timg = g.rayTalk.choice === 2 ? rayTalkShyImg : rayTalkImg;
+      // serious by default. After Sylvia speaks, if she was shy or
+      // flirty, he gets bashful and blushing. Front view, never flipped.
+      var timg = (g.rayTalk.step >= 1 && (g.rayTalk.choice === 2 || g.rayTalk.choice === 3)) ? rayTalkShyImg : rayTalkImg;
       if (!timg || !timg.complete || timg.naturalWidth === 0) timg = rayIdleImg;
       if (!timg || !timg.complete || timg.naturalWidth === 0) return;
       var tt = (r.depth + depthRange()) / depthRange();
@@ -2036,16 +2041,29 @@
       if (g.room !== "arcade" || Math.abs(g.px - g.kids[ktk].x) > 180) g.kidTalk.open = false;
     }
     if (g.rayTalk.open && Math.abs(g.px - g.ray.x) > 180) closeRayTalk();
-    // Sylvia's reply choices: three small buttons, only while Ray
-    // has just spoken and it is her turn to answer him.
+    // Sylvia's reply choices: four buttons around her head, only
+    // while Ray has just spoken and it is her turn to answer him.
+    // The four options are different every time: one random line
+    // from each tone, so she never sees the same set twice.
     var rayChoices = document.getElementById("rayChoices");
     if (rayChoices) {
       if (g.rayTalk.open && g.rayTalk.step === 0) {
         rayChoices.hidden = false;
         var rBtns = rayChoices.querySelectorAll("button");
         for (var bi = 0; bi < rBtns.length && bi < SYLVIA_CHOICES.length; bi++) {
-          rBtns[bi].textContent = SYLVIA_CHOICES[bi].label;
+          rBtns[bi].textContent = SYLVIA_CHOICES[bi].lines[g.rayTalk.choiceLines[bi]];
         }
+        // Center the choices on Sylvia's head, just above it.
+        var headX = g.px * scale() - g.camX;
+        var headTop = groundY() + g.depth - sylviaH();
+        var cw = 360; // matches the CSS width of .rayChoices
+        var cLeft = Math.max(cw / 2 + 8, Math.min(g.w - cw / 2 - 8, headX));
+        rayChoices.style.left = cLeft + "px";
+        var cTop = headTop - 10;
+        rayChoices.style.top = cTop + "px";
+        // Keep it on screen if her head is near the top.
+        var ch = rayChoices.offsetHeight || 120;
+        if (cTop - ch < 8) rayChoices.style.top = (ch + 8) + "px";
       } else {
         rayChoices.hidden = true;
       }
