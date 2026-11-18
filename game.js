@@ -39,11 +39,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=16" forces a fresh download after the go home portal moves
-  // from the dungeon door to the round blue tunnel in the Old Service
-  // Tunnels, and the subway intro line changes, so a browser that
-  // cached ?v=15 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=16"; return img; }
+  // "?v=17" forces a fresh download after a soft warm glow is added
+  // behind Sylvia and Ray so they never vanish into a dark doorway,
+  // so a browser that cached ?v=16 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=17"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1427,6 +1426,26 @@
     ctx.fill();
   }
 
+  function glow(x, feetY, w, h) {
+    // A soft warm glow behind a character, so they never vanish into
+    // a dark doorway. The dungeon door and the tunnel doors are so
+    // dark that Ray in his black tank and Sylvia in the shadows just
+    // blend away. This lifts them off the background just enough to
+    // always read clearly, without changing the art.
+    ctx.save();
+    ctx.translate(x, feetY - h * 0.5);
+    var r = w * 0.95;
+    var g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    g.addColorStop(0, "rgba(255, 232, 180, 0.55)");
+    g.addColorStop(0.5, "rgba(255, 222, 165, 0.28)");
+    g.addColorStop(1, "rgba(255, 222, 165, 0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * (h / w) * 0.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawSylvia() {
     if (g.climb.active && g.climb.sylHidden) return;
     if (g.inspect.active) {
@@ -1442,6 +1461,7 @@
       var ifeet = groundY() + g.depth;
       var ix = g.px * scale() - g.camX;
       shadow(ix, ifeet, iw);
+      glow(ix, ifeet, iw, ih);
       ctx.save();
       ctx.translate(ix, ifeet - ih / 2);
       if (g.facing === -1) ctx.scale(-1, 1);
@@ -1464,6 +1484,7 @@
       var cfeet = groundY() + g.depth + g.climb.sylY;
       var cx = g.px * scale() - g.camX;
       shadow(cx, cfeet, cw);
+      glow(cx, cfeet, cw, ch);
       ctx.save();
       ctx.translate(cx, cfeet - ch / 2);
       if (g.climb.kind === "stairs" && g.facing === -1) ctx.scale(-1, 1);
@@ -1489,6 +1510,7 @@
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
     shadow(x, feetY, w);
+    glow(x, feetY, w, h);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
@@ -1518,6 +1540,7 @@
     var feetY = groundY() - 6;
     var mx = (g.px + g.ray.x) / 2 * scale() - g.camX;
     shadow(mx, feetY, w);
+    glow(mx, feetY, w, h);
     ctx.save();
     ctx.translate(mx, feetY - h / 2);
     if (g.px > g.ray.x) ctx.scale(-1, 1);
@@ -1545,6 +1568,7 @@
       var rix = r.x * scale() - g.camX;
       if (rix < -riw || rix > g.w + riw) return;
       shadow(rix, rifeet, riw);
+      glow(rix, rifeet, riw, rih);
       ctx.save();
       ctx.translate(rix, rifeet - rih / 2);
       if (r.dir === -1) ctx.scale(-1, 1);
@@ -1566,6 +1590,7 @@
       var tx = r.x * scale() - g.camX;
       if (tx < -tw || tx > g.w + tw) return;
       shadow(tx, tfeet, tw);
+      glow(tx, tfeet, tw, th);
       ctx.save();
       ctx.translate(tx, tfeet - th / 2);
       ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
@@ -1589,6 +1614,7 @@
       var rx = r.x * scale() - g.camX;
       if (rx < -rw || rx > g.w + rw) return;
       shadow(rx, rfeet, rw);
+      glow(rx, rfeet, rw, rh);
       ctx.save();
       ctx.translate(rx, rfeet - rh / 2);
       // The reach faces right, so flip it when he reaches left for
@@ -1619,6 +1645,7 @@
     var x = r.x * scale() - g.camX;
     if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
+    glow(x, feetY, w, h);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Ray's frames face right, so flip them when he faces left.
@@ -1761,6 +1788,7 @@
     var x = g.px * scale() - g.camX;
     if (x < -w || x > g.w + w) return;
     shadow(x, feetY, w);
+    glow(x, feetY, w, h);
     ctx.drawImage(embraceImg, x - w / 2, feetY - h, w, h);
   }
   function wrapText(text, maxW) {
