@@ -39,11 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=10" forces a fresh download after the scattered junk and
-  // the readable papers land, and the secret arches get a faint
-  // golden shimmer so they are easier to find, so a browser that
-  // cached ?v=9 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=10"; return img; }
+  // "?v=11" forces a fresh download after I becomes crouch and
+  // inspect anywhere, and the junk text moves to a blue box on the
+  // screen instead of a speech bubble, so a browser that cached
+  // ?v=10 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=11"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -921,6 +921,10 @@
   function readProp(p) {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x;
+    // Crouch down to read it, the same as pressing I.
+    g.inspect.active = true; g.inspect.phase = "look"; g.inspect.arch = null; g.inspect.t = 0;
+    g.facing = g.px < p.x ? 1 : -1;
+    g.ray.dir = g.ray.x < p.x ? 1 : -1;
   }
   function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; }
   function drawPropPrompt() {
@@ -945,70 +949,72 @@
     ctx.restore();
   }
   function drawPropRead() {
-    // Little white bubble above the junk she is reading, same style
-    // as the talk bubbles. E or Esc or walking away puts it away.
+    // No speech bubble. Just the words in a blue box on the screen,
+    // down at the bottom like a caption. E or I or Esc puts it away.
     if (!g.propRead.open) return;
-    var px = g.propRead.x * scale() - g.camX;
-    var maxW = Math.min(g.w * 0.6, 420);
+    var maxW = Math.min(g.w * 0.8, 560);
     ctx.save();
     ctx.font = "400 14px 'Open Sans', sans-serif";
     var lines = wrapText(g.propRead.text, maxW - 32);
     var bw = 0;
-    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
     bw = Math.max(bw, ctx.measureText(g.propRead.name.toUpperCase()).width);
     ctx.font = "400 14px 'Open Sans', sans-serif";
     for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
     bw = Math.min(maxW, bw + 32);
-    var bh = 24 + lines.length * 18 + 20;
-    var bx = Math.max(8, Math.min(g.w - bw - 8, px - bw / 2));
-    var by = g.h * 0.30 - bh - 12;
-    if (by < 8) by = 8;
-    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, px));
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    var bh = 26 + lines.length * 18 + 22;
+    var bx = (g.w - bw) / 2;
+    var by = g.h - bh - 18;
+    ctx.fillStyle = "rgba(2, 1, 167, 0.92)";
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 12);
     else ctx.rect(bx, by, bw, bh);
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(tx - 9, by + bh - 2);
-    ctx.lineTo(tx + 9, by + bh - 2);
-    ctx.lineTo(tx, by + bh + 12);
-    ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#0201a7";
-    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(g.propRead.name.toUpperCase(), bx + 16, by + 20);
-    ctx.fillStyle = "#1a1a2e";
+    ctx.fillText(g.propRead.name.toUpperCase(), bx + 16, by + 22);
     ctx.font = "400 14px 'Open Sans', sans-serif";
-    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 44 + j * 18);
+    ctx.fillStyle = "rgba(255,255,255,0.65)";
     ctx.font = "600 11px 'Open Sans', sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText("E or Esc to put it down", bx + bw - 14, by + bh - 8);
+    ctx.fillText("E or I or Esc to put it down", bx + bw - 14, by + bh - 8);
     ctx.restore();
   }
   function startInspect() {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active) return;
-    // Already reading a piece of junk: I puts it back down.
-    if (g.propRead.open) { closePropRead(); return; }
+    // Already reading a piece of junk: I puts it back down and she
+    // stands back up.
+    if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; }
     if (g.inspect.active && g.inspect.phase === "look") {
-      // She decided to go down: they jump together.
-      g.inspect.phase = "drop"; g.inspect.t = 0;
-      return;
+      // She is already crouched and looking. At an arch she jumps
+      // down; anywhere else she just stands back up.
+      if (g.inspect.arch !== null) { g.inspect.phase = "drop"; g.inspect.t = 0; return; }
+      g.inspect.active = false; return;
     }
     if (g.inspect.active) return;
-    // I also inspects the junk on the floor: papers and trash.
-    var prop = propNear();
-    if (prop) { readProp(prop); return; }
+    // I is crouch and inspect. It always makes them crouch down to
+    // look, wherever they are, so the crouch itself is the inspect.
+    // What they find depends on the spot: an arch, a piece of junk,
+    // or nothing at all.
     var ax = inspectArch();
-    if (ax === null) return;
+    var prop = propNear();
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
-    g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = ax;
-    // Face the secret spot while they crouch down to look at it.
-    g.facing = g.px < ax ? 1 : -1;
-    g.ray.dir = g.ray.x < ax ? 1 : -1;
+    if (ax !== null) {
+      // At a secret arch: crouch down and look at it.
+      g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = ax;
+      g.facing = g.px < ax ? 1 : -1;
+      g.ray.dir = g.ray.x < ax ? 1 : -1;
+    } else if (prop) {
+      // Crouch down and read the junk on the floor. readProp sets
+      // the crouch and opens the blue box with what it says.
+      readProp(prop);
+    } else {
+      // Neither an arch nor a piece of junk: they just crouch down
+      // and look around. Press I again or walk away to stand up.
+      g.inspect.active = true; g.inspect.t = 0; g.inspect.phase = "look"; g.inspect.arch = null;
+    }
   }
   function updateInspect() {
     g.inspect.t += 1;
@@ -1016,8 +1022,9 @@
     if (g.inspect.phase === "look") {
       // They crouch down and look at the secret spot, deciding
       // whether to go down. Nothing happens until she presses I
-      // again or walks away.
-      g.camX = clampCam(g.inspect.arch * scale() - g.w * 0.38);
+      // again or walks away. If she just crouched to look around
+      // (no arch), the camera stays where it is.
+      if (g.inspect.arch !== null) g.camX = clampCam(g.inspect.arch * scale() - g.w * 0.38);
       return;
     }
     // phase === "drop": they jump down together, holding hands.
@@ -2562,7 +2569,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.propRead.open) { closePropRead(); return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
