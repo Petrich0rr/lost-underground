@@ -42,15 +42,15 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=50" forces a fresh download after the white fringe
-  // cleanup, round 3: a targeted light-rim erosion on Eve,
-  // Alexis, Diego and Adler, plus Eve idle's enclosed white gap
-  // between her arm and torso. The rim is a 1px opaque light-grey
-  // edge baked into the original art that the v=33
-  // semi-transparent erosion could not touch. Eve's silver dress
-  // highlights are clothing, not background, and are untouched.
-  // A browser that cached ?v=49 picks up the new sprites.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=50"; return img; }
+  // "?v=51" forces a fresh download after the white fringe
+  // cleanup, round 4. v=50 only eroded the four NPCs Erika
+  // cropped last time; Priya, Kian and Yuto had the same 1px
+  // opaque light-grey rim and were never touched, and Eve idle
+  // still had a light ring around the arm-torso gap. Same
+  // targeted erosion on all three plus Eve idle. White clothing
+  // (Kian's lab coat, Priya's sneakers) is untouched.
+  // A browser that cached ?v=50 picks up the new sprites.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=51"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
