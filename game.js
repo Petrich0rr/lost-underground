@@ -150,6 +150,10 @@
     talk: { open: false, idx: -1 },
     ownerTalk: { open: false, idx: -1, key: null },
     kidTalk: { open: false, idx: -1, key: null },
+    // Talking to Ray: open while the conversation runs. step 0 is
+    // Ray's opening line (Sylvia's turn to pick a reply), step 1 is
+    // Sylvia's line showing, step 2 is Ray's reply showing.
+    rayTalk: { open: false, step: 0, rayIdx: -1, choice: -1, sylIdx: -1, replyIdx: -1 },
     hp: 100, hpMax: 100,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
@@ -304,13 +308,17 @@
   function pressT() {
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (g.talk.open) { talkLine(); return; }
-    if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
-    if (g.kidTalk.open) { kidTalkLine(g.kidTalk.key); return; }
-    if (vickyNear()) talkLine();
+    if (g.ownerTalk.open || g.rayTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
+    if (g.kidTalk.open || g.rayTalk.open) { kidTalkLine(g.kidTalk.key); return; }
+    if (g.rayTalk.open) { advanceRayTalk(); return; }
+    // One conversation at a time: the room's own NPC wins, and Ray
+    // is the fallback when nobody else is near to talk to.
+    if (vickyNear()) { talkLine(); return; }
     var key = ownerNear();
-    if (key) ownerTalkLine(key);
+    if (key) { ownerTalkLine(key); return; }
     var kid = kidNear();
-    if (kid) kidTalkLine(kid);
+    if (kid) { kidTalkLine(kid); return; }
+    if (rayNear()) rayTalkLine();
   }
   // The shop owners. Walk up to one and press T to talk: they stop and
   // show their talking pose for a few seconds. No dialogue lines yet.
@@ -359,8 +367,121 @@
     var k = g.kids[key];
     k.dir = g.px < k.x ? -1 : 1; // face Sylvia
   }
+  // Talking to Ray: he is the very protective manly type, devoted to
+  // Sylvia. Walk up to him and press T. He speaks first, then Sylvia
+  // talks back: she picks one of three replies (sweet, teasing, shy),
+  // and Ray answers her in that same tone. A lot of lines, so the
+  // same conversation almost never repeats.
+  var RAY_LINES = [
+    "Baby, I'll go wherever you go. You don't walk these tunnels alone. Not ever.",
+    "I love you. That's not changing. Not down here, not up there, not anywhere.",
+    "If anything down here so much as looks at you wrong, it answers to me.",
+    "Stay close to me, baby. I've got you. I always do.",
+    "You are the best thing that ever happened to me. Down here, up there, anywhere.",
+    "I don't care how dark it gets. I'm not leaving your side.",
+    "You're mine, baby. And I'm yours. That's how this works.",
+    "I'd fight the whole underground for you. Don't ever doubt that.",
+    "You look beautiful, even down here in the dark. Especially down here.",
+    "When we get out, I'm taking you somewhere with real sun. Just us.",
+    "I love the way you walk. Like you own every tunnel you step into.",
+    "Don't worry about a thing, baby. I'll carry you if I have to.",
+    "You're the strongest person I know. But you don't have to be strong alone.",
+    "I like it when you stay close. Don't stop doing that.",
+    "If we get lost, we get lost together. That's the deal.",
+    "You make this place feel less like a basement and more like home.",
+    "I'm not scared of the dark. I'm scared of losing you. That's different.",
+    "Let me handle the scary parts. You just stay beautiful.",
+    "I love you more than I did yesterday. And tomorrow I'll love you more than today.",
+    "Whatever is up there waiting for us, we face it together. You and me.",
+    "You know what I love about you? Everything. That's the whole list.",
+    "Baby, hold my hand. I just like knowing you're right here.",
+    "If anyone ever tries to come between us, they will regret it. I promise you that.",
+    "You are my whole world, Sylvia. Down here, that world is just smaller."
+  ];
+  // Sylvia talks back. Three tones she can answer him in, and a pool
+  // of lines for each, so her reply is almost never the same twice.
+  var SYLVIA_CHOICES = [
+    { label: "I love you too", lines: [
+      "I love you too, Ray. I know. I always know.",
+      "You're the best thing down here. Don't ever forget it.",
+      "I love you. Even when you're being all protective and growly.",
+      "You make me feel safe. That's not a small thing.",
+      "I love you too. Now stop looking at me like that, you're making me blush.",
+      "I love you. You big, sweet, stubborn man."
+    ]},
+    { label: "My big protector", lines: [
+      "My big protector. What would I do without you?",
+      "So manly. So strong. So dramatic. I love it.",
+      "Oh, is that your protective voice? I like it.",
+      "You know I can handle myself, right? But keep going, it's cute.",
+      "My hero. My big, growly, sweet hero.",
+      "Careful, or I'll start calling you my bodyguard."
+    ]},
+    { label: "Stop it...", lines: [
+      "Stop it... you're making me blush.",
+      "Don't say that so loud. Someone might hear you.",
+      "You're too much sometimes. In a good way. Mostly.",
+      "I... I don't know what to say to that.",
+      "Okay, okay. I heard you. Now stop staring at me like that.",
+      "You're embarrassing me. Stop. Keep going."
+    ]}
+  ];
+  // Ray answers her in the same tone she picked.
+  var RAY_REPLIES = [
+    [ // she was sweet
+      "Good. Because I'm not going anywhere, baby.",
+      "I know you do. That's why I fight so hard for us.",
+      "You're the reason I keep going. Don't forget that.",
+      "Hearing you say that makes all of this worth it.",
+      "I love you more. And I will win that argument every time.",
+      "Come here. Let me hold you for a second.",
+      "That's my girl. That's my whole world right there."
+    ],
+    [ // she was teasing
+      "Dramatic? Me? Baby, I'm just getting started.",
+      "You love it. Admit it. You love when I get all protective.",
+      "Keep teasing me and I'll have to kiss you to shut you up.",
+      "I'm only dramatic because you're worth being dramatic about.",
+      "Careful, baby. I might just pick you up and carry you out of here.",
+      "You think I'm cute? Wait until you see me fight for you.",
+      "Tease me all you want. I'm still not letting you out of my sight."
+    ],
+    [ // she was shy
+      "Hey. Look at me. You don't have to be shy with me. Ever.",
+      "Blushing looks good on you. Don't hide it.",
+      "I'll say it as loud as I want. I love you, and I don't care who hears.",
+      "It's okay, baby. I know. You don't have to say it back perfectly.",
+      "Come here. You don't have to be brave all the time. Not with me.",
+      "You're cute when you're shy. Don't tell anyone I said that.",
+      "Shy suits you. But I already know what's in that heart of yours."
+    ]
+  ];
+  function rayNear() { return Math.abs(g.px - g.ray.x) < 150; }
+  function rayTalkLine() {
+    var idx;
+    do { idx = Math.floor(Math.random() * RAY_LINES.length); }
+    while (RAY_LINES.length > 1 && idx === g.rayTalk.rayIdx);
+    g.rayTalk.rayIdx = idx; g.rayTalk.open = true; g.rayTalk.step = 0; g.rayTalk.choice = -1;
+    g.ray.dir = g.px < g.ray.x ? -1 : 1; // face Sylvia
+  }
+  function pickRayChoice(i) {
+    if (!g.rayTalk.open || g.rayTalk.step !== 0) return;
+    if (i < 0 || i >= SYLVIA_CHOICES.length) return;
+    var sylLines = SYLVIA_CHOICES[i].lines;
+    var repLines = RAY_REPLIES[i];
+    g.rayTalk.choice = i;
+    g.rayTalk.sylIdx = Math.floor(Math.random() * sylLines.length);
+    g.rayTalk.replyIdx = Math.floor(Math.random() * repLines.length);
+    g.rayTalk.step = 1; // Sylvia's line is showing; T for Ray's reply
+  }
+  function advanceRayTalk() {
+    if (!g.rayTalk.open) return;
+    if (g.rayTalk.step === 1) { g.rayTalk.step = 2; return; } // Ray's reply
+    if (g.rayTalk.step === 2) { rayTalkLine(); return; } // new opening
+  }
+  function closeRayTalk() { g.rayTalk.open = false; g.rayTalk.step = 0; g.rayTalk.choice = -1; }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -398,7 +519,7 @@
     return Math.abs(g.px - s.baseX) < STAIR_RANGE ? g.room : null;
   }
   function climbStairs() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active) return;
     var key = stairsNear();
     if (!key) return;
     g.talk.open = false; g.ownerTalk.open = false;
@@ -445,7 +566,7 @@
     return g.room === "chamber" && Math.abs(g.px - WINDOW_X) < WINDOW_RANGE;
   }
   function climbOutWindow() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active) return;
     g.talk.open = false; g.ownerTalk.open = false;
     // Cute climb: Ray goes out first, then reaches back for her,
     // and she climbs up to his hand. The room switches at the end.
@@ -463,7 +584,7 @@
     return g.room === "chamber" && Math.abs(g.px - VANITY_X) < VANITY_RANGE;
   }
   function enterMirror() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active || g.mirror.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.mirror.active) return;
     if (!vanityNear()) return;
     g.talk.open = false; g.ownerTalk.open = false;
     g.mirror.active = true;
@@ -482,7 +603,7 @@
     return g.room === "chamber" && Math.abs(g.px - PHOTO_X) < PHOTO_RANGE;
   }
   function openPhoto() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active || g.mirror.active || g.photo.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.mirror.active || g.photo.active) return;
     if (!photoNear()) return;
     g.talk.open = false; g.ownerTalk.open = false;
     g.photo.active = true;
@@ -563,7 +684,7 @@
   }
   function inspectNear() { return inspectArch() !== null; }
   function drawInspectPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.portal.active) return;
     // One small, quiet button down at the floor, right over the arch.
     // It stays subtle so the secret does not shout.
     var ax = g.inspect.active ? g.inspect.arch : inspectArch();
@@ -588,7 +709,7 @@
     ctx.restore();
   }
   function startInspect() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active) return;
     if (g.inspect.active && g.inspect.phase === "look") {
       // She decided to go down: they jump together.
       g.inspect.phase = "drop"; g.inspect.t = 0;
@@ -646,7 +767,7 @@
     return g.room === "tunnels" && Math.abs(g.px - IRON_DOOR_X) < IRON_DOOR_RANGE;
   }
   function drawIronDoorPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
     var x = IRON_DOOR_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -663,7 +784,7 @@
     ctx.restore();
   }
   function enterDungeonFromIronDoor() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
     g.room = "dungeon";
@@ -679,7 +800,7 @@
     return g.room === "dungeon" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
   }
   function drawPortalPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     var x = PORTAL_X * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -696,7 +817,7 @@
     ctx.restore();
   }
   function goThroughPortal() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
     g.portal.active = true; g.portal.t = 0;
@@ -827,7 +948,7 @@
     return g.room === "shopping" && Math.abs(g.px - BEER_DOOR_X) < BEER_DOOR_RANGE;
   }
   function enterBarFromBeerDoor() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active) return;
     g.talk.open = false; g.ownerTalk.open = false;
     g.room = "bar";
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -855,7 +976,7 @@
     return null;
   }
   function enterShop(key) {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active) return;
     g.talk.open = false; g.ownerTalk.open = false;
     g.room = key;
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
@@ -866,7 +987,7 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
@@ -932,7 +1053,7 @@
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || !kissNear()) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.rayTalk.open || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
   }
 
@@ -1373,7 +1494,7 @@
   function drawKidTalk() {
     // Speech bubble above the arcade kid Sylvia is talking to,
     // tail pointing down to them. Mirrors the owners' bubble.
-    if (!g.kidTalk.open) return;
+    if (!g.kidTalk.open || g.rayTalk.open) return;
     var key = g.kidTalk.key;
     var k = g.kids[key];
     var name = KIDS[key].name.toUpperCase();
@@ -1418,10 +1539,70 @@
     ctx.fillText("T for more", bx + bw - 14, by + bh - 8);
     ctx.restore();
   }
+  function drawRayTalk() {
+    // Talking to Ray: a speech bubble above whoever is speaking, tail
+    // pointing down to them. Ray's name is royal blue, Sylvia's is a
+    // soft rose, so it is always clear who is talking.
+    if (!g.rayTalk.open) return;
+    var step = g.rayTalk.step;
+    var text, name, color, ax;
+    if (step === 1) {
+      text = SYLVIA_CHOICES[g.rayTalk.choice].lines[g.rayTalk.sylIdx];
+      name = "SYLVIA"; color = "#d6336c";
+      ax = g.px * scale() - g.camX;
+    } else if (step === 2) {
+      text = RAY_REPLIES[g.rayTalk.choice][g.rayTalk.replyIdx];
+      name = "RAY"; color = "#0201a7";
+      ax = g.ray.x * scale() - g.camX;
+    } else {
+      text = RAY_LINES[g.rayTalk.rayIdx];
+      name = "RAY"; color = "#0201a7";
+      ax = g.ray.x * scale() - g.camX;
+    }
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(text, maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText(name).width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, ax - bw / 2));
+    var by = g.h * 0.32 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, ax));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(name, bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(step === 0 ? "Pick what Sylvia says below" : step === 1 ? "T for Ray's reply" : "T for more", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
   function drawOwnerTalk() {
     // Speech bubble above the shop owner Sylvia is talking to,
     // tail pointing down to them. Mirrors Vicky's bubble.
-    if (!g.ownerTalk.open) return;
+    if (!g.ownerTalk.open || g.rayTalk.open) return;
     var key = g.ownerTalk.key;
     var o = g[key];
     var name = OWNERS[key].name.toUpperCase();
@@ -1740,6 +1921,7 @@
     drawTalk();
     drawOwnerTalk();
     drawKidTalk();
+    drawRayTalk();
   }
 
   function tick() {
@@ -1801,23 +1983,40 @@
       return;
     }
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
-    if (g.ownerTalk.open) {
+    if (g.ownerTalk.open || g.rayTalk.open) {
       var otk = g.ownerTalk.key;
       if (g.room !== OWNERS[otk].room || Math.abs(g.px - g[otk].x) > 180) g.ownerTalk.open = false;
     }
-    if (g.kidTalk.open) {
+    if (g.kidTalk.open || g.rayTalk.open) {
       var ktk = g.kidTalk.key;
       if (g.room !== "arcade" || Math.abs(g.px - g.kids[ktk].x) > 180) g.kidTalk.open = false;
+    }
+    if (g.rayTalk.open && Math.abs(g.px - g.ray.x) > 180) closeRayTalk();
+    // Sylvia's reply choices: three small buttons, only while Ray
+    // has just spoken and it is her turn to answer him.
+    var rayChoices = document.getElementById("rayChoices");
+    if (rayChoices) {
+      if (g.rayTalk.open && g.rayTalk.step === 0) {
+        rayChoices.hidden = false;
+        var rBtns = rayChoices.querySelectorAll("button");
+        for (var bi = 0; bi < rBtns.length && bi < SYLVIA_CHOICES.length; bi++) {
+          rBtns[bi].textContent = SYLVIA_CHOICES[bi].label;
+        }
+      } else {
+        rayChoices.hidden = true;
+      }
     }
     var talkBtn = document.getElementById("talkBtn");
     if (talkBtn) {
       var nearOwner = ownerNear();
       var nearKid = kidNear();
       if (vickyNear()) { talkBtn.hidden = false; talkBtn.textContent = g.talk.open ? "Next" : "Talk to Vicky"; }
-      else if (g.ownerTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
-      else if (g.kidTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.ownerTalk.open || g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.kidTalk.open || g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
+      else if (g.rayTalk.open) { talkBtn.hidden = false; talkBtn.textContent = "Next"; }
       else if (nearOwner) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + OWNERS[nearOwner].name; }
       else if (nearKid) { talkBtn.hidden = false; talkBtn.textContent = "Talk to " + KIDS[nearKid].name; }
+      else if (rayNear()) { talkBtn.hidden = false; talkBtn.textContent = "Talk to Ray"; }
       else talkBtn.hidden = true;
     }
     var enterBtn = document.getElementById("enterBtn");
@@ -1903,6 +2102,9 @@
     var r = g.ray;
     if (g.sleeping) {
       // He is in bed with her; he does not move, fight, or wander.
+    } else if (g.rayTalk.open) {
+      // Talking to her: he stands still and faces her.
+      r.dir = g.px < r.x ? -1 : 1;
     } else if (r.fight.active) {
       r.fight.t += 1;
       var tx = fightTargetX();
@@ -1977,7 +2179,7 @@
       var kidKeys = ["gamer", "dino", "cup"];
       for (var ki = 0; ki < kidKeys.length; ki++) {
         var kd = g.kids[kidKeys[ki]];
-        if (g.kidTalk.open && g.kidTalk.key === kidKeys[ki]) continue;
+        if (g.kidTalk.open || g.rayTalk.open && g.kidTalk.key === kidKeys[ki]) continue;
         if (kd.pause > 0) { kd.pause -= 1; }
         else {
           kd.x += kd.dir * 0.8;
@@ -2026,7 +2228,13 @@
     if (e.code === "KeyI") { startInspect(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
+    if (e.code === "Digit1" || e.code === "Digit2" || e.code === "Digit3") {
+      if (g.rayTalk.open && g.rayTalk.step === 0) {
+        pickRayChoice(e.code === "Digit1" ? 0 : e.code === "Digit2" ? 1 : 2);
+        return;
+      }
+    }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
@@ -2073,6 +2281,15 @@
   canvas.addEventListener("pointerup", pointerEnd);
   var talkBtn = document.getElementById("talkBtn");
   if (talkBtn) talkBtn.addEventListener("click", function (e) { e.stopPropagation(); pressT(); });
+  var rayChoices = document.getElementById("rayChoices");
+  if (rayChoices) {
+    var rBtns = rayChoices.querySelectorAll("button");
+    for (var bi = 0; bi < rBtns.length; bi++) {
+      (function (idx) {
+        rBtns[idx].addEventListener("click", function (e) { e.stopPropagation(); pickRayChoice(idx); });
+      })(bi);
+    }
+  }
   var attackBtn = document.getElementById("attackBtn");
   if (attackBtn) attackBtn.addEventListener("click", function (e) { e.stopPropagation(); tryAttack(); });
   var enterBtn = document.getElementById("enterBtn");
