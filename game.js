@@ -42,12 +42,16 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=47" forces a fresh download after the garden door becomes
-  // E-gated like a portal, and they walk UP into the open doorway
-  // instead of to the right. Walking into it no longer starts it;
-  // press E (or tap Go home) to go home. A browser that cached ?v=46
-  // picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=47"; return img; }
+  // "?v=48" forces a fresh download after the white-background
+  // cleanup: the enclosed white pockets are cleared from the
+  // scooter ride frames, Adler's walk-04, Alexis's idle, and the
+  // parked scooter's grab rail. The v=33 fringe cleanup only
+  // handled the thin semi-transparent edge; these were solid white
+  // background trapped inside the figure, which the border
+  // flood-fill could not reach. Eve's silver dress and Alexis's fur
+  // stole are clothing, not background, and are left untouched. A
+  // browser that cached ?v=47 picks up the new sprites.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=48"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
