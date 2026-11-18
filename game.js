@@ -73,6 +73,14 @@
   var gunnerWalkImgs = ["assets/gunner-walk-01.png", "assets/gunner-walk-02.png", "assets/gunner-walk-03.png", "assets/gunner-walk-04.png"].map(loadImg);
   var gunnerIdleImg = loadImg("assets/gunner-idle.png");
   var gunnerTalkImg = loadImg("assets/gunner-talk.png");
+  // The arcade kids: three regulars who stay in the arcade. Each has
+  // an idle portrait and a 4-frame side walk, all facing right.
+  var arcadeGamerWalkImgs = ["assets/arcade-gamer-walk-01.png", "assets/arcade-gamer-walk-02.png", "assets/arcade-gamer-walk-03.png", "assets/arcade-gamer-walk-04.png"].map(loadImg);
+  var arcadeGamerIdleImg = loadImg("assets/arcade-gamer-idle.png");
+  var arcadeDinoWalkImgs = ["assets/arcade-dino-walk-01.png", "assets/arcade-dino-walk-02.png", "assets/arcade-dino-walk-03.png", "assets/arcade-dino-walk-04.png"].map(loadImg);
+  var arcadeDinoIdleImg = loadImg("assets/arcade-dino-idle.png");
+  var arcadeCupWalkImgs = ["assets/arcade-cup-walk-01.png", "assets/arcade-cup-walk-02.png", "assets/arcade-cup-walk-03.png", "assets/arcade-cup-walk-04.png"].map(loadImg);
+  var arcadeCupIdleImg = loadImg("assets/arcade-cup-idle.png");
   var bgImgs = BG_SRCS.map(loadImg);
   var chamberImg = loadImg("assets/bg-chamber.jpg");
   var sleepImgs = ["assets/sleep-01.jpg", "assets/sleep-02.jpg"].map(loadImg);
@@ -109,6 +117,13 @@
     // Gunner, the repair shop owner. He only ever stands and walks in
     // the repair shop, never anywhere else.
     gunner: { x: 900, dir: 1, pause: 120, walk: 0, depth: 0, vdir: 0 },
+    // The arcade kids: three regulars who only ever stand and walk in
+    // the arcade, never anywhere else.
+    kids: {
+      gamer: { x: 400, dir: 1, pause: 120, walk: 0 },
+      dino: { x: 1000, dir: -1, pause: 60, walk: 0 },
+      cup: { x: 1600, dir: 1, pause: 180, walk: 0 }
+    },
     kiss: { active: false, t: 0 },
     attack: { active: false, t: 0, cooldown: 0 },
     talk: { open: false, idx: -1 },
@@ -840,6 +855,40 @@
     ctx.restore();
   }
 
+  // The arcade kids: three regulars who only ever appear in the
+  // arcade, standing still or walking around it. They never leave it.
+  // They are kids, so they are a bit shorter than Sylvia.
+  function drawArcadeKids() {
+    if (g.room !== "arcade") return;
+    var imgs = {
+      gamer: { walk: arcadeGamerWalkImgs, idle: arcadeGamerIdleImg },
+      dino: { walk: arcadeDinoWalkImgs, idle: arcadeDinoIdleImg },
+      cup: { walk: arcadeCupWalkImgs, idle: arcadeCupIdleImg }
+    };
+    var keys = ["gamer", "dino", "cup"];
+    for (var i = 0; i < keys.length; i++) {
+      var k = g.kids[keys[i]];
+      var walking = k.pause <= 0;
+      var img = walking ? imgs[keys[i]].walk[Math.floor(k.walk / 6) % imgs[keys[i]].walk.length] : imgs[keys[i]].idle;
+      if (!img || !img.complete || img.naturalWidth === 0) img = imgs[keys[i]].idle;
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var t = (0 + depthRange()) / depthRange(); // depth stays 0, full height
+      var h = sylviaH() * 0.85 * (0.92 + 0.08 * t);
+      var w = h * (img.naturalWidth / img.naturalHeight);
+      var feetY = groundY() - 6;
+      var x = k.x * scale() - g.camX;
+      if (x < -w || x > g.w + w) continue;
+      shadow(x, feetY, w);
+      ctx.save();
+      ctx.translate(x, feetY - h / 2);
+      // Their walk frames face right, so flip them when they walk left.
+      // The idle is a three-quarter front view, never flipped.
+      if (walking && k.dir === -1) ctx.scale(-1, 1);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+  }
+
   function drawEmbrace() {
     if (!embraceImg || !embraceImg.complete || embraceImg.naturalWidth === 0) {
       drawRay();
@@ -1202,6 +1251,7 @@
     drawChar();
     drawMikey();
     drawGunner();
+    drawArcadeKids();
     if (!g.sleeping) drawSylvia();
     drawTalk();
     drawOwnerTalk();
@@ -1383,6 +1433,22 @@
         n.walk += 0.3;
         if (n.x < 150 || n.x > room().w - 150) { n.dir *= -1; n.pause = 60 + Math.random() * 120; }
         else if (Math.random() < 0.002) { n.pause = 90 + Math.random() * 150; }
+      }
+    }
+    // The arcade kids: they only stand and walk in the arcade, never
+    // anywhere else. They wander it slowly, pausing by the machines,
+    // and turn at the walls.
+    if (g.room === "arcade") {
+      var kidKeys = ["gamer", "dino", "cup"];
+      for (var ki = 0; ki < kidKeys.length; ki++) {
+        var kd = g.kids[kidKeys[ki]];
+        if (kd.pause > 0) { kd.pause -= 1; }
+        else {
+          kd.x += kd.dir * 0.8;
+          kd.walk += 0.3;
+          if (kd.x < 150 || kd.x > room().w - 150) { kd.dir *= -1; kd.pause = 60 + Math.random() * 120; }
+          else if (Math.random() < 0.002) { kd.pause = 90 + Math.random() * 150; }
+        }
       }
     }
     // When she is standing still and he wanders up right behind
