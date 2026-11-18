@@ -42,12 +42,13 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=45" forces a fresh download after the wishing fountain in
-  // the Secret Garden: walk up and press E to make a wish, and five
-  // gold coins rise from the fountain, one time only, to help save
-  // for the $20 scooter. A soft golden shimmer marks it. A browser
-  // that cached ?v=44 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=45"; return img; }
+  // "?v=46" forces a fresh download after the garden door home: the
+  // stone arch on the right of the Secret Garden takes them back
+  // home to the chamber. They walk through it together, backs to
+  // the camera, in their back walk frames, and arrive in the room.
+  // A soft warm glow marks the doorway. A browser that cached ?v=45
+  // picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=46"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -389,6 +390,7 @@
     // hit. kissHealT is the cooldown before a kiss can heal again.
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
+    homeWalk: { active: false, t: 0 },
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
     // Climbing out the chamber window, or up a staircase: Ray goes
@@ -1731,7 +1733,7 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
@@ -1810,6 +1812,7 @@
     if (prop) { readProp(prop); return; }
     if (inspectNear()) { startInspect(); return; }
     if (fountainNear()) { makeWish(); return; }
+    if (gardenDoorNear()) { startHomeWalk(); return; }
     if (ironDoorNear()) { enterDungeonFromIronDoor(); return; }
     if (portalNear()) { goThroughPortal(); return; }
   }
@@ -1852,7 +1855,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -1876,6 +1879,7 @@
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
       if (inspectNear()) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
       if (fountainNear() && !g.fountainWished) acts.push({ id: "fountain", label: "Make a wish", run: makeWish });
+      if (gardenDoorNear()) acts.push({ id: "homedoor", label: "Go home", run: startHomeWalk });
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
       if (portalNear()) acts.push({ id: "portal", label: "Go home", run: goThroughPortal });
     }
@@ -2043,6 +2047,82 @@
     ctx.textAlign = "center";
     ctx.fillStyle = "#ffd977";
     ctx.fillText(g.fountainMsg, x, y);
+    ctx.restore();
+  }
+  // The stone arch doorway on the right of the Secret Garden. Its
+  // dark opening is centred at world x 2025 in the 2172-wide room
+  // (measured from the art with marker lines). Walk through it and
+  // they walk home together, backs to the camera, into the doorway,
+  // and arrive in the chamber. It is the second way home, beside the
+  // blue tunnel mouth in the Old Service Tunnels.
+  var GARDEN_DOOR_X = 2025, GARDEN_DOOR_RANGE = 90;
+  function gardenDoorNear() {
+    return g.room === "garden" && Math.abs(g.px - GARDEN_DOOR_X) < GARDEN_DOOR_RANGE;
+  }
+  function startHomeWalk() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.scooter.riding || g.propRead.open) return;
+    if (!gardenDoorNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false;
+    g.homeWalk.active = true; g.homeWalk.t = 0;
+    g.ray.x = g.px - 70; g.ray.dir = 1; g.ray.depth = g.depth; g.ray.vdir = -1;
+    g.facing = 1;
+  }
+  function updateHomeWalk() {
+    // They walk together through the doorway, backs to the camera,
+    // drifting up into the dark arch as they go, then arrive home.
+    g.homeWalk.t += 1;
+    g.px += 2;
+    g.depth -= 0.8;
+    if (g.depth < -depthRange()) g.depth = -depthRange();
+    g.ray.x = g.px - 70;
+    g.ray.depth = g.depth;
+    g.ray.vdir = -1; g.ray.dir = 1;
+    g.walk += 0.3; g.ray.walk += 0.3;
+    var target = g.px * scale() - g.w * 0.38;
+    if (target < 0) target = 0;
+    if (target > worldW() - g.w) target = worldW() - g.w;
+    g.camX += (target - g.camX) * 0.12;
+    if (g.homeWalk.t >= 90) {
+      g.homeWalk.active = false;
+      g.room = "chamber";
+      g.px = 110; g.facing = 1; g.depth = 0;
+      g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0;
+      g.camX = 0;
+      resize();
+    }
+  }
+  function drawGardenDoorGlow() {
+    // A soft warm glow in the dark doorway, so it reads as a way
+    // through, not just a dead end.
+    if (g.room !== "garden") return;
+    var pulse = 0.14 + 0.08 * Math.sin(Date.now() / 500);
+    var x = GARDEN_DOOR_X * scale() - g.camX;
+    var y = groundY() - sylviaH() * 0.45;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = "#ffd977";
+    ctx.beginPath();
+    ctx.ellipse(x, y, 26, 52, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function drawGardenDoorPrompt() {
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.homeWalk.active || g.scooter.riding) return;
+    if (!gardenDoorNear()) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Walk through the door to go home";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
     ctx.restore();
   }
   function drawScooter() {
@@ -2381,7 +2461,7 @@
     if (g.attack.active) {
       // Stance, then the high kick, then back to stance.
       img = (g.attack.t >= 8 && g.attack.t < 22) ? sylviaKickImg : sylviaStanceImg;
-    } else if (keys.up) { img = sylviaBackWalkImgs[Math.floor(g.walk / 6) % sylviaBackWalkImgs.length]; }
+    } else if (keys.up || g.homeWalk.active) { img = sylviaBackWalkImgs[Math.floor(g.walk / 6) % sylviaBackWalkImgs.length]; }
     else if (keys.down) { img = sylviaFrontWalkImgs[Math.floor(g.walk / 6) % sylviaFrontWalkImgs.length]; }
     else {
       img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
@@ -3732,6 +3812,7 @@
     drawScooter();
     drawArchGlow();
     drawFountainGlow();
+    drawGardenDoorGlow();
     drawHp();
     drawVickyPrompt();
     drawDoorPrompt();
@@ -3748,6 +3829,7 @@
     drawPortalPrompt();
     drawScooterPrompt();
     drawFountainPrompt();
+    drawGardenDoorPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); return; }
     if (g.scooter.riding) drawScooterRide();
@@ -3928,6 +4010,13 @@
       draw();
       return;
     }
+    if (g.homeWalk.active) {
+      // Walking home through the garden door together: the walk
+      // drives them both, and nothing else moves until they arrive.
+      updateHomeWalk();
+      draw();
+      return;
+    }
     if (g.kiss.active) {
       g.kiss.t += 1;
       // Face each other and lean in until cheek to cheek.
@@ -3960,6 +4049,8 @@
     // E needed. Stairs still need E to climb. Riding the scooter
     // through an edge carries it along (switchRoom moves its room).
     if ((keys.left && doorSide() === "left") || (keys.right && doorSide() === "right")) switchRoom();
+    // Walking into the garden door starts the walk home together.
+    if (g.room === "garden" && gardenDoorNear() && keys.right) startHomeWalk();
     if (keys.left || keys.right || keys.up || keys.down) g.walk += keys.fast ? 0.6 : 0.3;
     // Camera follows Sylvia across the bar.
     var target = g.px * scale() - g.w * 0.38;
