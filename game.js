@@ -37,10 +37,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=5" forces a fresh download after the two-step arcade
-  // inspect, so a browser that cached the old auto-jump version
-  // under ?v=4 picks up the new hold-and-decide flow.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=5"; return img; }
+  // "?v=6" forces a fresh download after Ray's talking poses and
+  // the flirty fourth reply, so a browser that cached ?v=5 picks
+  // up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=6"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -62,6 +62,8 @@
   var rayBackWalkImgs = ["assets/ray-back-walk-01.png", "assets/ray-back-walk-02.png"].map(loadImg);
   var rayPunchImg = loadImg("assets/ray-punch.png");
   var rayReachImg = loadImg("assets/ray-reach.png");
+  var rayTalkImg = loadImg("assets/ray-talk.png");
+  var rayTalkShyImg = loadImg("assets/ray-talk-shy.png");
   var sylviaClimbImg = loadImg("assets/sylvia-pose-sneak.png");
   // The golden mirror at the chamber vanity: she blinks, and when
   // she manifests she shuts her eyes and says an affirmation.
@@ -396,7 +398,13 @@
     "You know what I love about you? Everything. That's the whole list.",
     "Baby, hold my hand. I just like knowing you're right here.",
     "If anyone ever tries to come between us, they will regret it. I promise you that.",
-    "You are my whole world, Sylvia. Down here, that world is just smaller."
+    "You are my whole world, Sylvia. Down here, that world is just smaller.",
+    "You look so good in that dress, baby. It should be illegal.",
+    "Come here. I want to hold you properly.",
+    "You have no idea what you do to me, do you?",
+    "That dress... I love it. But I love what's underneath it more.",
+    "Baby, you're driving me crazy tonight.",
+    "I want you. Right here, right now. Don't look at me like that."
   ];
   // Sylvia talks back. Three tones she can answer him in, and a pool
   // of lines for each, so her reply is almost never the same twice.
@@ -424,6 +432,14 @@
       "I... I don't know what to say to that.",
       "Okay, okay. I heard you. Now stop staring at me like that.",
       "You're embarrassing me. Stop. Keep going."
+    ]},
+    { label: "Come here...", lines: [
+      "Come here, handsome. I want you closer.",
+      "Oh, is that so? Show me.",
+      "You look pretty good yourself, you know.",
+      "Kiss me, Ray. Stop talking and kiss me.",
+      "I like it when you look at me like that.",
+      "Come closer. I don't bite... much."
     ]}
   ];
   // Ray answers her in the same tone she picked.
@@ -454,6 +470,15 @@
       "Come here. You don't have to be brave all the time. Not with me.",
       "You're cute when you're shy. Don't tell anyone I said that.",
       "Shy suits you. But I already know what's in that heart of yours."
+    ],
+    [ // she was flirty
+      "Careful what you wish for, baby. I don't hold back.",
+      "You have no idea how much I want you right now.",
+      "Come here. Let me show you how much I love you.",
+      "That look in your eyes... you're trouble, and I love it.",
+      "Baby, you're going to be the death of me.",
+      "I love it when you talk like that. Say it again.",
+      "You want me closer? I'm already yours, baby. All yours."
     ]
   ];
   function rayNear() { return Math.abs(g.px - g.ray.x) < 150; }
@@ -1242,6 +1267,26 @@
       ctx.translate(rix, rifeet - rih / 2);
       if (r.dir === -1) ctx.scale(-1, 1);
       ctx.drawImage(riimg, -riw / 2, -rih / 2, riw, rih);
+      ctx.restore();
+      return;
+    }
+    if (g.rayTalk.open) {
+      // Talking to her: he shows his talking pose. Arms crossed and
+      // serious by default, bashful and blushing when the conversation
+      // is about a shy topic. Front view, never flipped.
+      var timg = g.rayTalk.choice === 2 ? rayTalkShyImg : rayTalkImg;
+      if (!timg || !timg.complete || timg.naturalWidth === 0) timg = rayIdleImg;
+      if (!timg || !timg.complete || timg.naturalWidth === 0) return;
+      var tt = (r.depth + depthRange()) / depthRange();
+      var th = rayH() * (0.92 + 0.08 * tt);
+      var tw = th * (timg.naturalWidth / timg.naturalHeight);
+      var tfeet = groundY() + r.depth - 6;
+      var tx = r.x * scale() - g.camX;
+      if (tx < -tw || tx > g.w + tw) return;
+      shadow(tx, tfeet, tw);
+      ctx.save();
+      ctx.translate(tx, tfeet - th / 2);
+      ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
       ctx.restore();
       return;
     }
@@ -2228,9 +2273,9 @@
     if (e.code === "KeyI") { startInspect(); return; }
     if (e.code === "KeyT") { pressT(); return; }
     if (e.code === "KeyM") { if (g.mirror.active) manifest(); return; }
-    if (e.code === "Digit1" || e.code === "Digit2" || e.code === "Digit3") {
+    if (e.code === "Digit1" || e.code === "Digit2" || e.code === "Digit3" || e.code === "Digit4") {
       if (g.rayTalk.open && g.rayTalk.step === 0) {
-        pickRayChoice(e.code === "Digit1" ? 0 : e.code === "Digit2" ? 1 : 2);
+        pickRayChoice(e.code === "Digit1" ? 0 : e.code === "Digit2" ? 1 : e.code === "Digit3" ? 2 : 3);
         return;
       }
     }
