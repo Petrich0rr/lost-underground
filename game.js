@@ -39,10 +39,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=9" forces a fresh download after the Upper Levels replace
-  // the garden and the map becomes a jump-to-room shortcut, so a
-  // browser that cached ?v=8 picks up the new code.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=9"; return img; }
+  // "?v=10" forces a fresh download after the scattered junk and
+  // the readable papers land, and the secret arches get a faint
+  // golden shimmer so they are easier to find, so a browser that
+  // cached ?v=9 picks up the new code.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=10"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -105,6 +106,30 @@
   var upper1Img = loadImg("assets/bg-upper1.jpg");
   var upper2Img = loadImg("assets/bg-upper2.jpg");
   var upper3Img = loadImg("assets/bg-upper3.jpg");
+  // Random junk scattered around the underground: papers that can
+  // hint at the way up, and the rest just trash. They only appear
+  // in the deep underground rooms, never in the chamber, the shops
+  // or the Upper Levels.
+  var propPaperImg = loadImg("assets/prop-paper.png");
+  var propNewspaperImg = loadImg("assets/prop-newspaper.png");
+  var propTakeoutImg = loadImg("assets/prop-takeout.png");
+  var propCanImg = loadImg("assets/prop-can.png");
+  var propGlassImg = loadImg("assets/prop-glass.png");
+  var propGrateImg = loadImg("assets/prop-grate.png");
+  var propValveImg = loadImg("assets/prop-valve.png");
+  var propBucketImg = loadImg("assets/prop-bucket.png");
+  var propChainImg = loadImg("assets/prop-chain.png");
+  var propLanternImg = loadImg("assets/prop-lantern.png");
+  var propBundleImg = loadImg("assets/prop-bundle.png");
+  var propKeyImg = loadImg("assets/prop-key.png");
+  var propCassetteImg = loadImg("assets/prop-cassette.png");
+  var propTokenImg = loadImg("assets/prop-token.png");
+  var propBootImg = loadImg("assets/prop-boot.png");
+  var propRubbleImg = loadImg("assets/prop-rubble.png");
+  var propPuddleImg = loadImg("assets/prop-puddle.png");
+  var propMushroomImg = loadImg("assets/prop-mushroom.png");
+  var propCrystalImg = loadImg("assets/prop-crystal.png");
+  var propSackImg = loadImg("assets/prop-sack.png");
   // The midair descent: Ray and Sylvia jumping down to the quarry,
   // holding hands. Shown full screen while they fall through the
   // secret passage under the arcade floor.
@@ -129,6 +154,57 @@
   ROOMS.upper1.frames = [upper1Img];
   ROOMS.upper2.frames = [upper2Img];
   ROOMS.upper3.frames = [upper3Img];
+  // Scattered junk on the floor of the deep underground rooms.
+  // x is world px, d is depth across the floor band (0 back, 1
+  // front), h is the height in canvas px. name and text make a prop
+  // readable: walk up and press E or I to inspect it. The papers
+  // can hint at the way up; the rest is just trash down here.
+  var PROPS = {
+    bar: [
+      { img: propBucketImg, x: 180, d: 0.9, h: 52, name: "Rusty bucket", text: "A rusty bucket. It has seen better days." },
+      { img: propPaperImg, x: 300, d: 0.6, h: 32, name: "Crumpled paper", text: "A crumpled paper ball. Someone wrote I HATE IT HERE on it, then crossed it out and wrote I hate it here again, smaller." },
+      { img: propCanImg, x: 420, d: 0.8, h: 34, name: "Crushed can", text: "A crushed can. Someone was very thirsty down here once." },
+      { img: propGlassImg, x: 720, d: 0.5, h: 32, name: "Broken glass", text: "Broken green glass. Careful where you step." },
+      { img: propLanternImg, x: 950, d: 0.7, h: 60, name: "Old lantern", text: "A lantern with a blue flame. It still burns, somehow." }
+    ],
+    subway: [
+      { img: propNewspaperImg, x: 300, d: 0.6, h: 48, name: "Soggy newspaper", text: "A soggy newspaper. The headline is smudged, but one line is still clear: THE SURFACE IS REAL. Three floors up, and the sky is waiting." },
+      { img: propTakeoutImg, x: 650, d: 0.8, h: 50, name: "Takeout box", text: "An old takeout box. Whatever was in it has long since given up." },
+      { img: propGrateImg, x: 1000, d: 0.5, h: 60, name: "Rusted grate", text: "A rusted grate. Something used to flow through here." },
+      { img: propChainImg, x: 1300, d: 0.7, h: 40, name: "Broken chain", text: "A broken chain. Whatever it held is long gone." },
+      { img: propRubbleImg, x: 1600, d: 0.6, h: 62, name: "Rubble", text: "A pile of rubble. The ceiling is always falling, a little at a time." },
+      { img: propPuddleImg, x: 1800, d: 0.9, h: 40, name: "Dark puddle", text: "A still puddle. The water is dark and does not reflect much." }
+    ],
+    cistern: [
+      { img: propBundleImg, x: 350, d: 0.6, h: 52, name: "Bundle of papers", text: "A bundle of old papers tied with string. The top sheet says: Upper Level 1 is blue and cold. Level 2 is violet and quiet. Level 3 is white, and it watches you." },
+      { img: propValveImg, x: 750, d: 0.7, h: 62, name: "Valve wheel", text: "A rusted valve wheel. It has not turned in years." },
+      { img: propBucketImg, x: 1150, d: 0.5, h: 52, name: "Rusty bucket", text: "A rusty bucket. It has seen better days." },
+      { img: propMushroomImg, x: 1550, d: 0.8, h: 56, name: "Pale mushrooms", text: "Pale mushrooms growing on a rock. They glow faintly. Probably best not to eat them." },
+      { img: propCrystalImg, x: 1900, d: 0.6, h: 58, name: "Pale crystals", text: "A cluster of pale crystals. They catch the light and throw it back in pieces." }
+    ],
+    quarry: [
+      { img: propCrystalImg, x: 300, d: 0.7, h: 58, name: "Pale crystals", text: "A cluster of pale crystals. They catch the light and throw it back in pieces." },
+      { img: propRubbleImg, x: 700, d: 0.5, h: 62, name: "Rubble", text: "A pile of rubble. The ceiling is always falling, a little at a time." },
+      { img: propSackImg, x: 1100, d: 0.8, h: 60, name: "Torn sack", text: "A torn sack. Whatever was in it spilled out long ago." },
+      { img: propPaperImg, x: 1450, d: 0.6, h: 32, name: "Torn page", text: "A torn page from someone's journal. The stairs past the subway go UP. Three levels. Blue, then violet, then white. The top one is where they keep the way out. Something guards it. Do not go unprepared." },
+      { img: propBootImg, x: 1800, d: 0.7, h: 48, name: "Worn boot", text: "A worn boot with a hole in it. Someone walked a long way in this." }
+    ],
+    tunnels: [
+      { img: propKeyImg, x: 300, d: 0.6, h: 44, name: "Old key", text: "An old key. It does not fit any door you know." },
+      { img: propCassetteImg, x: 650, d: 0.8, h: 50, name: "Cracked cassette", text: "A cracked cassette tape. The music is gone, but the ribbon remembers." },
+      { img: propTokenImg, x: 1000, d: 0.5, h: 44, name: "Arcade token", text: "An arcade token. It has a little machine stamped on it. Worthless up there, priceless down here." },
+      { img: propBootImg, x: 1250, d: 0.7, h: 48, name: "Worn boot", text: "A worn boot with a hole in it. Someone walked a long way in this." },
+      { img: propGlassImg, x: 1700, d: 0.6, h: 32, name: "Broken glass", text: "Broken green glass. Careful where you step." },
+      { img: propBundleImg, x: 1950, d: 0.8, h: 52, name: "Bundle of papers", text: "A bundle of papers tied with string. It is just a shopping list. Milk, bread, candles, rope. The rope is underlined three times." }
+    ],
+    dungeon: [
+      { img: propLanternImg, x: 300, d: 0.7, h: 60, name: "Old lantern", text: "A lantern with a blue flame. It still burns, somehow." },
+      { img: propSackImg, x: 700, d: 0.8, h: 60, name: "Torn sack", text: "A torn sack. Whatever was in it spilled out long ago." },
+      { img: propRubbleImg, x: 1100, d: 0.5, h: 62, name: "Rubble", text: "A pile of rubble. The ceiling is always falling, a little at a time." },
+      { img: propNewspaperImg, x: 1450, d: 0.6, h: 48, name: "Wet newspaper", text: "A wet newspaper. The only readable bit is a crossword, half finished, and every answer is wrong." },
+      { img: propValveImg, x: 1750, d: 0.6, h: 62, name: "Valve wheel", text: "A rusted valve wheel. It has not turned in years." }
+    ]
+  };
 
   var keys = { up: false, down: false, left: false, right: false, fast: false };
   var g = {
@@ -162,6 +238,10 @@
     // Ray's opening line (Sylvia's turn to pick a reply), step 1 is
     // Sylvia's line showing, step 2 is Ray's reply showing.
     rayTalk: { open: false, step: 0, rayIdx: -1, choice: -1, sylIdx: -1, replyIdx: -1, choiceLines: [-1, -1, -1, -1] },
+    // Reading a piece of junk on the floor: open while the little
+    // bubble shows what it says. The papers can hint at the way up;
+    // the rest is just trash down here.
+    propRead: { open: false, name: "", text: "", x: 0 },
     hp: 100, hpMax: 100,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
@@ -315,6 +395,7 @@
   }
   function pressT() {
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.propRead.open) { closePropRead(); return; }
     if (g.talk.open) { talkLine(); return; }
     if (g.ownerTalk.open) { ownerTalkLine(g.ownerTalk.key); return; }
     if (g.kidTalk.open) { kidTalkLine(g.kidTalk.key); return; }
@@ -516,7 +597,7 @@
   }
   function closeRayTalk() { g.rayTalk.open = false; g.rayTalk.step = 0; g.rayTalk.choice = -1; }
   function tryAttack() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.attack.cooldown > 0) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.propRead.open || g.climb.active || g.inspect.active || g.portal.active || g.attack.cooldown > 0) return;
     g.attack.active = true; g.attack.t = 0; g.attack.cooldown = 40;
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
@@ -721,6 +802,7 @@
     if (!ROOMS[roomKey]) return;
     closeMap();
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.rayTalk.open = false;
+    g.propRead.open = false;
     g.mirror.active = false; g.photo.active = false; g.inspect.active = false;
     g.climb.active = false; g.portal.active = false; g.kiss.active = false;
     g.embrace.active = false; g.sleeping = false; g.ray.inBed = false;
@@ -748,7 +830,7 @@
   // one and press I to inspect it. They crouch down and look, and
   // stay there while she decides. Press I again to jump down
   // together, or walk away (or Esc) to stand back up.
-  var INSPECT_XS = [348, 1086, 1955], INSPECT_RANGE = 90;
+  var INSPECT_XS = [348, 1086, 1955], INSPECT_RANGE = 130;
   function inspectArch() {
     if (g.room !== "arcade") return null;
     var best = null, bd = 1e9;
@@ -784,14 +866,142 @@
     ctx.fillText(label, x, y);
     ctx.restore();
   }
+  function drawProps() {
+    var list = PROPS[g.room];
+    if (!list) return;
+    var dr = depthRange();
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      var img = p.img;
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var h = p.h * (0.92 + 0.08 * p.d);
+      var w = h * img.naturalWidth / img.naturalHeight;
+      var x = p.x * scale() - g.camX;
+      var y = groundY() - dr * (1 - p.d);
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(img, x - w / 2, y - h, w, h);
+      ctx.restore();
+    }
+  }
+  function drawArchGlow() {
+    // The secret arches under the arcade floor are easy to miss, so
+    // each one gets a faint golden shimmer, so she can find where to
+    // look. Subtle on purpose: it is still a secret, just findable.
+    if (g.room !== "arcade") return;
+    var pulse = 0.16 + 0.10 * Math.sin(Date.now() / 500);
+    for (var i = 0; i < INSPECT_XS.length; i++) {
+      var x = INSPECT_XS[i] * scale() - g.camX;
+      var y = groundY() + 26;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = "#ffd977";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 26, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = pulse * 1.6;
+      ctx.fillStyle = "#fff3c4";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 12, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  var PROP_RANGE = 90;
+  function propNear() {
+    var list = PROPS[g.room];
+    if (!list) return null;
+    var best = null, bd = 1e9;
+    for (var i = 0; i < list.length; i++) {
+      var d = Math.abs(g.px - list[i].x);
+      if (d < bd) { bd = d; best = list[i]; }
+    }
+    return bd < PROP_RANGE ? best : null;
+  }
+  function readProp(p) {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    g.propRead.open = true; g.propRead.name = p.name; g.propRead.text = p.text; g.propRead.x = p.x;
+  }
+  function closePropRead() { g.propRead.open = false; g.propRead.name = ""; g.propRead.text = ""; }
+  function drawPropPrompt() {
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active || g.propRead.open) return;
+    var p = propNear();
+    if (!p) return;
+    var x = g.px * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var isPaper = /paper|newspaper/i.test(p.name);
+    var label = isPaper ? "Press E to read it" : "Press E to look closer";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
+  function drawPropRead() {
+    // Little white bubble above the junk she is reading, same style
+    // as the talk bubbles. E or Esc or walking away puts it away.
+    if (!g.propRead.open) return;
+    var px = g.propRead.x * scale() - g.camX;
+    var maxW = Math.min(g.w * 0.6, 420);
+    ctx.save();
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    var lines = wrapText(g.propRead.text, maxW - 32);
+    var bw = 0;
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    bw = Math.max(bw, ctx.measureText(g.propRead.name.toUpperCase()).width);
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var i = 0; i < lines.length; i++) bw = Math.max(bw, ctx.measureText(lines[i]).width);
+    bw = Math.min(maxW, bw + 32);
+    var bh = 24 + lines.length * 18 + 20;
+    var bx = Math.max(8, Math.min(g.w - bw - 8, px - bw / 2));
+    var by = g.h * 0.30 - bh - 12;
+    if (by < 8) by = 8;
+    var tx = Math.max(bx + 18, Math.min(bx + bw - 18, px));
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - 9, by + bh - 2);
+    ctx.lineTo(tx + 9, by + bh - 2);
+    ctx.lineTo(tx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0201a7";
+    ctx.font = "700 12px 'Open Sans', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(g.propRead.name.toUpperCase(), bx + 16, by + 20);
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "400 14px 'Open Sans', sans-serif";
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], bx + 16, by + 42 + j * 18);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.font = "600 11px 'Open Sans', sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("E or Esc to put it down", bx + bw - 14, by + bh - 8);
+    ctx.restore();
+  }
   function startInspect() {
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active) return;
+    // Already reading a piece of junk: I puts it back down.
+    if (g.propRead.open) { closePropRead(); return; }
     if (g.inspect.active && g.inspect.phase === "look") {
       // She decided to go down: they jump together.
       g.inspect.phase = "drop"; g.inspect.t = 0;
       return;
     }
     if (g.inspect.active) return;
+    // I also inspects the junk on the floor: papers and trash.
+    var prop = propNear();
+    if (prop) { readProp(prop); return; }
     var ax = inspectArch();
     if (ax === null) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false;
@@ -1063,7 +1273,7 @@
     g.camX = 0;
   }
   function switchRoom() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.rayTalk.open || g.propRead.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     var side = doorSide();
     if (!side) return;
     var from = g.room;
@@ -1114,6 +1324,7 @@
     if (g.embrace.active) return;
     if (g.sleeping) { wakeUp(); return; }
     if (g.photo.active) { closePhoto(); return; }
+    if (g.propRead.open) { closePropRead(); return; }
     if (photoNear()) { openPhoto(); return; }
     if (bedNear()) { goToBed(); return; }
     if (vanityNear()) { enterMirror(); return; }
@@ -1122,6 +1333,8 @@
     if (beerDoorNear()) { enterBarFromBeerDoor(); return; }
     var shop = shopNear();
     if (shop) { enterShop(shop); return; }
+    var prop = propNear();
+    if (prop) { readProp(prop); return; }
     if (inspectNear()) { startInspect(); return; }
     if (ironDoorNear()) { enterDungeonFromIronDoor(); return; }
     if (portalNear()) { goThroughPortal(); return; }
@@ -1129,7 +1342,7 @@
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
-    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.rayTalk.open || !kissNear()) return;
+    if (g.embrace.active || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.rayTalk.open || g.propRead.open || !kissNear()) return;
     g.kiss.active = true; g.kiss.t = 0;
   }
 
@@ -1993,6 +2206,8 @@
     if (g.inspect.active && g.inspect.phase === "drop") { drawDescent(); return; }
     if (g.portal.active) { drawPortal(); return; }
     drawBg();
+    drawProps();
+    drawArchGlow();
     drawHp();
     drawVickyPrompt();
     drawDoorPrompt();
@@ -2004,6 +2219,7 @@
     drawBeerDoorPrompt();
     drawShopPrompt();
     drawInspectPrompt();
+    drawPropPrompt();
     drawIronDoorPrompt();
     drawPortalPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); return; }
@@ -2018,6 +2234,7 @@
     drawOwnerTalk();
     drawKidTalk();
     drawRayTalk();
+    drawPropRead();
   }
 
   function tick() {
@@ -2088,6 +2305,7 @@
       if (g.room !== "arcade" || Math.abs(g.px - g.kids[ktk].x) > 180) g.kidTalk.open = false;
     }
     if (g.rayTalk.open && Math.abs(g.px - g.ray.x) > 180) closeRayTalk();
+    if (g.propRead.open && Math.abs(g.px - g.propRead.x) > 180) closePropRead();
     // Sylvia's reply choices: four buttons around her head, only
     // while Ray has just spoken and it is her turn to answer him.
     // The four options are different every time: one random line
@@ -2139,6 +2357,7 @@
       else if (stairsNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = STAIRS[stairsNear()].btn; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
       else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
+      else if (propNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.propRead.open ? "Put it down" : "Inspect"; }
       else if (inspectNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = g.inspect.active ? "Go down" : "Inspect"; }
       else if (ironDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Iron door"; }
       else if (portalNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Through the tunnel"; }
@@ -2343,7 +2562,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.propRead.open) { closePropRead(); return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
