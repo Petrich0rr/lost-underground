@@ -111,10 +111,11 @@
     hp: 100, hpMax: 100,
     sleeping: false,
     embrace: { active: false, t: 0, cooldown: 0 },
-    // Climbing out the chamber window: Ray goes first, then reaches
-    // back for her, and she climbs up to his hand. While it plays,
-    // the two of them are driven by the climb, not by the keys.
-    climb: { active: false, t: 0, rayStartX: 0, sylStartX: 0, rayY: 0, sylY: 0, rayHidden: false, sylHidden: false }
+    // Climbing out the chamber window, or up a staircase: Ray goes
+    // first out the window and reaches back for her; on stairs they
+    // climb up together. While it plays, the two of them are driven
+    // by the climb, not by the keys.
+    climb: { active: false, t: 0, kind: null, to: null, baseX: 0, topX: 0, rayStartX: 0, sylStartX: 0, rayY: 0, sylY: 0, rayHidden: false, sylHidden: false }
   };
   var VICKY_X = 560; // the bartender in the background, behind the bar
   var VICKY_LINES = [
@@ -220,13 +221,13 @@
     g.ray.fight.active = true; g.ray.fight.t = 0; g.ray.pause = 0;
   }
   function fightTargetX() { return g.px + g.facing * 70; }
-  // Doors: the bar's left edge leads to the chamber, its right edge
-  // (the stairs) leads up to the Forgotten subway. Each room's door
-  // back to the bar is on the side you came in through.
+  // Doors: the bar's left edge leads to the chamber. Each room's door
+  // back is on the side you came in through. Going UP uses the stairs,
+  // not the edge: walk to the staircase and press E to climb it.
   var EXITS = {
-    bar: { left: "chamber", right: "subway" },
+    bar: { left: "chamber" },
     chamber: { right: "bar" },
-    subway: { left: "bar", right: "garden" },
+    subway: { left: "bar" },
     shopping: { left: "chamber" },
     repair: { left: "shopping" },
     clothing: { left: "shopping" },
@@ -234,6 +235,32 @@
     arcade: { left: "shopping" },
     garden: { left: "subway" }
   };
+  // The staircases that go up: the bar's stone stairs on the right
+  // climb to the Forgotten subway, and the subway's wide stairs on
+  // the right climb to the garden. Walk to the foot of the stairs
+  // and press E, and they climb up together.
+  var STAIRS = {
+    bar: { baseX: 1070, topX: 1150, to: "subway", label: "Go up the stairs to the Forgotten subway", btn: "Up the stairs" },
+    subway: { baseX: 1980, topX: 2120, to: "garden", label: "Go up the stairs to the garden", btn: "Up the stairs" }
+  };
+  var STAIR_RANGE = 90;
+  function stairsNear() {
+    var s = STAIRS[g.room];
+    if (!s) return null;
+    return Math.abs(g.px - s.baseX) < STAIR_RANGE ? g.room : null;
+  }
+  function climbStairs() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.embrace.active || g.climb.active) return;
+    var key = stairsNear();
+    if (!key) return;
+    g.talk.open = false; g.ownerTalk.open = false;
+    var s = STAIRS[key];
+    g.climb.active = true; g.climb.t = 0; g.climb.kind = "stairs"; g.climb.to = s.to;
+    g.climb.baseX = s.baseX; g.climb.topX = s.topX;
+    g.climb.rayStartX = g.ray.x; g.climb.sylStartX = g.px;
+    g.climb.rayY = 0; g.climb.sylY = 0;
+    g.climb.rayHidden = false; g.climb.sylHidden = false;
+  }
   function doorSide() {
     var exits = EXITS[g.room];
     if (exits.left && g.px <= 90) return "left";
@@ -269,7 +296,7 @@
     g.talk.open = false; g.ownerTalk.open = false;
     // Cute climb: Ray goes out first, then reaches back for her,
     // and she climbs up to his hand. The room switches at the end.
-    g.climb.active = true; g.climb.t = 0;
+    g.climb.active = true; g.climb.t = 0; g.climb.kind = "window"; g.climb.to = "shopping";
     g.climb.rayStartX = g.ray.x; g.climb.sylStartX = g.px;
     g.climb.rayY = 0; g.climb.sylY = 0;
     g.climb.rayHidden = false; g.climb.sylHidden = false;
@@ -281,6 +308,7 @@
   function updateClimb() {
     var c = g.climb;
     c.t += 1;
+    if (c.kind === "stairs") { updateStairClimb(); return; }
     var rise = g.h * 0.27; // the window sill above the floor
     if (c.t <= 40) {
       var k = c.t / 40;
@@ -310,7 +338,7 @@
     } else {
       c.active = false;
       c.rayY = 0; c.sylY = 0; c.rayHidden = false; c.sylHidden = false;
-      g.room = "shopping";
+      g.room = c.to;
       g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
       g.px = 110; g.facing = 1;
       g.ray.x = 60; g.ray.dir = 1;
@@ -320,6 +348,45 @@
     }
     // Keep the camera on the window while they climb.
     var target = WINDOW_X * scale() - g.w * 0.38;
+    if (target < 0) target = 0;
+    if (target > worldW() - g.w) target = worldW() - g.w;
+    g.camX += (target - g.camX) * 0.12;
+  }
+  // Climbing a staircase together: they walk to the foot of the
+  // stairs (0-30), then climb up them side by side (30-90), rising
+  // as they go up and to the right, and at the top they are through.
+  function updateStairClimb() {
+    var c = g.climb;
+    var rise = g.h * 0.30; // how high the top of the stairs sits
+    if (c.t <= 30) {
+      var k = c.t / 30;
+      g.px = c.sylStartX + (c.baseX - c.sylStartX) * k;
+      g.facing = 1; g.walk += 1;
+      g.ray.dir = (c.baseX - 60 - c.rayStartX) >= 0 ? 1 : -1;
+      g.ray.x = c.rayStartX + (c.baseX - 60 - c.rayStartX) * k;
+      g.ray.walk += 1; g.ray.pause = 0;
+    } else if (c.t <= 90) {
+      var k2 = (c.t - 30) / 60;
+      g.px = c.baseX + (c.topX - c.baseX) * k2;
+      g.facing = 1; g.walk += 1;
+      g.ray.x = (c.baseX - 60) + (c.topX - c.baseX) * k2;
+      g.ray.dir = 1; g.ray.walk += 1;
+      c.sylY = -rise * k2;
+      c.rayY = -rise * k2;
+      if (c.t === 90) { c.sylHidden = true; c.rayHidden = true; }
+    } else {
+      c.active = false;
+      c.rayY = 0; c.sylY = 0; c.rayHidden = false; c.sylHidden = false;
+      g.room = c.to;
+      g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
+      g.px = 110; g.facing = 1;
+      g.ray.x = 60; g.ray.dir = 1;
+      resize();
+      g.camX = 0;
+      return;
+    }
+    // Keep the camera on the stairs while they climb.
+    var target = c.topX * scale() - g.w * 0.38;
     if (target < 0) target = 0;
     if (target > worldW() - g.w) target = worldW() - g.w;
     g.camX += (target - g.camX) * 0.12;
@@ -423,6 +490,7 @@
     if (g.sleeping) { wakeUp(); return; }
     if (bedNear()) { goToBed(); return; }
     if (windowNear()) { climbOutWindow(); return; }
+    if (stairsNear()) { climbStairs(); return; }
     if (beerDoorNear()) { enterBarFromBeerDoor(); return; }
     var shop = shopNear();
     if (shop) { enterShop(shop); return; }
@@ -500,9 +568,12 @@
   function drawSylvia() {
     if (g.climb.active && g.climb.sylHidden) return;
     if (g.climb.active) {
-      // Climbing out the window: she waits in her idle pose, then
-      // walks to the window and climbs up in the sneak pose.
-      var cimg = g.climb.t > 115 ? sylviaClimbImg : sylviaIdleImg;
+      // Climbing a staircase: she walks up in her side walk frames,
+      // rising as she goes. Out the window she waits, then climbs in
+      // the sneak pose.
+      var cimg = g.climb.kind === "stairs"
+        ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length]
+        : (g.climb.t > 115 ? sylviaClimbImg : sylviaIdleImg);
       if (!cimg || !cimg.complete || cimg.naturalWidth === 0) cimg = sylviaIdleImg;
       if (!cimg || !cimg.complete || cimg.naturalWidth === 0) return;
       var ct = (g.depth + depthRange()) / depthRange();
@@ -513,6 +584,7 @@
       shadow(cx, cfeet, cw);
       ctx.save();
       ctx.translate(cx, cfeet - ch / 2);
+      if (g.climb.kind === "stairs" && g.facing === -1) ctx.scale(-1, 1);
       ctx.drawImage(cimg, -cw / 2, -ch / 2, cw, ch);
       ctx.restore();
       return;
@@ -577,10 +649,13 @@
     if (r.inBed) return; // under the covers with her
     if (g.climb.active && g.climb.rayHidden) return;
     if (g.climb.active) {
-      // Climbing out the window: he runs to it and climbs up in his
+      // Climbing a staircase: he walks up in his walk frames, right
+      // behind her. Out the window he runs to it and climbs up in his
       // walk frames, then leans back in and reaches for her.
-      var rimg = g.climb.t > 80 ? rayReachImg
-        : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length];
+      var rimg = g.climb.kind === "stairs"
+        ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length]
+        : (g.climb.t > 80 ? rayReachImg
+          : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length]);
       if (!rimg || !rimg.complete || rimg.naturalWidth === 0) rimg = rayIdleImg;
       if (!rimg || !rimg.complete || rimg.naturalWidth === 0) return;
       var rt = (r.depth + depthRange()) / depthRange();
@@ -594,7 +669,8 @@
       ctx.translate(rx, rfeet - rh / 2);
       // The reach faces right, so flip it when he reaches left for
       // her. The walk frames face right, flip when he runs left.
-      if (g.climb.t > 80 || r.dir === -1) ctx.scale(-1, 1);
+      if (g.climb.kind === "window" && g.climb.t > 80) ctx.scale(-1, 1);
+      else if (r.dir === -1) ctx.scale(-1, 1);
       ctx.drawImage(rimg, -rw / 2, -rh / 2, rw, rh);
       ctx.restore();
       return;
@@ -881,6 +957,26 @@
     }
     ctx.restore();
   }
+  function drawStairPrompt() {
+    if (g.kiss.active || g.talk.open || g.climb.active) return;
+    var key = stairsNear();
+    if (!key) return;
+    var x = STAIRS[key].baseX * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to " + STAIRS[key].label.charAt(0).toLowerCase() + STAIRS[key].label.slice(1);
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y, tw + 20, 24, 12);
+    else ctx.rect(x - tw / 2 - 10, y, tw + 20, 24);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, x, y + 17);
+    ctx.restore();
+  }
   function drawWindowPrompt() {
     if (g.kiss.active || g.talk.open || g.climb.active) return;
     if (!windowNear()) return;
@@ -965,6 +1061,7 @@
     drawDoorPrompt();
     drawBedPrompt();
     drawWindowPrompt();
+    drawStairPrompt();
     drawBeerDoorPrompt();
     drawShopPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); return; }
@@ -1000,6 +1097,7 @@
       else if (g.sleeping) { enterBtn.hidden = false; enterBtn.textContent = "Get up"; }
       else if (bedNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Go to bed"; }
       else if (windowNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Climb out the window"; }
+      else if (stairsNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = STAIRS[stairsNear()].btn; }
       else if (beerDoorNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = "Enter the bar"; }
       else if (shopNear() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = SHOPS[shopNear()].btn; }
       else if (atDoor() && !g.kiss.active) { enterBtn.hidden = false; enterBtn.textContent = doorLabel(); }
