@@ -49,11 +49,12 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=80" forces a fresh download: the map fog is softer, like
-  // clouds, and the zones are wider so no label fragment peeks out,
-  // and the map's text box fogs with the Surface. A browser that
-  // cached ?v=79 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=80"; return img; }
+  // "?v=81" forces a fresh download: the garden unlocks from the
+  // Mayor on Day 3, the subway unlocks from X once the dungeon is
+  // done, the arcade drops to the tunnels, the tunnels portal goes
+  // to the quarry, and the quarry glows blue. A browser that cached
+  // ?v=80 picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=81"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -228,6 +229,7 @@
   var heartHalfImg = loadImg("assets/heart-half.png");
   var heartEmptyImg = loadImg("assets/heart-empty.png");
   var shadowImg = loadImg("assets/shadow.png");
+  var glowBlueImg = loadImg("assets/glow-blue.png");
   var energyBgImg = loadImg("assets/energy-bg.png");
   var energyFillImg = loadImg("assets/energy-fill.png");
   var energyFillLowImg = loadImg("assets/energy-fill-low.png");
@@ -264,7 +266,7 @@
   var propMushroomImg = loadImg("assets/prop-mushroom.png");
   var propCrystalImg = loadImg("assets/prop-crystal.png");
   var propSackImg = loadImg("assets/prop-sack.png");
-  // The midair descent: Ray and Sylvia jumping down to the quarry,
+  // The midair descent: Ray and Sylvia jumping down to the tunnels,
   // holding hands. Shown full screen while they fall through the
   // secret passage under the arcade floor.
   var descentImg = loadImg("assets/descent.jpg");
@@ -467,6 +469,11 @@
     // hit. kissHealT is the cooldown before a kiss can heal again.
     monsters: [], coins: [], coinCount: 0, monsterHits: 0, hurtT: 0, kissHealT: 0,
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
+    gardenUnlocked: false, mayorCutsceneDone: false,
+    mayorCutscene: { active: false, step: 0, t: 0 },
+    subwayUnlocked: false, dungeonCleared: {},
+    xCutsceneDone: false, xCutscene: { active: false, step: 0, t: 0 },
+    arcadeMinigameDone: false, subwayPuzzlesDone: false,
     visited: { chamber: true, shopping: true },
     fountainSecret: null, secretOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
@@ -792,6 +799,23 @@
     "Be careful down there. The dungeon does not forgive, and neither does exhaustion.",
     "I will be going now. Sleep, eat something, and take it slow tomorrow."
   ];
+  // The Mayor, drunk on Day 3 in the bar, slips up and tells them
+  // where the hidden garden is. This is the only way the garden
+  // unlocks.
+  var MAYOR_CUTSCENE_LINES = [
+    "Sylvia! Ray! Sit, sit. The Mayor of the whole underground city is allowed a few drinks.",
+    "You want to know something? There is a garden. A real one, blooming in the dark, past the Flooded Cistern. Go right, past the water, and there it is.",
+    "Do not tell anyone I told you. I am the Mayor. I know things. Now go. I am... very busy. With this drink."
+  ];
+  // X, appearing for the first time once the whole dungeon is
+  // cleared. He sees great potential in them, and he is the one who
+  // unlocks the subway, hinting that the bar leads to it.
+  var X_CUTSCENE_LINES = [
+    "You cleared the Court. All of it. I have been watching from the dark.",
+    "I see great potential in you. Both of you. More than anyone who has come down here before.",
+    "The subway is open to you now. It has been locked for longer than you have been alive.",
+    "The bar leads to it. The stairs at the far end of the bar. Go. And do not look back."
+  ];
   function kianNear() { return g.room === g.kian.room && Math.abs(g.px - g.kian.x) < 150; }
   function kianTalkLine() {
     var first = !g.kianTalk.open;
@@ -954,6 +978,8 @@
   function pressT() {
     if (g.proposal.active) { advanceProposal(); return; }
     if (g.rescue.active) { advanceRescue(); return; }
+    if (g.mayorCutscene.active) { advanceMayorCutscene(); return; }
+    if (g.xCutscene.active) { advanceXCutscene(); return; }
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding) return;
     if (g.propRead.open) { closePropRead(); return; }
     if (g.talk.open) { talkLine(); return; }
@@ -1216,7 +1242,7 @@
     cistern: { left: "shopping", right: "garden" },
     garden: { left: "cistern" },
     quarry: { left: "arcade", right: "tunnels" },
-    tunnels: { left: "quarry" },
+    tunnels: { left: "chamber" },
     dungeon: { left: "tunnels" },
     dungeon2: { left: "dungeon", right: "dungeon3" },
     dungeon3: { left: "dungeon2", right: "dungeon4" },
@@ -1250,6 +1276,11 @@
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active) return;
     var key = stairsNear();
     if (!key) return;
+    // The subway stays sealed until X unlocks it, after the whole
+    // dungeon is cleared. The subway stairs stay sealed until the
+    // puzzles down there are solved.
+    if (key === "bar" && !g.subwayUnlocked) { showDungeonMsg("The stairs are sealed. The dungeon must be finished first."); return; }
+    if (key === "subway" && !g.subwayPuzzlesDone) { showDungeonMsg("The stairs are sealed by a puzzle. Something here needs solving first."); return; }
     g.talk.open = false; g.ownerTalk.open = false;
     var s = STAIRS[key];
     g.climb.active = true; g.climb.t = 0; g.climb.kind = "stairs"; g.climb.to = s.to;
@@ -1471,6 +1502,8 @@
   // walking the whole route every time.
   function teleportToRoom(roomKey) {
     if (!ROOMS[roomKey]) return;
+    if (roomKey === "garden" && !g.gardenUnlocked) return;
+    if (roomKey === "subway" && !g.subwayUnlocked) return;
     closeMap();
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false; g.rayTalk.open = false;
     g.propRead.open = false; hidePropPanel();
@@ -1504,7 +1537,7 @@
     if (best) teleportToRoom(best);
   }
   // The secret under the arcade floor: three dark arches in the
-  // floor are hidden passages down to the Crystal Quarry. Walk over
+  // floor are hidden passages down to the Old Service Tunnels. Walk over
   // one and press I to inspect it. They crouch down and look, and
   // stay there while she decides. Press I again to jump down
   // together, or walk away (or Esc) to stand back up.
@@ -1567,6 +1600,7 @@
     // each one gets a faint golden shimmer, so she can find where to
     // look. Subtle on purpose: it is still a secret, just findable.
     if (g.room !== "arcade") return;
+    if (!g.arcadeMinigameDone) return;
     var pulse = 0.16 + 0.10 * Math.sin(Date.now() / 500);
     for (var i = 0; i < INSPECT_XS.length; i++) {
       var x = INSPECT_XS[i] * scale() - g.camX;
@@ -1726,6 +1760,10 @@
     // else there is nothing to look at, so no crouch.
     var ax = inspectArch();
     var prop = propNear();
+    // The arcade arches only open up after the minigame gives her a
+    // hint. The minigame itself is not built yet, so for now the
+    // arches stay shut.
+    if (ax !== null && !g.arcadeMinigameDone) { showDungeonMsg("This arch needs a hint first."); return; }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     if (ax !== null) {
       // At a secret arch: crouch down and look at it.
@@ -1753,9 +1791,9 @@
     }
     // phase === "drop": they jump down together, holding hands.
     if (t >= 90) {
-      // They land in the Crystal Quarry.
+      // They land in the Old Service Tunnels.
       g.inspect.active = false;
-      g.room = "quarry";
+      g.room = "tunnels";
       g.px = 110; g.facing = 1; g.depth = 0;
       g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
       g.camX = 0;
@@ -1848,12 +1886,12 @@
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
   }
-  // The way home in the Old Service Tunnels: the round blue tunnel
-  // mouth on the left side, the dark arch with the teal glow, right
-  // where you first walk in from the quarry. Going through it takes
-  // them straight back home to their room. No tunnel image, no pop
-  // up, just the door and home. The big stone door in the Ancient
-  // Dungeon is NOT this: it is for more dungeon levels later.
+  // The round blue tunnel mouth in the Old Service Tunnels: the
+  // dark arch with the teal glow, on the left side, right where you
+  // first walk in from the quarry. Going through it takes them to
+  // the Crystal Quarry. No tunnel image, no pop up, just the door.
+  // The big stone door in the Ancient Dungeon is NOT this: it is
+  // for more dungeon levels later.
   var PORTAL_X = 700, PORTAL_RANGE = 110;
   function portalNear() {
     return g.room === "tunnels" && Math.abs(g.px - PORTAL_X) < PORTAL_RANGE;
@@ -1866,7 +1904,7 @@
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to go back home";
+    var label = "Press E to go to the Crystal Quarry";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(20,10,30,0.72)";
     if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
@@ -1880,8 +1918,8 @@
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!portalNear()) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
-    // Straight back home to their room, no tunnel image, no wait.
-    g.room = "chamber";
+    // Through the blue tunnel mouth to the Crystal Quarry.
+    g.room = "quarry";
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
@@ -2040,6 +2078,12 @@
       showDungeonMsg("Clear all the monsters first!");
       return;
     }
+    // The garden stays shut until the Mayor tells them where it is,
+    // in the Day 3 bar cutscene.
+    if (from === "cistern" && to === "garden" && !g.gardenUnlocked) {
+      showDungeonMsg("The way is dark. You do not know where the garden is yet.");
+      return;
+    }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
     markVisited(to);
@@ -2116,6 +2160,8 @@
     if (g.rescue.active) { advanceRescue(); return; }
     if (g.embrace.active) return;
     if (g.proposal.active) { advanceProposal(); return; }
+    if (g.mayorCutscene.active) { advanceMayorCutscene(); return; }
+    if (g.xCutscene.active) { advanceXCutscene(); return; }
     if (g.sleeping) { wakeUp(); return; }
     if (g.photo.active) { closePhoto(); return; }
     if (g.propRead.open) { closePropRead(); return; }
@@ -2180,7 +2226,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -2209,7 +2255,7 @@
       if (gardenDoorNear()) acts.push({ id: "homedoor", label: "Go home", run: startHomeWalk });
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
     if (stoneDoorNear()) acts.push({ id: "stone", label: "Go deeper", run: enterDungeon2 });
-      if (portalNear()) acts.push({ id: "portal", label: "Go home", run: goThroughPortal });
+      if (portalNear()) acts.push({ id: "portal", label: "Go to the quarry", run: goThroughPortal });
     }
     var ids = acts.map(function (a) { return a.id + ":" + a.label; }).join("|");
     if (ids === lastActionIds) { list.hidden = acts.length === 0; return; }
@@ -2854,6 +2900,10 @@
       room: g.room, px: g.px, depth: g.depth, facing: g.facing,
       scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
       fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, visited: Object.keys(g.visited), proposed: g.proposed,
+      gardenUnlocked: g.gardenUnlocked, mayorCutsceneDone: g.mayorCutsceneDone,
+      subwayUnlocked: g.subwayUnlocked, dungeonCleared: g.dungeonCleared,
+      xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
+      subwayPuzzlesDone: g.subwayPuzzlesDone,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
       fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
@@ -2942,6 +2992,13 @@
     g.scooter.x = (typeof s.scooterX === "number") ? s.scooterX : SCOOTER_X;
     g.fountainWished = !!s.fountainWished;
     g.fountainSecret = s.fountainSecret || null;
+    g.gardenUnlocked = !!s.gardenUnlocked;
+    g.mayorCutsceneDone = !!s.mayorCutsceneDone;
+    g.subwayUnlocked = !!s.subwayUnlocked;
+    g.dungeonCleared = s.dungeonCleared || {};
+    g.xCutsceneDone = !!s.xCutsceneDone;
+    g.arcadeMinigameDone = !!s.arcadeMinigameDone;
+    g.subwayPuzzlesDone = !!s.subwayPuzzlesDone;
     g.visited = { chamber: true, shopping: true };
     (s.visited || []).forEach(function (r) { g.visited[r] = true; });
     g.visited[g.room] = true;
@@ -3025,6 +3082,16 @@
       ctx.fill();
     }
   }
+  // The Crystal Quarry makes them glow a soft blue, but only in
+  // there. An image, not a canvas fill, so the energy-bar fill bug
+  // cannot tint it. Drawn behind the sprite, like an aura.
+  function drawQuarryGlow(x, cy, w, h) {
+    if (g.room !== "quarry") return;
+    if (!glowBlueImg || !glowBlueImg.complete || glowBlueImg.naturalWidth === 0) return;
+    var gw = w * 2.2;
+    var gh = h * 1.3;
+    ctx.drawImage(glowBlueImg, x - gw / 2, cy - gh / 2, gw, gh);
+  }
 
   // Dungeon monsters: Key Knight, Candle Pup, Bitey Rock, Bell Ghost.
   // They live only in the Ancient Dungeon. Each one takes 2 hits to
@@ -3060,6 +3127,9 @@
   var DUNGEON_ORDER = { dungeon: 0, dungeon2: 1, dungeon3: 2, dungeon4: 3 };
   function dungeonCleared() {
     return isDungeonRoom(g.room) && g.monsters.length === 0;
+  }
+  function dungeonAllCleared() {
+    return g.dungeonCleared.dungeon && g.dungeonCleared.dungeon2 && g.dungeonCleared.dungeon3 && g.dungeonCleared.dungeon4;
   }
   function showDungeonMsg(text) {
     g.dungeonMsg = text;
@@ -3156,6 +3226,9 @@
           g.coins.push({ x: m.x + (Math.random() * 100 - 50), depth: m.depth });
         }
         g.monsters.splice(i, 1);
+        // The level is cleared the moment its last monster falls.
+        // This is what the subway unlock counts on.
+        if (g.monsters.length === 0) g.dungeonCleared[g.room] = true;
       }
     }
   }
@@ -3225,6 +3298,7 @@
       var ifeet = groundY() + g.depth;
       var ix = g.px * scale() - g.camX;
       shadow(ix, ifeet, iw);
+      drawQuarryGlow(ix, ifeet - ih / 2, iw, ih);
       ctx.save();
       ctx.translate(ix, ifeet - ih / 2);
       if (g.facing === -1) ctx.scale(-1, 1);
@@ -3275,6 +3349,7 @@
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
     shadow(x, feetY, w);
+    drawQuarryGlow(x, feetY - h / 2, w, h);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
@@ -3357,7 +3432,7 @@
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
     if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
-    if (g.rescue.active) return;
+    if (g.rescue.active || g.mayorCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
@@ -3379,9 +3454,74 @@
     g.proposed = true;
     saveGame();
   }
+  // The Mayor's garden cutscene: on Day 3, when she walks into the
+  // bar, the Mayor is drunk and slips up about the hidden garden.
+  // After it, the garden is unlocked. One time only.
+  function startMayorCutscene() {
+    if (g.mayorCutsceneDone || g.mayorCutscene.active) return;
+    if (g.sleeping || g.kiss.active || g.embrace.active) return;
+    if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
+    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.proposal.active || g.rescue.active || g.xCutscene.active) return;
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
+    g.mayorCutscene.active = true;
+    g.mayorCutscene.step = 0;
+    g.mayorCutscene.t = 0;
+    g.adler.dir = g.px < g.adler.x ? -1 : 1;
+    g.ray.dir = g.adler.x < g.ray.x ? -1 : 1;
+    g.ray.pause = 9999;
+  }
+  function advanceMayorCutscene() {
+    if (!g.mayorCutscene.active) return;
+    g.mayorCutscene.step += 1;
+    g.mayorCutscene.t = 0;
+    if (g.mayorCutscene.step > 2) endMayorCutscene();
+  }
+  function endMayorCutscene() {
+    g.mayorCutscene.active = false;
+    g.mayorCutsceneDone = true;
+    g.gardenUnlocked = true;
+    g.ray.pause = 0;
+    saveGame();
+  }
+  // X's appearance: once the whole dungeon is cleared, he shows
+  // himself in the Court, and they are both shocked to see him. He
+  // tells them the subway is open now, and that the bar leads to it.
+  function startXCutscene() {
+    if (g.xCutsceneDone || g.xCutscene.active) return;
+    if (g.sleeping || g.kiss.active || g.embrace.active) return;
+    if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
+    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active) return;
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
+    g.xCutscene.active = true;
+    g.xCutscene.step = 0;
+    g.xCutscene.t = 0;
+    g.xSeen = true;
+    g.sylviaSurprisedT = 9999;
+    g.facing = g.px < g.stranger.x ? 1 : -1;
+    g.ray.dir = g.stranger.x < g.ray.x ? -1 : 1;
+    g.ray.pause = 9999;
+  }
+  function advanceXCutscene() {
+    if (!g.xCutscene.active) return;
+    g.xCutscene.step += 1;
+    g.xCutscene.t = 0;
+    if (g.xCutscene.step > 3) endXCutscene();
+  }
+  function endXCutscene() {
+    g.xCutscene.active = false;
+    g.xCutsceneDone = true;
+    g.subwayUnlocked = true;
+    g.sylviaSurprisedT = 90;
+    g.ray.pause = 0;
+    saveGame();
+  }
   function startRescue() {
     if (g.rescue.active) return;
-    if (g.sleeping || g.proposal.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.sleeping || g.proposal.active || g.mayorCutscene.active || g.xCutscene.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.kiss.active || g.embrace.active || g.mirror.active || g.map.active || g.photo.active) return;
     if (g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
     if (g.portal.active) return;
@@ -3518,6 +3658,61 @@
     for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], cx, by + 42 + j * 20);
     ctx.restore();
   }
+  // A top-centre story bubble, like the rescue's: the speaker's name
+  // in colour at the top, the line wrapped below it. Used by the
+  // Mayor's garden cutscene and by X's appearance.
+  function drawStoryBubble(name, line, nameColor) {
+    if (!line) return;
+    var cx = g.w / 2;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    var nameW = ctx.measureText(name).width;
+    ctx.font = "16px 'Open Sans', sans-serif";
+    var lineW = ctx.measureText(line).width;
+    var maxW = Math.min(440, g.w - 60);
+    var bw = Math.min(maxW, Math.max(nameW, lineW)) + 36;
+    var bh = 24 + 22 + 18;
+    var bx = cx - bw / 2;
+    var by = 56;
+    ctx.fillStyle = "rgba(255,255,255,0.96)";
+    ctx.strokeStyle = "#d9c7ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 14);
+    else ctx.rect(bx, by, bw, bh);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, by + bh);
+    ctx.lineTo(cx + 10, by + bh);
+    ctx.lineTo(cx, by + bh + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = nameColor;
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.fillText(name, cx, by + 20);
+    ctx.fillStyle = "#222";
+    ctx.font = "16px 'Open Sans', sans-serif";
+    var words = line.split(" ");
+    var lines = [], cur = "";
+    for (var k = 0; k < words.length; k++) {
+      var test = cur ? cur + " " + words[k] : words[k];
+      if (ctx.measureText(test).width > bw - 36 && cur) { lines.push(cur); cur = words[k]; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], cx, by + 42 + j * 20);
+    ctx.restore();
+  }
+  function drawMayorCutsceneBubble() {
+    if (!g.mayorCutscene.active) return;
+    drawStoryBubble("MAYOR ADLER", MAYOR_CUTSCENE_LINES[g.mayorCutscene.step], "#7a5fd0");
+  }
+  function drawXCutsceneBubble() {
+    if (!g.xCutscene.active) return;
+    drawStoryBubble("X", X_CUTSCENE_LINES[g.xCutscene.step], "#5a4a8a");
+  }
   function drawProposal() {
     // One picture per beat now: step 0 Ray slowly gets down on one
     // knee over six frames, then holds out the ring (silent until the
@@ -3643,6 +3838,7 @@
       var rifeet = groundY() + r.depth - 6;
       var rix = r.x * scale() - g.camX;
       shadow(rix, rifeet, riw);
+      drawQuarryGlow(rix, rifeet - rih / 2, riw, rih);
       ctx.save();
       ctx.translate(rix, rifeet - rih / 2);
       if (r.dir === -1) ctx.scale(-1, 1);
@@ -3721,6 +3917,7 @@
     var feetY = groundY() + r.depth - 6;
     var x = r.x * scale() - g.camX;
     shadow(x, feetY, w);
+    drawQuarryGlow(x, feetY - h / 2, w, h);
     ctx.save();
     ctx.translate(x, feetY - h / 2);
     // Ray's frames face right, so flip them when he faces left.
@@ -4941,6 +5138,8 @@
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
     var label = "Press E to " + STAIRS[key].label.charAt(0).toLowerCase() + STAIRS[key].label.slice(1);
+    if (key === "bar" && !g.subwayUnlocked) label = "The stairs are sealed";
+    else if (key === "subway" && !g.subwayPuzzlesDone) label = "The stairs are sealed by a puzzle";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.beginPath();
@@ -5221,6 +5420,8 @@
     drawStrangerTalk();
     drawRescueKian();
     drawRescueBubble();
+    drawMayorCutsceneBubble();
+    drawXCutsceneBubble();
     drawRayTalk();
     drawFountainMsg();
     drawChestMsg();
@@ -5236,7 +5437,12 @@
     if (!g.started) { draw(); return; }
     // A new room means a new first impression: show the little
     // intro line for the place she just walked into.
-    if (g.room !== g.lastRoom) { g.lastRoom = g.room; showRoomIntro(); }
+    if (g.room !== g.lastRoom) {
+      g.lastRoom = g.room; showRoomIntro();
+      // On Day 3, walking into the bar starts the Mayor's cutscene:
+      // drunk, he slips up and tells them where the hidden garden is.
+      if (g.room === "bar" && g.day >= 3 && !g.mayorCutsceneDone) startMayorCutscene();
+    }
     if (g.mirror.active) {
       // Looking in the mirror: she blinks once in a while, and
       // while she manifests she keeps her eyes shut on an
@@ -5424,7 +5630,7 @@
       return;
     }
     if (g.inspect.active) {
-      // Inspecting the secret spot, then jumping down to the quarry.
+      // Inspecting the secret spot, then jumping down to the tunnels.
       // The inspect drives them both, and nothing else moves until
       // they land.
       updateInspect();
@@ -5442,6 +5648,20 @@
       // The proposal cutscene on the Surface: the art and the lines
       // play, and nothing else moves until it is done.
       g.proposal.t += 1;
+      draw();
+      return;
+    }
+    if (g.mayorCutscene.active) {
+      // The Mayor's garden cutscene in the bar: his lines play, and
+      // nothing else moves until it is done.
+      g.mayorCutscene.t += 1;
+      draw();
+      return;
+    }
+    if (g.xCutscene.active) {
+      // X's appearance in the Court: his lines play, and nothing else
+      // moves until it is done.
+      g.xCutscene.t += 1;
       draw();
       return;
     }
@@ -5833,27 +6053,26 @@
     }
     if (g.adlerTalk.open) ad.dir = g.px < ad.x ? -1 : 1; // face Sylvia
     // Mika: she lives in the Flooded Cistern and never leaves it, so
-    // she never changes rooms. She wanders it slowly and sits down
-    // whenever she pauses, because she is mostly sitting down. Her
-    // pauses are long (5 to 15 seconds) and her walk is slow. While
-    // talking she stands still and faces Sylvia; her laugh and
-    // surprise timers count down here.
+    // she never changes rooms. She is sitting down about 90% of the
+    // time: her pauses are very long (15 to 30 seconds) and she only
+    // walks for a couple of seconds between them, sitting the moment
+    // she stops. While talking she stands still and faces Sylvia; her
+    // laugh and surprise timers count down here.
     var mk = g.mika;
     if (mk.laughT > 0) mk.laughT -= 1;
     if (mk.surprisedT > 0) mk.surprisedT -= 1;
     if (g.room === mk.room && !g.mikaTalk.open) {
       if (mk.pause > 0) {
         mk.pause -= 1;
-        // She sits down a moment after she stops, and stays sitting
-        // for the rest of her long pause.
-        mk.sitT += 1;
-        if (mk.sitT > 90) mk.sitting = true;
+        // She sits the moment she stops, and stays sitting for the
+        // rest of her very long pause.
+        mk.sitting = true;
       } else {
         mk.sitting = false; mk.sitT = 0;
         mk.x += mk.dir * 0.5;
         mk.walk += 0.3;
-        if (mk.x < 150) { mk.x = 150; mk.dir = 1; mk.pause = 300 + Math.random() * 600; } else if (mk.x > room().w - 150) { mk.x = room().w - 150; mk.dir = -1; mk.pause = 300 + Math.random() * 600; }
-        else if (Math.random() < 0.004) { mk.pause = 300 + Math.random() * 600; }
+        if (mk.x < 150) { mk.x = 150; mk.dir = 1; mk.pause = 900 + Math.random() * 900; } else if (mk.x > room().w - 150) { mk.x = room().w - 150; mk.dir = -1; mk.pause = 900 + Math.random() * 900; }
+        else if (Math.random() < 0.008) { mk.pause = 900 + Math.random() * 900; }
       }
     }
     if (g.mikaTalk.open) mk.dir = g.px < mk.x ? -1 : 1; // face Sylvia
@@ -5872,18 +6091,11 @@
       }
     }
     if (g.strangerTalk.open) st.dir = g.px < st.x ? -1 : 1; // face Sylvia
-    // The first time the Court is cleared and X shows himself, they
-    // are both shocked and turn to face the direction he is in. Sylvia
-    // shows her surprised pose. Ray has no surprised pose, so he turns
-    // and stands still facing him.
-    if (!g.xSeen && g.room === "dungeon4" && dungeonCleared()) {
-      g.xSeen = true;
-      g.sylviaSurprisedT = 90;
-      g.facing = g.px < st.x ? 1 : -1;
-      g.ray.dir = st.x < g.ray.x ? -1 : 1;
-      g.ray.pause = 90;
-    }
-    if (g.sylviaSurprisedT > 0) g.sylviaSurprisedT -= 1;
+    // The first time the whole dungeon is cleared and X shows
+    // himself in the Court, it is a cutscene: they are both shocked
+    // and turn to face him, and he tells them the subway is open.
+    if (!g.xCutsceneDone && g.room === "dungeon4" && dungeonCleared() && dungeonAllCleared()) startXCutscene();
+    if (g.sylviaSurprisedT > 0 && !g.xCutscene.active) g.sylviaSurprisedT -= 1;
     // When she is standing still and he wanders up right behind
     // her, he holds her for a few seconds, then wanders off again.
     if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
@@ -5973,6 +6185,8 @@
       if (dt < 250 && moved < 12) {
         if (g.proposal.active) { advanceProposal(); pointerDownAt = 0; return; }
     if (g.rescue.active) { advanceRescue(); pointerDownAt = 0; return; }
+    if (g.mayorCutscene.active) { advanceMayorCutscene(); pointerDownAt = 0; return; }
+    if (g.xCutscene.active) { advanceXCutscene(); pointerDownAt = 0; return; }
         tryAttack();
       }
     }
