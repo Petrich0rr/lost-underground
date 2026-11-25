@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=84" forces a fresh download: missions, the Vicky drink
+  // "?v=85" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=84"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=85"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -82,11 +82,6 @@
   var rayReachImg = loadImg("assets/ray-reach.png");
   var rayTalkImg = loadImg("assets/ray-talk.png");
   var rayTalkShyImg = loadImg("assets/ray-talk-shy.png");
-  // Char's fashion: the red gown for Sylvia (front and side views)
-  // and the black bandana for Ray, worn as a headband.
-  var gownFrontImg = loadImg("assets/gown-red-front.png");
-  var gownSideImg = loadImg("assets/gown-red-side.png");
-  var bandanaImg = loadImg("assets/bandana-headband.png");
   var sylviaClimbImg = loadImg("assets/sylvia-pose-sneak.png");
   // The golden mirror at the chamber vanity: she blinks, and when
   // she manifests she shuts her eyes and says an affirmation.
@@ -401,7 +396,7 @@
     // bar, when Sylvia is not with him. roomT counts down to his
     // next move; laughT and surprisedT are his talk poses, like the
     // others'.
-    kian: { x: 850, dir: 1, pause: 120, walk: 0, depth: 0, room: "bar", roomT: 3000, laughT: 0, surprisedT: 0 },
+    kian: { x: 850, dir: 1, pause: 120, walk: 0, depth: 0, room: "shopping", roomT: 3000, laughT: 0, surprisedT: 0 },
     // Yuto, a Japanese sexy nerd that loves reading. He is always
     // teaching people something new and interesting facts. He is a
     // bit cocky and egoistic, but in a hot way. He wanders the
@@ -528,10 +523,10 @@
     // True while the sleep confirm panel shows: she has to say yes
     // before sleeping, because sleeping moves to the next day.
     sleepConfirmOpen: false,
-    // Char's fashion shop: the Ruby Satin Evening Gown for Sylvia
-    // and a black bandana for Ray, bought with gold coins in the
-    // clothing store. Owned once bought; On while she is wearing
-    // it. fashionOpen is true while the fashion panel shows.
+    // Char's fashion shop: the store is empty right now (the gown
+    // and bandana were removed). The fashion state stays in the
+    // save so old saves still load. fashionOpen is true while
+    // the fashion panel shows.
     fashion: { gownOwned: false, gownOn: false, bandanaOwned: false, bandanaOn: false },
     fashionOpen: false,
     map: { active: false },
@@ -2389,10 +2384,6 @@
   // an edge door carries it into the next room. Get off to climb
   // stairs or to go through a shop, bar, or iron door.
   var SCOOTER_X = 280, SCOOTER_RANGE = 110, SCOOTER_PRICE = 20;
-  // Char's fashion prices, in gold coins: the gown is the dear one,
-  // the bandana is cheaper, so both are reachable after a few
-  // dungeon runs. (The scooter stays $20.)
-  var GOWN_PRICE = 15, BANDANA_PRICE = 10;
   function scooterNear() {
     return g.scooter.room === g.room && g.scooter.owned && !g.scooter.riding && Math.abs(g.px - g.scooter.x) < SCOOTER_RANGE;
   }
@@ -2468,11 +2459,10 @@
     if (note) note.textContent = "You own the pink scooter. It is parked outside on the street.";
     saveGame();
   }
-  // Char's fashion shop: the Ruby Satin Evening Gown for Sylvia
-  // and a black bandana for Ray, bought with gold coins in the
-  // clothing store. Buying adds it to the wardrobe and puts it on
-  // right away; the button then toggles Wear and Take off. The two
-  // pieces layer: one dress, one bandana, both at once.
+  // Char's fashion shop: the store is empty right now (the gown
+  // and bandana were removed), so the panel just says she is
+  // restocking. The panel and button stay so new pieces can be
+  // added back later without rewiring Char's talk.
   function openFashion() {
     if (g.fashionOpen) return;
     g.fashionOpen = true;
@@ -2487,51 +2477,8 @@
     if (panel) panel.hidden = true;
   }
   function refreshFashionPanel() {
-    var gownBtn = document.getElementById("fashionGownBtn");
-    if (gownBtn) {
-      if (!g.fashion.gownOwned) {
-        gownBtn.disabled = g.coinCount < GOWN_PRICE;
-        gownBtn.textContent = "Buy it for " + GOWN_PRICE + " coins";
-      } else {
-        gownBtn.disabled = false;
-        gownBtn.textContent = g.fashion.gownOn ? "Take it off" : "Wear it";
-      }
-    }
-    var bandBtn = document.getElementById("fashionBandanaBtn");
-    if (bandBtn) {
-      if (!g.fashion.bandanaOwned) {
-        bandBtn.disabled = g.coinCount < BANDANA_PRICE;
-        bandBtn.textContent = "Buy it for " + BANDANA_PRICE + " coins";
-      } else {
-        bandBtn.disabled = false;
-        bandBtn.textContent = g.fashion.bandanaOn ? "Take it off" : "Wear it";
-      }
-    }
     var note = document.getElementById("fashionNote");
-    if (note) note.textContent = "You have " + g.coinCount + " coins. Beat dungeon monsters to earn more.";
-  }
-  function fashionAction(item) {
-    if (item === "gown") {
-      if (!g.fashion.gownOwned) {
-        if (g.coinCount < GOWN_PRICE) return;
-        g.coinCount -= GOWN_PRICE;
-        g.fashion.gownOwned = true;
-        g.fashion.gownOn = true;
-      } else {
-        g.fashion.gownOn = !g.fashion.gownOn;
-      }
-    } else {
-      if (!g.fashion.bandanaOwned) {
-        if (g.coinCount < BANDANA_PRICE) return;
-        g.coinCount -= BANDANA_PRICE;
-        g.fashion.bandanaOwned = true;
-        g.fashion.bandanaOn = true;
-      } else {
-        g.fashion.bandanaOn = !g.fashion.bandanaOn;
-      }
-    }
-    refreshFashionPanel();
-    saveGame();
+    if (note) note.textContent = "Char is restocking. Nothing here right now, check back soon!";
   }
   // The wishing fountain in the Secret Garden. The fountain's
   // central column is at world x 1475 in the 2172-wide room (measured
@@ -3515,29 +3462,6 @@
     // attacks the way she is facing. Front and back views are never flipped.
     if (g.facing === -1 && img !== sylviaIdleImg && img !== sylviaSurprisedImg && !keys.up && !keys.down) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
-    // Char's red gown, when she is wearing it. Front view (standing
-    // still, or walking toward the camera) gets the front gown, laid
-    // from her shoulders to her feet; the side walk gets the side
-    // gown, stretched a little wider so its skirt covers her legs.
-    // It stays off for the back walk and the kick, where the dress
-    // would hide the pose. It flips with her, inside this transform.
-    if (g.fashion.gownOn && !g.attack.active && !keys.up && !g.homeWalk.active) {
-      var gownImg = null, gownTop = 0, gownH = 0, gownW = 0;
-      if (keys.down || !moving) {
-        gownImg = gownFrontImg;
-        gownH = h * 0.90;
-        gownTop = -h / 2 + h * 0.12;
-        if (gownImg && gownImg.complete && gownImg.naturalWidth > 0)
-          gownW = gownH * (gownImg.naturalWidth / gownImg.naturalHeight);
-      } else {
-        gownImg = gownSideImg;
-        gownH = h * 0.79;
-        gownTop = -h / 2 + h * 0.22;
-        gownW = w * 1.07;
-      }
-      if (gownImg && gownImg.complete && gownImg.naturalWidth > 0 && gownW > 0)
-        ctx.drawImage(gownImg, -gownW / 2, gownTop, gownW, gownH);
-    }
     ctx.restore();
   }
 
@@ -4068,13 +3992,6 @@
       ctx.save();
       ctx.translate(tx, tfeet - th / 2);
       ctx.drawImage(timg, -tw / 2, -th / 2, tw, th);
-      // The bandana, on his talking pose too: a wider band, since
-      // the portrait shows his head bigger than the walk frames do.
-      if (g.fashion.bandanaOn && bandanaImg && bandanaImg.complete && bandanaImg.naturalWidth > 0) {
-        var bw2 = tw * 0.45;
-        var bh2 = bw2 * (bandanaImg.naturalHeight / bandanaImg.naturalWidth);
-        ctx.drawImage(bandanaImg, -bw2 / 2, -th * 0.44 - bh2 / 2, bw2, bh2);
-      }
       ctx.restore();
       return;
     }
@@ -4134,14 +4051,6 @@
     if (sideView && img === rayPunchImg) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
-    // Ray's black bandana, when he is wearing it: a headband across
-    // his forehead, just above his eyes. It flips with him, inside
-    // this transform, so the knot stays at the back of his head.
-    if (g.fashion.bandanaOn && bandanaImg && bandanaImg.complete && bandanaImg.naturalWidth > 0) {
-      var bw = w * 0.30;
-      var bh = bw * (bandanaImg.naturalHeight / bandanaImg.naturalWidth);
-      ctx.drawImage(bandanaImg, -bw / 2, -h * 0.45 - bh / 2, bw, bh);
-    }
     ctx.restore();
   }
 
@@ -6092,8 +6001,8 @@
     }
     if (g.eveTalk.open) ev.dir = g.px < ev.x ? -1 : 1; // face Sylvia
     // Alexis: she wanders the Shopping District street and goes to
-    // the clothing store and the bar often, so her room rotates
-    // between the three. She only moves rooms when her talk is closed
+    // the clothing store often, so her room rotates between the two.
+    // She only moves rooms when her talk is closed
     // and Sylvia is not in her room, so she never vanishes in front
     // of Sylvia. While talking she stands still and faces Sylvia;
     // her laugh and surprise timers count down here.
@@ -6103,7 +6012,7 @@
     if (!g.alexisTalk.open && g.room !== ax.room) {
       ax.roomT -= 1;
       if (ax.roomT <= 0) {
-        var aRooms = ["shopping", "clothing", "bar"];
+        var aRooms = ["shopping", "clothing"];
         var aNext;
         do { aNext = aRooms[Math.floor(Math.random() * aRooms.length)]; }
         while (aNext === ax.room);
@@ -6186,27 +6095,12 @@
       }
     }
     if (g.diegoTalk.open) dg.dir = g.px < dg.x ? -1 : 1; // face Sylvia
-    // Dr. Kian: he walks around the Shopping District street but is
-    // mostly in the bar, so his room rotates between the two,
-    // weighted toward the bar (two chances in three). He only moves
-    // rooms when his talk is closed and Sylvia is not in his room,
-    // so he never vanishes in front of Sylvia. While talking he
-    // stands still and faces Sylvia; his laugh and surprise timers
-    // count down here.
+    // Dr. Kian: he walks around the Shopping District street and
+    // stays there. While talking he stands still and faces Sylvia;
+    // his laugh and surprise timers count down here.
     var kn = g.kian;
     if (kn.laughT > 0) kn.laughT -= 1;
     if (kn.surprisedT > 0) kn.surprisedT -= 1;
-    if (!g.kianTalk.open && g.room !== kn.room) {
-      kn.roomT -= 1;
-      if (kn.roomT <= 0) {
-        var kNext;
-        do { kNext = Math.random() < 0.67 ? "bar" : "shopping"; }
-        while (kNext === kn.room);
-        kn.room = kNext;
-        kn.x = 200; kn.dir = 1; kn.pause = 60;
-        kn.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
-      }
-    }
     if (g.room === kn.room && !g.kianTalk.open) {
       if (kn.pause > 0) { kn.pause -= 1; }
       else {
@@ -6217,26 +6111,12 @@
       }
     }
     if (g.kianTalk.open) kn.dir = g.px < kn.x ? -1 : 1; // face Sylvia
-    // Yuto: he wanders the Shopping District street and the bar, so
-    // his room rotates between the two. He only moves rooms when his
-    // talk is closed and Sylvia is not in his room, so he never
-    // vanishes in front of Sylvia. While talking he stands still and
-    // faces Sylvia; his laugh and surprise timers count down here.
+    // Yuto: he wanders the Shopping District street and stays
+    // there. While talking he stands still and faces Sylvia; his
+    // laugh and surprise timers count down here.
     var yt = g.yuto;
     if (yt.laughT > 0) yt.laughT -= 1;
     if (yt.surprisedT > 0) yt.surprisedT -= 1;
-    if (!g.yutoTalk.open && g.room !== yt.room) {
-      yt.roomT -= 1;
-      if (yt.roomT <= 0) {
-        var yRooms = ["shopping", "bar"];
-        var yNext;
-        do { yNext = yRooms[Math.floor(Math.random() * yRooms.length)]; }
-        while (yNext === yt.room);
-        yt.room = yNext;
-        yt.x = 200; yt.dir = 1; yt.pause = 60;
-        yt.roomT = 2700 + Math.floor(Math.random() * 4500); // 45-120s
-      }
-    }
     if (g.room === yt.room && !g.yutoTalk.open) {
       if (yt.pause > 0) { yt.pause -= 1; }
       else {
@@ -6445,10 +6325,6 @@
   if (shopCloseBtn) shopCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeShop(); });
   var fashionBtn = document.getElementById("fashionBtn");
   if (fashionBtn) fashionBtn.addEventListener("click", function (e) { e.stopPropagation(); openFashion(); });
-  var fashionGownBtn = document.getElementById("fashionGownBtn");
-  if (fashionGownBtn) fashionGownBtn.addEventListener("click", function (e) { e.stopPropagation(); fashionAction("gown"); });
-  var fashionBandanaBtn = document.getElementById("fashionBandanaBtn");
-  if (fashionBandanaBtn) fashionBandanaBtn.addEventListener("click", function (e) { e.stopPropagation(); fashionAction("bandana"); });
   var fashionCloseBtn = document.getElementById("fashionCloseBtn");
   if (fashionCloseBtn) fashionCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeFashion(); });
   var sleepConfirmBtn = document.getElementById("sleepConfirmBtn");
