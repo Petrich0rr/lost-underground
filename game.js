@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=88" forces a fresh download: missions, the Vicky drink
+  // "?v=89" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=88"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=89"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -639,6 +639,9 @@
     subwayUnlocked: false, dungeonCleared: {},
     xCutsceneDone: false, xCutscene: { active: false, step: 0, t: 0 },
     arcadeMinigameDone: false, subwayPuzzlesDone: false,
+    // The quarry crystal mission: five glowing crystals in the
+    // Crystal Quarry. Gather them all and the iron door opens.
+    crystals: [0, 1, 2, 3, 4], crystalCount: 0, quarryMissionDone: false,
     visited: { chamber: true, shopping: true },
     fountainSecret: null, secretOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
@@ -1435,7 +1438,7 @@
   // back is on the side you came in through. Going UP uses the stairs,
   // not the edge: walk to the staircase and press E to climb it.
   var EXITS = {
-    bar: { left: "chamber" },
+    bar: { left: "chamber", right: "shopping" },
     chamber: { right: "bar" },
     subway: { left: "bar" },
     shopping: { left: "chamber", right: "cistern" },
@@ -1655,7 +1658,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=88" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=89" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1711,7 +1714,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=88" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=89" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -2554,6 +2557,9 @@
       // They land in the Old Service Tunnels.
       g.inspect.active = false;
       g.room = "tunnels";
+      markVisited("tunnels");
+      onEnterRoom("tunnels");
+      updateMapImage();
       g.px = 110; g.facing = 1; g.depth = 0;
       g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
       g.camX = 0;
@@ -2594,8 +2600,10 @@
     if (g.monsters.length > 0) { showDungeonMsg("Clear all the monsters first!"); return; }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = "dungeon2";
+    markVisited("dungeon2");
+    onEnterRoom("dungeon2");
+    updateMapImage();
     spawnMonsters();
-    maybeShowDungeonControls();
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
@@ -2627,7 +2635,7 @@
     ctx.save();
     ctx.font = "700 13px 'Open Sans', sans-serif";
     ctx.textAlign = "center";
-    var label = "Press E to go to Dungeon";
+    var label = (!g.quarryMissionDone && !g.dungeonCleared.dungeon) ? "The iron door is sealed" : "Press E to go to Dungeon";
     var tw = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(20,10,30,0.72)";
     if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
@@ -2641,9 +2649,15 @@
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
     if (!ironDoorNear()) return;
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
+    // The iron door stays sealed until the quarry crystals are
+    // gathered (unless she has already cleared the first level,
+    // so an older save is never locked out of the dungeon).
+    if (!g.quarryMissionDone && !g.dungeonCleared.dungeon) { showDungeonMsg("The iron door is sealed. The crystals in the Crystal Quarry hum — gather them first."); return; }
     g.room = "dungeon";
+    markVisited("dungeon");
+    onEnterRoom("dungeon");
+    updateMapImage();
     spawnMonsters();
-    maybeShowDungeonControls();
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
@@ -2682,6 +2696,9 @@
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     // Through the blue tunnel mouth to the Crystal Quarry.
     g.room = "quarry";
+    markVisited("quarry");
+    onEnterRoom("quarry");
+    updateMapImage();
     g.px = 110; g.facing = 1; g.depth = 0;
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
@@ -2730,6 +2747,9 @@
       c.active = false;
       c.rayY = 0; c.sylY = 0; c.rayHidden = false; c.sylHidden = false;
       g.room = c.to;
+      markVisited(c.to);
+      onEnterRoom(c.to);
+      updateMapImage();
       g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
       g.px = 110; g.facing = 1;
       g.ray.x = 60; g.ray.dir = 1;
@@ -2769,6 +2789,9 @@
       c.active = false;
       c.rayY = 0; c.sylY = 0; c.rayHidden = false; c.sylHidden = false;
       g.room = c.to;
+      markVisited(c.to);
+      onEnterRoom(c.to);
+      updateMapImage();
       g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
       g.px = 110; g.facing = 1;
       g.ray.x = 60; g.ray.dir = 1;
@@ -2793,6 +2816,9 @@
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active) return;
     g.talk.open = false; g.ownerTalk.open = false;
     g.room = "bar";
+    markVisited("bar");
+    onEnterRoom("bar");
+    updateMapImage();
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You walk in through the bar door, on the right side of the room,
     // facing the bar and Vicky. Ray comes in just behind you.
@@ -2821,6 +2847,9 @@
     if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active) return;
     g.talk.open = false; g.ownerTalk.open = false;
     g.room = key;
+    markVisited(key);
+    onEnterRoom(key);
+    updateMapImage();
     g.depth = 0; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0; g.ray.fight.active = false;
     // You walk in the shop door, on the left side of the room, facing in.
     g.px = 110; g.facing = 1;
@@ -2889,6 +2918,10 @@
       // Walking out of a shop puts you on the street in front of its door.
       g.px = SHOPS[from].doorX; g.facing = 1;
       g.ray.x = SHOPS[from].doorX - 60; g.ray.dir = 1;
+    } else if (from === "bar" && to === "shopping") {
+      // Out through the bar door, onto the street in front of it.
+      g.px = BEER_DOOR_X; g.facing = -1;
+      g.ray.x = BEER_DOOR_X - 60; g.ray.dir = -1;
     } else if (from === "earthen" && to === "surface") {
       // Coming out of the tunnel, they start at the top of the stone
       // steps that climb out onto the terrace, not at the left edge.
@@ -2904,7 +2937,7 @@
     if (g.px < roomMinX()) { g.px = roomMinX() + 10; g.facing = 1; }
     if (g.ray.x < roomMinX()) { g.ray.x = roomMinX(); g.ray.dir = 1; }
     resize();
-    if (SHOPS[from] && to === "shopping") {
+    if ((SHOPS[from] && to === "shopping") || (from === "bar" && to === "shopping")) {
       g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
     } else if (from === "earthen" && to === "surface") {
       g.camX = 0;
@@ -3043,7 +3076,7 @@
       var pr = propNear();
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
       if (pinballNear()) acts.push({ id: "pinball", label: "Play pinball", run: openPinball });
-      if (inspectNear()) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
+      if (inspectNear() && g.arcadeMinigameDone) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
       if (fountainNear() && !g.fountainWished) acts.push({ id: "fountain", label: "Make a wish", run: makeWish });
       if (fountainNear() && g.fountainWished && !g.fountainSecret) acts.push({ id: "fountain", label: "Ask the fountain", run: makeWish });
       if (chestNear()) acts.push({ id: "chest", label: "Open the chest", run: openChest });
@@ -3504,6 +3537,9 @@
     if (g.homeWalk.t >= 90) {
       g.homeWalk.active = false;
       g.room = "chamber";
+      markVisited("chamber");
+      onEnterRoom("chamber");
+      updateMapImage();
       g.px = 110; g.facing = 1; g.depth = 0;
       g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.vdir = 0; g.ray.pause = 0;
       g.camX = 0;
@@ -3649,6 +3685,7 @@
       subwayUnlocked: g.subwayUnlocked, dungeonCleared: g.dungeonCleared,
       xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
       subwayPuzzlesDone: g.subwayPuzzlesDone,
+      crystals: g.crystals.slice(), crystalCount: g.crystalCount, quarryMissionDone: g.quarryMissionDone,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
       fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn },
@@ -3748,6 +3785,9 @@
     g.xCutsceneDone = !!s.xCutsceneDone;
     g.arcadeMinigameDone = !!s.arcadeMinigameDone;
     g.subwayPuzzlesDone = !!s.subwayPuzzlesDone;
+    g.crystals = Array.isArray(s.crystals) ? s.crystals.slice() : [0, 1, 2, 3, 4];
+    g.crystalCount = s.crystalCount || 0;
+    g.quarryMissionDone = !!s.quarryMissionDone;
     g.visited = { chamber: true, shopping: true };
     (s.visited || []).forEach(function (r) { g.visited[r] = true; });
     g.visited[g.room] = true;
@@ -3901,7 +3941,8 @@
     { id: "garden", title: "Find the Secret Garden", hint: "Past the Flooded Cistern, past the shopping district. The Mayor let it slip.", room: "garden" },
     { id: "fountain", title: "Make a wish", hint: "The fountain in the garden grants one wish.", room: "garden" },
     { id: "arcade", title: "The arcade's secret", hint: "The arcade's arches hide a way down. Find the hint that opens them.", room: "arcade" },
-    { id: "dungeon", title: "Clear the dungeon", hint: "The iron door in the Old Service Tunnels leads down. Clear every level.", room: "dungeon4" },
+    { id: "quarry", title: "Crystals in the quarry", hint: "The Crystal Quarry hums. Gather the five glowing crystals.", room: "quarry" },
+    { id: "dungeon", title: "Clear the dungeon", hint: "Gather the quarry crystals to open the iron door, then clear every level.", room: "dungeon4" },
     { id: "x", title: "Meet X", hint: "Something waits at the bottom of the dungeon.", room: "dungeon4" },
     { id: "subway", title: "Solve the subway puzzles", hint: "The stairs in the Forgotten Subway are sealed by a puzzle.", room: "subway" },
     { id: "surface", title: "Reach the Surface", hint: "Up through the Upper Levels and the Earthen Tunnel.", room: "surface" },
@@ -4017,6 +4058,28 @@
         g.coinCount += 1;
       }
     }
+    // Glowing crystals in the quarry; walking over one picks it up.
+    // Gather all five and the iron door in the tunnels opens.
+    if (g.room === "quarry" && !g.quarryMissionDone) {
+      var dr = depthRange();
+      for (var k = g.crystals.length - 1; k >= 0; k--) {
+        var sp = CRYSTAL_SPOTS[g.crystals[k]];
+        if (!sp) continue;
+        var cDepth = -(1 - sp.d) * dr;
+        if (Math.abs(sp.x - g.px) < 60 && Math.abs(cDepth - g.depth) < 20) {
+          g.crystals.splice(k, 1);
+          g.crystalCount += 1;
+          if (g.crystalCount >= QUARRY_CRYSTALS_NEEDED) {
+            g.quarryMissionDone = true;
+            completeMission("quarry");
+            showDungeonMsg("The crystals sing together. The iron door in the tunnels is open now.");
+            saveGame();
+          } else {
+            showDungeonMsg("Crystal " + g.crystalCount + " of " + QUARRY_CRYSTALS_NEEDED + ".");
+          }
+        }
+      }
+    }
   }
   function hitMonsters(fromX, facing, fromDepth) {
     // Sylvia's kick or Ray's punch lands: any monster in front of the
@@ -4081,6 +4144,41 @@
       ctx.translate(x, feetY - h / 2);
       if (m.dir === -1) ctx.scale(-1, 1);
       ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+  }
+  // The quarry crystal mission: five glowing crystals scattered
+  // across the Crystal Quarry. Walk over one to pick it up; gather
+  // all five and the iron door in the tunnels opens.
+  var QUARRY_CRYSTALS_NEEDED = 5;
+  var CRYSTAL_SPOTS = [
+    { x: 300, d: 0.7 },
+    { x: 700, d: 0.4 },
+    { x: 1100, d: 0.8 },
+    { x: 1500, d: 0.3 },
+    { x: 1900, d: 0.6 }
+  ];
+  function drawCrystals() {
+    if (g.room !== "quarry" || g.quarryMissionDone) return;
+    var dr = depthRange();
+    var pulse = 0.55 + 0.25 * Math.sin(Date.now() / 400);
+    for (var i = 0; i < g.crystals.length; i++) {
+      var s = CRYSTAL_SPOTS[g.crystals[i]];
+      if (!s) continue;
+      var img = propCrystalImg;
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var h = g.h * 0.13;
+      var w = h * (img.naturalWidth / img.naturalHeight);
+      var depth = -(1 - s.d) * dr;
+      var feetY = groundY() + depth;
+      var x = s.x * scale() - g.camX;
+      shadow(x, feetY, w);
+      // A soft blue glow behind each crystal, so they read as
+      // special, not just another piece of junk on the floor.
+      drawQuarryGlow(x, feetY - h / 2, w * 1.6, h * 1.2);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.drawImage(img, x - w / 2, feetY - h, w, h);
       ctx.restore();
     }
   }
@@ -6193,6 +6291,7 @@
     drawProps();
     drawChests();
     drawCoins();
+    drawCrystals();
     drawScooter();
     drawArchGlow();
     drawFountainGlow();
@@ -7181,6 +7280,9 @@
       g.xCutsceneDone = false;
       g.arcadeMinigameDone = false;
       g.subwayPuzzlesDone = false;
+      g.crystals = [0, 1, 2, 3, 4];
+      g.crystalCount = 0;
+      g.quarryMissionDone = false;
       g.look = { sylviaOutfit: "default", sylviaHair: "wavy", rayOutfit: "default", rayHair: "afro", owned: [] };
       updateMapImage();
       rollChests();
