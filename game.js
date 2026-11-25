@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=86" forces a fresh download: missions, the Vicky drink
+  // "?v=87" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=86"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=87"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -269,6 +269,164 @@
   // secret passage under the arcade floor.
   var descentImg = loadImg("assets/descent.jpg");
   var rayCrouchImg = loadImg("assets/ray-crouch.png");
+
+  // ---- Outfits and hairstyles (v87) ----
+  // Sylvia and Ray can buy outfits at Char's fashion store and
+  // hairstyles at Mikey's salon, then change into what they own at
+  // the closet in their room (the chamber). What they wear now is
+  // the default, always free to change back to.
+  var SHOP_ITEMS = [
+    { id: "olive", who: "sylvia", kind: "outfit", name: "Olive Pantsuit", price: 20, desc: "A sharp olive suit. Sylvia's power look." },
+    { id: "corset", who: "sylvia", kind: "outfit", name: "White Corset Outfit", price: 20, desc: "A white corset with a ruffle skirt and white boots." },
+    { id: "black", who: "sylvia", kind: "outfit", name: "Black Exclusive Set", price: 60, desc: "The exclusive set. Black crop top and shorts, sunglasses, buns and a checkered bag. The most expensive piece in the store." },
+    { id: "brownsuit", who: "ray", kind: "outfit", name: "Brown Suit", price: 25, desc: "A tailored brown suit. Ray cleans up well." },
+    { id: "lightblue", who: "ray", kind: "outfit", name: "Light Blue Casual", price: 20, desc: "A light blue shirt and white pants. Easy and cool." },
+    { id: "ponytail", who: "sylvia", kind: "hair", name: "Golden Ponytail", price: 15, desc: "Sylvia's hair up in a high golden ponytail." },
+    { id: "straight", who: "sylvia", kind: "hair", name: "Straight Blonde", price: 15, desc: "Sylvia's hair worn long and straight." },
+    { id: "fluffy", who: "ray", kind: "hair", name: "Fluffy Afro", price: 15, desc: "Ray's hair big and fluffy." },
+    { id: "bandana", who: "ray", kind: "hair", name: "Black Bandana", price: 10, desc: "A black bandana for Ray." }
+  ];
+  function shopItem(id) { for (var i = 0; i < SHOP_ITEMS.length; i++) if (SHOP_ITEMS[i].id === id) return SHOP_ITEMS[i]; return null; }
+  function ownsItem(id) { return g.look.owned.indexOf(id) >= 0; }
+  function buyItem(id) {
+    var it = shopItem(id);
+    if (!it || ownsItem(id) || g.coinCount < it.price) return false;
+    g.coinCount -= it.price;
+    g.look.owned.push(id);
+    saveGame();
+    return true;
+  }
+  // Equip an outfit or a hairstyle from the closet. The Black
+  // Exclusive Set comes with the buns, so putting it on sets her
+  // hair to buns; changing her hair away from buns while wearing
+  // it takes the set off again, back to her blue dress.
+  function equipItem(id) {
+    var it = shopItem(id);
+    if (!it) return;
+    if (it.kind === "outfit") {
+      if (it.who === "sylvia") {
+        g.look.sylviaOutfit = id;
+        if (id === "black") g.look.sylviaHair = "buns";
+        else if (g.look.sylviaHair === "buns") g.look.sylviaHair = "wavy";
+      } else {
+        g.look.rayOutfit = id;
+      }
+    } else {
+      if (it.who === "sylvia") {
+        g.look.sylviaHair = id;
+        if (g.look.sylviaOutfit === "black" && id !== "buns") g.look.sylviaOutfit = "default";
+      } else {
+        g.look.rayHair = id;
+      }
+    }
+    preloadLook();
+    saveGame();
+  }
+  function equipDefault(who, kind) {
+    if (who === "sylvia") {
+      if (kind === "outfit") g.look.sylviaOutfit = "default";
+      else g.look.sylviaHair = "wavy";
+    } else {
+      if (kind === "outfit") g.look.rayOutfit = "default";
+      else g.look.rayHair = "afro";
+    }
+    preloadLook();
+    saveGame();
+  }
+  // Sprite lookup for the current look. Each getter returns the
+  // outfit image when it exists and has loaded, and the default
+  // outfit's sprite otherwise, so the characters never vanish
+  // while a new outfit is still downloading. The Olive walk, front
+  // and back views and its stance and kick were only drawn with
+  // wavy hair, so a ponytail or straight-haired Olive still walks
+  // in wavy; her idle and poses do change with her hair.
+  var outfitImgCache = {};
+  function outfitImg(path) {
+    if (!outfitImgCache[path]) outfitImgCache[path] = loadImg(path);
+    return outfitImgCache[path];
+  }
+  function sylviaOutfitPath(kind, num) {
+    var outfit = g.look.sylviaOutfit, hair = g.look.sylviaHair;
+    if (outfit === "default") return null;
+    if (outfit === "black") hair = "buns";
+    else if (hair === "buns") hair = "wavy";
+    var has = {
+      corset: { walk: 1, front: 1, back: 1, idle: 1, crouch: 1, surprised: 1, climb: 1 },
+      olive: { walk: 1, front: 1, back: 1, idle: 1, crouch: 1, surprised: 1, climb: 1, stance: 1, kick: 1 },
+      black: { walk: 1, front: 1, back: 1, idle: 1, crouch: 1, surprised: 1, climb: 1, stance: 1, kick: 1 }
+    }[outfit];
+    if (!has || !has[kind]) return null;
+    if (outfit === "olive" && (kind === "walk" || kind === "front" || kind === "back" || kind === "stance" || kind === "kick")) hair = "wavy";
+    var base = "assets/sylvia-" + outfit + "-" + kind + "-" + hair;
+    if (num) base += "-" + ("0" + num).slice(-2);
+    return base + ".png";
+  }
+  function sylviaLookImg(kind, num, fallback) {
+    var p = sylviaOutfitPath(kind, num);
+    if (!p) return fallback;
+    var img = outfitImg(p);
+    return (img.complete && img.naturalWidth !== 0) ? img : fallback;
+  }
+  function sylviaWalk(i) { return sylviaLookImg("walk", i + 1, sylviaWalkImgs[i]); }
+  function sylviaIdle() { return sylviaLookImg("idle", 0, sylviaIdleImg); }
+  function sylviaFront(i) { return sylviaLookImg("front", i + 1, sylviaFrontWalkImgs[i]); }
+  function sylviaBack(i) { return sylviaLookImg("back", i + 1, sylviaBackWalkImgs[i]); }
+  function sylviaStance() { return sylviaLookImg("stance", 0, sylviaStanceImg); }
+  function sylviaKick() { return sylviaLookImg("kick", 0, sylviaKickImg); }
+  function sylviaCrouch() { return sylviaLookImg("crouch", 0, sylviaCrouchImg); }
+  function sylviaSurprised() { return sylviaLookImg("surprised", 0, sylviaSurprisedImg); }
+  function sylviaClimb() { return sylviaLookImg("climb", 0, sylviaClimbImg); }
+  // Ray's combat and talk poses live in the Light Blue sheets under
+  // different file names (combat-stance, combat-punch, pose-reach,
+  // pose-crossed, pose-crouch). The Brown Suit has no combat art, so
+  // it falls back to his default tank-top poses.
+  var RAY_SLOT_FILE = { stance: "combat-stance", punch: "combat-punch", reach: "pose-reach", talk: "pose-crossed", "talk-shy": "pose-crossed", crouch: "pose-crouch" };
+  function rayOutfitPath(kind, num) {
+    var outfit = g.look.rayOutfit, hair = g.look.rayHair;
+    if (outfit === "default") return null;
+    var has = {
+      brownsuit: { walk: 1, front: 1, back: 1, idle: 1 },
+      lightblue: { walk: 1, front: 1, back: 1, idle: 1, stance: 1, punch: 1, reach: 1, talk: 1, "talk-shy": 1, crouch: 1 }
+    }[outfit];
+    if (!has || !has[kind]) return null;
+    var fileKind = RAY_SLOT_FILE[kind] || kind;
+    var base = "assets/ray-" + outfit + "-" + fileKind + "-" + hair;
+    if (num) base += "-" + ("0" + num).slice(-2);
+    return base + ".png";
+  }
+  function rayLookImg(kind, num, fallback) {
+    var p = rayOutfitPath(kind, num);
+    if (!p) return fallback;
+    var img = outfitImg(p);
+    return (img.complete && img.naturalWidth !== 0) ? img : fallback;
+  }
+  function rayWalk(i) { return rayLookImg("walk", i + 1, rayWalkImgs[i]); }
+  function rayIdle() { return rayLookImg("idle", 0, rayIdleImg); }
+  function rayFront(i) { return rayLookImg("front", i + 1, rayFrontWalkImgs[i]); }
+  function rayBack(i) { return rayLookImg("back", i + 1, rayBackWalkImgs[i]); }
+  function rayStance() { return rayLookImg("stance", 0, rayStanceImg); }
+  function rayPunch() { return rayLookImg("punch", 0, rayPunchImg); }
+  function rayReach() { return rayLookImg("reach", 0, rayReachImg); }
+  function rayTalk() { return rayLookImg("talk", 0, rayTalkImg); }
+  function rayTalkShy() { return rayLookImg("talk-shy", 0, rayTalkShyImg); }
+  function rayCrouch() { return rayLookImg("crouch", 0, rayCrouchImg); }
+  // Start downloading the current look's sprites so they are ready
+  // by the time the closet or shop panel closes.
+  function preloadLook() {
+    var kinds = ["walk", "front", "back", "idle", "stance", "kick", "crouch", "surprised", "climb"];
+    var i, p;
+    for (i = 0; i < kinds.length; i++) {
+      p = sylviaOutfitPath(kinds[i], 1);
+      if (p) outfitImg(p);
+      p = rayOutfitPath(kinds[i], 1);
+      if (p) outfitImg(p);
+    }
+    for (i = 1; i <= 8; i++) {
+      p = sylviaOutfitPath("walk", i); if (p) outfitImg(p);
+      p = rayOutfitPath("walk", i); if (p) outfitImg(p);
+    }
+  }
+
   // The pink scooter Gunner sells, and the four riding frames of
   // Ray driving with Sylvia in front. The scooter is parked on the
   // shopping street after you buy it, and you ride it together.
@@ -529,6 +687,13 @@
     // the fashion panel shows.
     fashion: { gownOwned: false, gownOn: false, bandanaOwned: false, bandanaOn: false },
     fashionOpen: false,
+    // Outfits and hairstyles (v87): what Sylvia and Ray are wearing
+    // right now, and which shop items they own. "default" is the blue
+    // dress and black tank they started in, always free to change
+    // back to. salonOpen / closetOpen are true while those panels show.
+    look: { sylviaOutfit: "default", sylviaHair: "wavy", rayOutfit: "default", rayHair: "afro", owned: [] },
+    salonOpen: false,
+    closetOpen: false,
     map: { active: false },
     inspect: { active: false, t: 0, arch: 0, phase: "look" },
     // The portal tunnel: active while they pass through the tunnel
@@ -1419,6 +1584,154 @@
     var pop = document.getElementById("photoPopup");
     if (pop) pop.hidden = true;
   }
+  // The closet in their room (the chamber), between the vanity and
+  // the bed: walk up and press E to open it. Everything they own
+  // from Char's fashion store and Mikey's salon is in here, plus
+  // the blue dress and black tank they started in, always free to
+  // change back to.
+  var CLOSET_X = 550, CLOSET_RANGE = 90;
+  function closetNear() {
+    return g.room === "chamber" && Math.abs(g.px - CLOSET_X) < CLOSET_RANGE;
+  }
+  function openCloset() {
+    if (g.closetOpen) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.mirror.active || g.photo.active) return;
+    if (!closetNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false;
+    g.closetOpen = true;
+    var panel = document.getElementById("closetPanel");
+    if (panel) panel.hidden = false;
+    refreshClosetPanel();
+  }
+  function closeCloset() {
+    g.closetOpen = false;
+    var panel = document.getElementById("closetPanel");
+    if (panel) panel.hidden = true;
+  }
+  // A preview picture for a shop item: the idle sprite for that
+  // outfit in its base hair, or for a hairstyle the idle sprite of
+  // another outfit that shows the hair.
+  function itemPreview(it) {
+    if (it.kind === "outfit") {
+      if (it.who === "sylvia") return "assets/sylvia-" + it.id + "-idle-" + (it.id === "black" ? "buns" : "wavy") + ".png";
+      return "assets/ray-" + it.id + "-idle-afro.png";
+    }
+    if (it.who === "sylvia") return "assets/sylvia-corset-idle-" + it.id + ".png";
+    return "assets/ray-lightblue-idle-" + it.id + ".png";
+  }
+  function isWearing(id) {
+    var it = shopItem(id);
+    if (!it) return false;
+    if (it.kind === "outfit") return (it.who === "sylvia" ? g.look.sylviaOutfit : g.look.rayOutfit) === id;
+    return (it.who === "sylvia" ? g.look.sylviaHair : g.look.rayHair) === id;
+  }
+  function isDefaultWorn(who, kind) {
+    if (who === "sylvia") return kind === "outfit" ? g.look.sylviaOutfit === "default" : g.look.sylviaHair === "wavy";
+    return kind === "outfit" ? g.look.rayOutfit === "default" : g.look.rayHair === "afro";
+  }
+  // One row in a shop or closet list: preview, name, description,
+  // price, and a button. The button's data-id and data-act are
+  // handled by the panel click listener set up at the bottom.
+  function shopRowHTML(it, btnLabel, btnDisabled) {
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=87" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+  }
+  function refreshFashionPanel() {
+    var box = document.getElementById("fashionItems");
+    var note = document.getElementById("fashionNote");
+    if (note) note.textContent = "You have " + g.coinCount + " coins. Wear what you buy from the closet in your room.";
+    if (!box) return;
+    var html = "";
+    SHOP_ITEMS.forEach(function (it) {
+      if (it.kind !== "outfit") return;
+      var label, dis = false;
+      if (isWearing(it.id)) { label = "Wearing"; dis = true; }
+      else if (ownsItem(it.id)) { label = "Wear it"; }
+      else { label = "Buy it for " + it.price + " coins"; dis = g.coinCount < it.price; }
+      html += shopRowHTML(it, label, dis);
+    });
+    box.innerHTML = html;
+  }
+  function openSalon() {
+    if (g.salonOpen) return;
+    g.salonOpen = true;
+    g.ownerTalk.open = false;
+    var panel = document.getElementById("salonPanel");
+    if (panel) panel.hidden = false;
+    refreshSalonPanel();
+  }
+  function closeSalon() {
+    g.salonOpen = false;
+    var panel = document.getElementById("salonPanel");
+    if (panel) panel.hidden = true;
+  }
+  function refreshSalonPanel() {
+    var box = document.getElementById("salonItems");
+    var note = document.getElementById("salonNote");
+    if (note) note.textContent = "You have " + g.coinCount + " coins. Wear what you buy from the closet in your room.";
+    if (!box) return;
+    var html = "";
+    SHOP_ITEMS.forEach(function (it) {
+      if (it.kind !== "hair") return;
+      var label, dis = false;
+      if (isWearing(it.id)) { label = "Wearing"; dis = true; }
+      else if (ownsItem(it.id)) { label = "Wear it"; }
+      else { label = "Buy it for " + it.price + " coins"; dis = g.coinCount < it.price; }
+      html += shopRowHTML(it, label, dis);
+    });
+    box.innerHTML = html;
+  }
+  function refreshClosetPanel() {
+    var box = document.getElementById("closetItems");
+    var note = document.getElementById("closetNote");
+    if (note) note.textContent = "Everything you own, plus what you started in. Tap Wear to change.";
+    if (!box) return;
+    function rowFor(who, kind, id, name, desc, img) {
+      var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
+      var label = worn ? "Wearing" : "Wear";
+      var dis = worn;
+      return '<div class="fashionItem"><img src="' + img + '?v=87" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+    }
+    var html = "";
+    html += '<div class="shopCardName">Sylvia</div>';
+    html += rowFor("sylvia", "outfit", null, "Blue Dress", "Her blue dress. The default.", "assets/sylvia-idle.png");
+    SHOP_ITEMS.forEach(function (it) {
+      if (it.who === "sylvia" && it.kind === "outfit" && ownsItem(it.id)) html += rowFor("sylvia", "outfit", it.id, it.name, it.desc, itemPreview(it));
+    });
+    html += rowFor("sylvia", "hair", null, "Long Wavy Hair", "Her long wavy blonde hair. The default.", "assets/sylvia-idle.png");
+    SHOP_ITEMS.forEach(function (it) {
+      if (it.who === "sylvia" && it.kind === "hair" && ownsItem(it.id)) html += rowFor("sylvia", "hair", it.id, it.name, it.desc, itemPreview(it));
+    });
+    html += '<div class="shopCardName">Ray</div>';
+    html += rowFor("ray", "outfit", null, "Black Tank", "His black tank top. The default.", "assets/ray-idle.png");
+    SHOP_ITEMS.forEach(function (it) {
+      if (it.who === "ray" && it.kind === "outfit" && ownsItem(it.id)) html += rowFor("ray", "outfit", it.id, it.name, it.desc, itemPreview(it));
+    });
+    html += rowFor("ray", "hair", null, "Short Afro", "His short natural afro. The default.", "assets/ray-idle.png");
+    SHOP_ITEMS.forEach(function (it) {
+      if (it.who === "ray" && it.kind === "hair" && ownsItem(it.id)) html += rowFor("ray", "hair", it.id, it.name, it.desc, itemPreview(it));
+    });
+    box.innerHTML = html;
+  }
+  // One click handler for the three panels. A shop button either
+  // buys the item or wears it if it is already owned; a closet
+  // button wears it (or switches back to the default).
+  function onShopPanelClick(e) {
+    var b = e.target.closest ? e.target.closest("[data-id]") : null;
+    if (!b) return;
+    var id = b.getAttribute("data-id"), act = b.getAttribute("data-act");
+    if (act === "shop") {
+      if (ownsItem(id)) { equipItem(id); refreshFashionPanel(); refreshSalonPanel(); }
+      else if (buyItem(id)) { refreshFashionPanel(); refreshSalonPanel(); }
+    } else if (act === "closet") {
+      if (id.indexOf("default-") === 0) {
+        var parts = id.split("-");
+        equipDefault(parts[1], parts[2]);
+      } else {
+        equipItem(id);
+      }
+      refreshClosetPanel();
+    }
+  }
   // The world map. The map button (top left, under the HP hearts)
   // opens it: the whole underground world, blurred behind, with
   // Sylvia's and Ray's heads pinned at their current room.
@@ -1941,7 +2254,7 @@
   }
   function openPinball() {
     if (pinball.active) return;
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
     if (!pinballNear()) return;
     keys.left = keys.right = keys.up = keys.down = keys.fast = false;
     var pop = document.getElementById("pinballPopup");
@@ -2595,6 +2908,7 @@
     if (g.propRead.open) { closePropRead(); return; }
     if (g.scooter.riding) { dismountScooter(); return; }
     if (photoNear()) { openPhoto(); return; }
+    if (closetNear()) { openCloset(); return; }
     if (bedNear()) { openSleepConfirm(); return; }
     if (vanityNear()) { enterMirror(); return; }
     if (windowNear()) { climbOutWindow(); return; }
@@ -2655,7 +2969,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -2666,6 +2980,7 @@
     } else {
       addTalkActions(acts);
       if (photoNear()) acts.push({ id: "photo", label: "Look at the photo", run: openPhoto });
+      if (closetNear()) acts.push({ id: "closet", label: "Open the closet", run: openCloset });
       if (bedNear()) acts.push({ id: "bed", label: "Go to bed", run: openSleepConfirm });
       if (vanityNear()) acts.push({ id: "mirror", label: "Look in the mirror", run: enterMirror });
       if (windowNear()) acts.push({ id: "window", label: "Climb out the window", run: climbOutWindow });
@@ -2797,10 +3112,9 @@
     if (note) note.textContent = "You own the pink scooter. It is parked outside on the street.";
     saveGame();
   }
-  // Char's fashion shop: the store is empty right now (the gown
-  // and bandana were removed), so the panel just says she is
-  // restocking. The panel and button stay so new pieces can be
-  // added back later without rewiring Char's talk.
+  // Char's fashion shop: outfits for Sylvia and Ray, bought with
+  // gold coins. Buying does not put it on; wear it from the closet
+  // in their room, or tap Wear it right here.
   function openFashion() {
     if (g.fashionOpen) return;
     g.fashionOpen = true;
@@ -2813,10 +3127,6 @@
     g.fashionOpen = false;
     var panel = document.getElementById("fashionPanel");
     if (panel) panel.hidden = true;
-  }
-  function refreshFashionPanel() {
-    var note = document.getElementById("fashionNote");
-    if (note) note.textContent = "Char is restocking. Nothing here right now, check back soon!";
   }
   // The wishing fountain in the Secret Garden. The fountain's
   // central column is at world x 1475 in the 2172-wide room (measured
@@ -3290,7 +3600,8 @@
       subwayPuzzlesDone: g.subwayPuzzlesDone,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
-      fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn }
+      fashion: { gownOwned: g.fashion.gownOwned, gownOn: g.fashion.gownOn, bandanaOwned: g.fashion.bandanaOwned, bandanaOn: g.fashion.bandanaOn },
+      look: { sylviaOutfit: g.look.sylviaOutfit, sylviaHair: g.look.sylviaHair, rayOutfit: g.look.rayOutfit, rayHair: g.look.rayHair, owned: g.look.owned.slice() }
     };
   }
   function saveGame() {
@@ -3406,6 +3717,14 @@
       g.fashion.gownOn = !!s.fashion.gownOn;
       g.fashion.bandanaOwned = !!s.fashion.bandanaOwned;
       g.fashion.bandanaOn = !!s.fashion.bandanaOn;
+    }
+    if (s.look) {
+      g.look.sylviaOutfit = s.look.sylviaOutfit || "default";
+      g.look.sylviaHair = s.look.sylviaHair || "wavy";
+      g.look.rayOutfit = s.look.rayOutfit || "default";
+      g.look.rayHair = s.look.rayHair || "afro";
+      g.look.owned = (s.look.owned || []).slice();
+      preloadLook();
     }
     g.monsters = []; g.coins = [];
     g.lastRoom = null;
@@ -3732,8 +4051,8 @@
       // Inspecting the secret spot: she crouches down to look at it.
       // Once they jump, she is in the descent art, not on the floor.
       if (g.inspect.phase === "drop") return;
-      var iimg = sylviaCrouchImg;
-      if (!iimg || !iimg.complete || iimg.naturalWidth === 0) iimg = sylviaIdleImg;
+      var iimg = sylviaCrouch();
+      if (!iimg || !iimg.complete || iimg.naturalWidth === 0) iimg = sylviaIdle();
       if (!iimg || !iimg.complete || iimg.naturalWidth === 0) return;
       var it = (g.depth + depthRange()) / depthRange();
       var ih = sylviaH() * 0.62 * (0.92 + 0.08 * it);
@@ -3754,9 +4073,9 @@
       // rising as she goes. Out the window she waits, then climbs in
       // the sneak pose.
       var cimg = g.climb.kind === "stairs"
-        ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length]
-        : (g.climb.t > 115 ? sylviaClimbImg : sylviaIdleImg);
-      if (!cimg || !cimg.complete || cimg.naturalWidth === 0) cimg = sylviaIdleImg;
+        ? sylviaWalk(Math.floor(g.walk / 3) % 8)
+        : (g.climb.t > 115 ? sylviaClimb() : sylviaIdle());
+      if (!cimg || !cimg.complete || cimg.naturalWidth === 0) cimg = sylviaIdle();
       if (!cimg || !cimg.complete || cimg.naturalWidth === 0) return;
       var ct = (g.depth + depthRange()) / depthRange();
       var ch = sylviaH() * (0.92 + 0.08 * ct);
@@ -3775,16 +4094,16 @@
     var img;
     if (g.sylviaSurprisedT > 0) {
       // She just saw X for the first time: her surprised pose.
-      img = sylviaSurprisedImg;
+      img = sylviaSurprised();
     } else if (g.attack.active) {
       // Stance, then the high kick, then back to stance.
-      img = (g.attack.t >= 8 && g.attack.t < 22) ? sylviaKickImg : sylviaStanceImg;
-    } else if (keys.up || g.homeWalk.active) { img = sylviaBackWalkImgs[Math.floor(g.walk / 6) % sylviaBackWalkImgs.length]; }
-    else if (keys.down) { img = sylviaFrontWalkImgs[Math.floor(g.walk / 6) % sylviaFrontWalkImgs.length]; }
+      img = (g.attack.t >= 8 && g.attack.t < 22) ? sylviaKick() : sylviaStance();
+    } else if (keys.up || g.homeWalk.active) { img = sylviaBack(Math.floor(g.walk / 6) % 2); }
+    else if (keys.down) { img = sylviaFront(Math.floor(g.walk / 6) % 2); }
     else {
-      img = moving ? sylviaWalkImgs[Math.floor(g.walk / 3) % sylviaWalkImgs.length] : sylviaIdleImg;
+      img = moving ? sylviaWalk(Math.floor(g.walk / 3) % 8) : sylviaIdle();
     }
-    if (!img || !img.complete || img.naturalWidth === 0) img = sylviaIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = sylviaIdle();
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (g.depth + depthRange()) / depthRange(); // 0 back, 1 front
     var h = sylviaH() * (0.92 + 0.08 * t);
@@ -3798,7 +4117,7 @@
     // Sylvia's walk frames face right, so flip them when she faces left.
     // Her stance and kick face right too, so they flip as well, and she
     // attacks the way she is facing. Front and back views are never flipped.
-    if (g.facing === -1 && img !== sylviaIdleImg && img !== sylviaSurprisedImg && !keys.up && !keys.down) ctx.scale(-1, 1);
+    if (g.facing === -1 && img !== sylviaIdle() && img !== sylviaSurprised() && !keys.up && !keys.down) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
@@ -3851,7 +4170,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
     if (g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
@@ -3883,7 +4202,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.vickyCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.mayorCutscene.active = true;
@@ -3915,7 +4234,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.vickyCutscene.active = true;
@@ -3945,7 +4264,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.xCutscene.active = true;
@@ -3976,7 +4295,7 @@
     if (g.rescue.active) return;
     if (g.sleeping || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.kiss.active || g.embrace.active || g.mirror.active || g.map.active || g.missionsOpen || g.photo.active) return;
-    if (g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
+    if (g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.chestOpen) return;
     if (g.portal.active) return;
     g.rescue.active = true;
     g.rescue.phase = "carry";
@@ -4297,8 +4616,8 @@
       // Inspecting the secret spot: he crouches down beside her.
       // Once they jump, he is in the descent art, not on the floor.
       if (g.inspect.phase === "drop") return;
-      var riimg = rayCrouchImg;
-      if (!riimg || !riimg.complete || riimg.naturalWidth === 0) riimg = rayIdleImg;
+      var riimg = rayCrouch();
+      if (!riimg || !riimg.complete || riimg.naturalWidth === 0) riimg = rayIdle();
       if (!riimg || !riimg.complete || riimg.naturalWidth === 0) return;
       var rit = (r.depth + depthRange()) / depthRange();
       var rih = rayH() * 0.62 * (0.92 + 0.08 * rit);
@@ -4318,8 +4637,8 @@
       // Talking to her: he shows his talking pose. Arms crossed and
       // serious by default. After Sylvia speaks, if she was shy or
       // flirty, he gets bashful and blushing. Front view, never flipped.
-      var timg = (g.rayTalk.step >= 1 && (g.rayTalk.choice === 2 || g.rayTalk.choice === 3)) ? rayTalkShyImg : rayTalkImg;
-      if (!timg || !timg.complete || timg.naturalWidth === 0) timg = rayIdleImg;
+      var timg = (g.rayTalk.step >= 1 && (g.rayTalk.choice === 2 || g.rayTalk.choice === 3)) ? rayTalkShy() : rayTalk();
+      if (!timg || !timg.complete || timg.naturalWidth === 0) timg = rayIdle();
       if (!timg || !timg.complete || timg.naturalWidth === 0) return;
       var tt = (r.depth + depthRange()) / depthRange();
       var th = rayH() * (0.92 + 0.08 * tt);
@@ -4338,10 +4657,10 @@
       // behind her. Out the window he runs to it and climbs up in his
       // walk frames, then leans back in and reaches for her.
       var rimg = g.climb.kind === "stairs"
-        ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length]
-        : (g.climb.t > 80 ? rayReachImg
-          : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length]);
-      if (!rimg || !rimg.complete || rimg.naturalWidth === 0) rimg = rayIdleImg;
+        ? rayWalk(Math.floor(r.walk / 3) % 8)
+        : (g.climb.t > 80 ? rayReach()
+          : rayWalk(Math.floor(r.walk / 3) % 8));
+      if (!rimg || !rimg.complete || rimg.naturalWidth === 0) rimg = rayIdle();
       if (!rimg || !rimg.complete || rimg.naturalWidth === 0) return;
       var rt = (r.depth + depthRange()) / depthRange();
       var rh = rayH() * (0.92 + 0.08 * rt);
@@ -4363,14 +4682,14 @@
     var img;
     if (r.fight.active) {
       var nearTarget = Math.abs(r.x - fightTargetX()) < 30;
-      img = nearTarget ? rayPunchImg
-        : rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length];
-    } else if (r.vdir === -1) { img = rayBackWalkImgs[Math.floor(r.walk / 6) % rayBackWalkImgs.length]; }
-    else if (r.vdir === 1) { img = rayFrontWalkImgs[Math.floor(r.walk / 6) % rayFrontWalkImgs.length]; }
+      img = nearTarget ? rayPunch()
+        : rayWalk(Math.floor(r.walk / 3) % 8);
+    } else if (r.vdir === -1) { img = rayBack(Math.floor(r.walk / 6) % 2); }
+    else if (r.vdir === 1) { img = rayFront(Math.floor(r.walk / 6) % 2); }
     else {
-      img = walking ? rayWalkImgs[Math.floor(r.walk / 3) % rayWalkImgs.length] : rayIdleImg;
+      img = walking ? rayWalk(Math.floor(r.walk / 3) % 8) : rayIdle();
     }
-    if (!img || !img.complete || img.naturalWidth === 0) img = rayIdleImg;
+    if (!img || !img.complete || img.naturalWidth === 0) img = rayIdle();
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (r.depth + depthRange()) / depthRange(); // 0 back, 1 front
     var h = rayH() * (0.92 + 0.08 * t);
@@ -4386,7 +4705,7 @@
     // His walk frames flip by the way he is actually moving, so he never
     // moonwalks while running to her side. Front and back views are never flipped.
     var sideView = r.fight.active || r.vdir === 0;
-    if (sideView && img === rayPunchImg) { if (g.facing === -1) ctx.scale(-1, 1); }
+    if (sideView && img === rayPunch()) { if (g.facing === -1) ctx.scale(-1, 1); }
     else if (sideView && walking && r.dir === -1) ctx.scale(-1, 1);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
@@ -6088,6 +6407,12 @@
       // she talks to Char first, then opens the shop from the chat.
       fashionBtn.hidden = !(g.ownerTalk.open && g.ownerTalk.key === "char" && !g.fashionOpen);
     }
+    var salonBtn = document.getElementById("salonBtn");
+    if (salonBtn) {
+      // Mikey's salon: only while his talk bubble is open, so she
+      // talks to Mikey first, then opens the salon from the chat.
+      salonBtn.hidden = !(g.ownerTalk.open && g.ownerTalk.key === "mikey" && !g.salonOpen);
+    }
     updateActionList();
     if (g.climb.active) {
       // Climbing out the window: the climb drives them both, and
@@ -6694,6 +7019,16 @@
   if (fashionBtn) fashionBtn.addEventListener("click", function (e) { e.stopPropagation(); openFashion(); });
   var fashionCloseBtn = document.getElementById("fashionCloseBtn");
   if (fashionCloseBtn) fashionCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeFashion(); });
+  var salonBtn = document.getElementById("salonBtn");
+  if (salonBtn) salonBtn.addEventListener("click", function (e) { e.stopPropagation(); openSalon(); });
+  var salonCloseBtn = document.getElementById("salonCloseBtn");
+  if (salonCloseBtn) salonCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeSalon(); });
+  var closetCloseBtn = document.getElementById("closetCloseBtn");
+  if (closetCloseBtn) closetCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeCloset(); });
+  ["fashionPanel", "salonPanel", "closetPanel"].forEach(function (pid) {
+    var p = document.getElementById(pid);
+    if (p) p.addEventListener("click", onShopPanelClick);
+  });
   var pinballCanvas = document.getElementById("pinballCanvas");
   if (pinballCanvas) {
     pinballCanvas.addEventListener("pointerdown", function (e) {
@@ -6771,6 +7106,7 @@
       g.xCutsceneDone = false;
       g.arcadeMinigameDone = false;
       g.subwayPuzzlesDone = false;
+      g.look = { sylviaOutfit: "default", sylviaHair: "wavy", rayOutfit: "default", rayHair: "afro", owned: [] };
       updateMapImage();
       rollChests();
       startGame();
