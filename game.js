@@ -49,10 +49,11 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=82" forces a fresh download: Diego is a tiny bit shorter
-  // than Ray, and the map fog is gone entirely. A browser that
-  // cached ?v=81 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=82"; return img; }
+  // "?v=83" forces a fresh download: the world map is now 20
+  // pre-rendered variants with unvisited places pixelated in the
+  // art, and the pins are re-measured for the new map. A browser
+  // that cached ?v=82 picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=83"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -472,6 +473,7 @@
     subwayUnlocked: false, dungeonCleared: {},
     xCutsceneDone: false, xCutscene: { active: false, step: 0, t: 0 },
     arcadeMinigameDone: false, subwayPuzzlesDone: false,
+    visited: { chamber: true, shopping: true },
     fountainSecret: null, secretOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
     dungeonMsg: "", dungeonMsgT: 0,
@@ -1385,25 +1387,25 @@
   var MAP_PINS = {
     chamber:  { x: 0.125, y: 0.575 },
     bar:      { x: 0.45,  y: 0.625 },
-    shopping: { x: 0.425, y: 0.56 },
+    shopping: { x: 0.45,  y: 0.57 },
     repair:   { x: 0.37,  y: 0.60 },
     clothing: { x: 0.40,  y: 0.57 },
     salon:    { x: 0.49,  y: 0.57 },
     arcade:   { x: 0.55,  y: 0.60 },
     subway:   { x: 0.18,  y: 0.385 },
-    cistern:  { x: 0.70,  y: 0.60 },
-    garden:   { x: 0.80,  y: 0.62 },
-    quarry:   { x: 0.13,  y: 0.78 },
-    tunnels:  { x: 0.50,  y: 0.80 },
-    dungeon:  { x: 0.86,  y: 0.76 },
+    cistern:  { x: 0.73,  y: 0.61 },
+    garden:   { x: 0.90,  y: 0.46 },
+    quarry:   { x: 0.19,  y: 0.81 },
+    tunnels:  { x: 0.50,  y: 0.85 },
+    dungeon:  { x: 0.84,  y: 0.77 },
     dungeon2: { x: 0.88,  y: 0.82 },
     dungeon3: { x: 0.90,  y: 0.88 },
     dungeon4: { x: 0.92,  y: 0.94 },
-    upper1:   { x: 0.42,  y: 0.28 },
-    upper2:   { x: 0.52,  y: 0.22 },
-    upper3:   { x: 0.62,  y: 0.16 },
+    upper1:   { x: 0.56,  y: 0.37 },
+    upper2:   { x: 0.58,  y: 0.25 },
+    upper3:   { x: 0.57,  y: 0.13 },
     earthen:  { x: 0.67,  y: 0.11 },
-    surface:  { x: 0.74,  y: 0.06 }
+    surface:  { x: 0.92,  y: 0.09 }
   };
   var MAP_ROOM_NAMES = {
     chamber: "Silvia & Ray's Room",
@@ -1428,9 +1430,76 @@
     earthen: "The Earthen Tunnel",
     surface: "The Surface"
   };
+  // The world map comes in 20 pre-rendered variants: each one has the
+  // places she has not visited yet pixelated out, so the hidden part is
+  // baked into the art instead of a blur pasted on top. MAP_HIDDEN
+  // lists, per variant, the regions it hides. The hub (room, bar,
+  // shops) and the Surface are clear in every variant. Variants 5 and
+  // 9 are the same picture, so the picker always lands on 5.
+  var MAP_HIDDEN = [
+    [], // 0: everything clear
+    ["upper3"], // 1
+    ["upper3", "upper2"], // 2
+    ["upper3", "upper2", "upper1"], // 3
+    ["upper3", "upper2", "upper1", "subway"], // 4
+    ["upper3", "upper2", "upper1", "subway", "quarry", "tunnels", "dungeon"], // 5
+    ["upper3", "upper2", "upper1", "subway", "dungeon"], // 6
+    ["upper3", "upper2", "upper1", "subway", "quarry"], // 7
+    ["upper3", "upper2", "upper1", "subway", "quarry", "dungeon"], // 8
+    ["upper3", "upper2", "upper1", "subway", "quarry", "tunnels", "dungeon"], // 9: same as 5
+    ["upper3", "upper2", "upper1", "subway", "garden", "quarry", "tunnels", "dungeon"], // 10
+    ["upper3", "upper2", "upper1", "subway", "garden", "cistern", "quarry", "tunnels", "dungeon"], // 11: all hidden
+    ["upper3", "upper2", "upper1", "subway", "garden"], // 12
+    ["upper3", "upper2", "upper1", "subway", "garden", "cistern"], // 13
+    ["upper3", "upper2", "upper1", "subway", "garden", "cistern", "quarry"], // 14
+    ["upper3", "upper2", "upper1", "subway", "garden", "cistern", "quarry", "dungeon"], // 15
+    ["upper3", "upper2", "upper1", "subway", "garden", "cistern", "dungeon"], // 16
+    ["upper3", "upper2", "upper1", "subway", "garden", "dungeon"], // 17
+    ["upper3", "upper2", "upper1", "subway", "garden", "quarry", "dungeon"], // 18
+    ["upper3", "upper2", "upper1", "subway", "garden", "quarry"] // 19
+  ];
+  function mapRegionVisited(r) {
+    // The dungeon region covers all four dungeon levels.
+    if (r === "dungeon") return !!(g.visited.dungeon || g.visited.dungeon2 || g.visited.dungeon3 || g.visited.dungeon4);
+    return !!g.visited[r];
+  }
+  function mapVariant() {
+    var regions = ["garden", "cistern", "quarry", "tunnels", "dungeon", "subway", "upper1", "upper2", "upper3"];
+    var unvisited = [];
+    for (var i = 0; i < regions.length; i++) {
+      if (!mapRegionVisited(regions[i])) unvisited.push(regions[i]);
+    }
+    // Pick the variant that hides every unvisited region and the
+    // fewest extra ones, so the map never shows a place she has not
+    // been to, but reveals as much as it can. Variant 11 hides
+    // everything, so there is always a safe pick.
+    var best = 11, bestExtra = 99;
+    for (var v = 0; v < MAP_HIDDEN.length; v++) {
+      var hide = MAP_HIDDEN[v];
+      var ok = true;
+      for (var j = 0; j < unvisited.length; j++) {
+        if (hide.indexOf(unvisited[j]) === -1) { ok = false; break; }
+      }
+      if (!ok) continue;
+      var extra = hide.length - unvisited.length;
+      if (extra < bestExtra) { best = v; bestExtra = extra; }
+    }
+    return best;
+  }
+  function updateMapImage() {
+    var img = document.getElementById("mapImg");
+    if (!img) return;
+    var v = mapVariant();
+    img.src = "assets/map-" + (v < 10 ? "0" + v : "" + v) + ".jpg?v=83";
+  }
+  function markVisited(room) {
+    if (!room || !ROOMS[room]) return;
+    g.visited[room] = true;
+  }
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
     g.map.active = true;
+    updateMapImage();
     var pin = MAP_PINS[g.room] || MAP_PINS.chamber;
     var ps = document.getElementById("pinSylvia");
     var pr = document.getElementById("pinRay");
@@ -1465,6 +1534,8 @@
     // street entrance, so it is never left riding in another room.
     if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; g.scooter.room = "shopping"; }
     g.room = roomKey;
+    markVisited(roomKey);
+    updateMapImage();
     if (isDungeonRoom(roomKey)) spawnMonsters();
     else clearMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -2035,6 +2106,8 @@
     }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
+    markVisited(to);
+    updateMapImage();
     if (g.scooter.riding) g.scooter.room = to;
     if (isDungeonRoom(to)) spawnMonsters();
     else if (isDungeonRoom(from)) clearMonsters();
@@ -2847,7 +2920,7 @@
       day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
       room: g.room, px: g.px, depth: g.depth, facing: g.facing,
       scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
-      fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, proposed: g.proposed,
+      fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, visited: Object.keys(g.visited), proposed: g.proposed,
       gardenUnlocked: g.gardenUnlocked, mayorCutsceneDone: g.mayorCutsceneDone,
       subwayUnlocked: g.subwayUnlocked, dungeonCleared: g.dungeonCleared,
       xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
@@ -2947,6 +3020,10 @@
     g.xCutsceneDone = !!s.xCutsceneDone;
     g.arcadeMinigameDone = !!s.arcadeMinigameDone;
     g.subwayPuzzlesDone = !!s.subwayPuzzlesDone;
+    g.visited = { chamber: true, shopping: true };
+    (s.visited || []).forEach(function (r) { g.visited[r] = true; });
+    g.visited[g.room] = true;
+    updateMapImage();
     if (s.chestDay === s.day && Array.isArray(s.chestLayout)) {
       g.chestDay = s.chestDay;
       g.chestLayout = s.chestLayout.slice();
@@ -6219,6 +6296,8 @@
     if (newGameBtn) newGameBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       clearSave();
+      g.visited = { chamber: true, shopping: true };
+      updateMapImage();
       rollChests();
       startGame();
     });

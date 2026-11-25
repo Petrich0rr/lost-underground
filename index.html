@@ -70,7 +70,7 @@
   .roomIntro { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); z-index: 8; font-family: Georgia, serif; font-style: italic; font-weight: 600; font-size: 21px; line-height: 1.4; color: rgba(255, 255, 255, 0.95); text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 0, 0, 0.5); text-align: center; max-width: 86%; pointer-events: none; opacity: 0; transition: opacity 0.6s ease; }
   .roomIntro.show { opacity: 1; }
   .roomIntro[hidden] { display: none; }
-  .mapWrap { position: relative; width: min(96%, 1200px); aspect-ratio: 1672 / 941; }
+  .mapWrap { position: relative; width: min(96%, 1200px); aspect-ratio: 2048 / 1152; }
   .mapImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,0.65); }
   .mapPin { position: absolute; width: 64px; height: 64px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7)); pointer-events: none; }
   #pinSylvia { transform: translate(calc(-50% - 15px), -50%); }
@@ -140,7 +140,7 @@
     <div class="photoPopup" id="photoPopup" hidden><img src="assets/couple-photo.jpg" alt="A framed photo of Sylvia and Ray kissing in the ruins"><span class="photoQuote">"We should get better photos taken when we're out of the swamps..." — Ray</span><span class="photoHint">Tap or press Esc to put it back</span></div>
     <button class="mapBtn" id="mapBtn" type="button" aria-label="Open map"><img src="assets/map-icon.png" alt="Map"></button>
     <button class="saveFileBtn" id="saveFileBtn" type="button" aria-label="Save to file" title="Save to file">&#128190;</button>
-    <div class="mapPopup" id="mapPopup" hidden><div class="mapWrap" id="mapWrap"><img class="mapImg" src="assets/world-map.jpg" alt="Map of the underground world"><img class="mapPin" id="pinSylvia" src="assets/pin-sylvia.png" alt="Sylvia"><img class="mapPin" id="pinRay" src="assets/pin-ray.png" alt="Ray"></div><span class="mapCaption" id="mapCaption">Silvia &amp; Ray's Room</span><span class="mapHint">Tap the map to jump there · Tap outside or press Esc to close</span></div>
+    <div class="mapPopup" id="mapPopup" hidden><div class="mapWrap" id="mapWrap"><img class="mapImg" id="mapImg" src="assets/map-11.jpg?v=83" alt="Map of the underground world"><img class="mapPin" id="pinSylvia" src="assets/pin-sylvia.png" alt="Sylvia"><img class="mapPin" id="pinRay" src="assets/pin-ray.png" alt="Ray"></div><span class="mapCaption" id="mapCaption">Silvia &amp; Ray's Room</span><span class="mapHint">Tap the map to jump there · Tap outside or press Esc to close</span></div>
     <div class="propPanel" id="propPanel" hidden><div class="propPanelName" id="propPanelName"></div><div class="propPanelText" id="propPanelText"></div><div class="propPanelHint">E or I or Esc to put it down</div></div>
     <div class="propImage" id="propImage" hidden><img id="propImageImg" alt=""></div>
     <div class="roomIntro" id="roomIntro" hidden></div>
@@ -156,7 +156,7 @@
     <div class="tile"><h2>The bar</h2><p>The bar under the ground, where Vicky pours drinks. The stairs on the right lead up to the Forgotten subway, once X has unlocked them. Their chamber is through the far left edge. On Day 3, walk in and the Mayor, drunk, will slip up about the hidden garden.</p></div>
     <div class="tile"><h2>The golden mirror</h2><p>The makeup desk in the chamber, with a golden arched mirror. She looks in it, blinks, and when she manifests she shuts her eyes and says her life is about to get better, and she and Ray will get out and live happily on land.</p></div>
     <div class="tile"><h2>Junk on the floor</h2><p>Random stuff is scattered around the deep underground: crumpled paper, old newspapers, takeout boxes, crushed cans, rusted valves, lanterns, keys, cassette tapes, mushrooms, crystals and more. Walk up to any of it and press E or I to inspect it. The papers can hint at the way up, or they can just be trash. The secret arches under the arcade floor have a faint golden shimmer now, so they are easier to find: walk up to one and press I to crouch down and look, then press I again to jump down to the Crystal Quarry.</p></div>
-    <div class="tile"><h2>The world map</h2><p>A vast subterranean world of many levels, from the Crystal Quarry and the Old Service Tunnels below to the Upper Levels and the Surface far above. The map button at the top left, under the hearts, opens it with Sylvia's and Ray's heads pinned at their current room. Tap anywhere on the map to jump straight to the room nearest that spot.</p></div>
+    <div class="tile"><h2>The world map</h2><p>A vast subterranean world of many levels, from the Crystal Quarry and the Old Service Tunnels below to the Upper Levels and the Surface far above. The map button at the top left, under the hearts, opens it with Sylvia's and Ray's heads pinned at their current room. Places you have not visited yet are pixelated out on the map, and each new place becomes clear once you have been there. Tap anywhere on the map to jump straight to the room nearest that spot.</p></div>
     <div class="tile"><h2>The photo on the nightstand</h2><p>A framed photo of Sylvia and Ray kissing in the ruins, on the nightstand beside the bed. Walk right up to it and press E and it pops up big, with the rest of the game blurred behind it. Ray says they should get better photos taken when they are out of the swamps. Tap it or press Esc to put it back.</p></div>
     <div class="tile"><h2>The Forgotten subway</h2><p>An abandoned station up the stairs from the bar, with a rusty old train. The stairs from the bar stay sealed until the whole dungeon is cleared and X unlocks them, and the stairs on the right only climb up to Upper Level 1 once you solve the puzzles down there.</p></div>
     <div class="tile"><h2>Upper Level 1</h2><p>A ghostly blue cavern with a great lantern tower and stone stairs on the right, up the stairs from the Forgotten subway. The stairs on the right climb to Upper Level 2. Walk all the way to the left to go back down to the subway.</p></div>
@@ -195,6 +195,6 @@
 
   <footer>Lost Underground is a standalone game page.</footer>
 </main>
-<script src="game.js?v=82"></script>
+<script src="game.js?v=83"></script>
 </body>
 </html>
