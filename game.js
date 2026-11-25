@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=85" forces a fresh download: missions, the Vicky drink
+  // "?v=86" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=85"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=86"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1708,6 +1708,342 @@
       ctx.restore();
     }
   }
+  // ---- Aqueduct Pinball: the arcade minigame ----
+  // The pinball machine in the arcade (the one with the aqueduct
+  // backglass) opens a pop-up game on her playfield art. Launch the
+  // ball, flip it with the flippers, and light all four round
+  // bumpers to win. Winning gives the hint that unlocks the arches
+  // in the arcade floor, and finishes the arcade mission.
+  var PINBALL_X = 795, PINBALL_RANGE = 110;
+  var pinballImg = loadImg("assets/pinball-playfield.jpg");
+  // PINBALL-TEST-START
+  // The playfield is drawn on a 600x900 canvas (the art is 2:3), so
+  // every position below is in that canvas's pixels.
+  var PB_W = 600, PB_H = 900;
+  var PB_BALL_R = 9;
+  var PB_GRAV = 1500, PB_MAXV = 1400, PB_WALL_E = 0.65;
+  var PB_L = 33, PB_R = 567, PB_T = 86, PB_DRAIN_Y = 815;
+  var PB_BUMPERS = [
+    { x: 140, y: 164, r: 22 },
+    { x: 434, y: 164, r: 22 },
+    { x: 229, y: 313, r: 22 },
+    { x: 461, y: 343, r: 22 }
+  ];
+  var PB_POSTS = [
+    { x: 318, y: 234, r: 7 },
+    { x: 360, y: 378, r: 7 },
+    { x: 300, y: 558, r: 7 }
+  ];
+  var PB_SLINGS = [
+    { ax: 75, ay: 640, bx: 150, by: 700 },
+    { ax: 525, ay: 640, bx: 450, by: 700 }
+  ];
+  var PB_GUIDES = [
+    { ax: 33, ay: 690, bx: 123, by: 750 },
+    { ax: 567, ay: 690, bx: 432, by: 750 }
+  ];
+  var PB_ROLLS = [
+    { x: 63, y: 261 }, { x: 84, y: 288 }, { x: 93, y: 324 },
+    { x: 90, y: 360 }, { x: 450, y: 504 }, { x: 444, y: 540 }
+  ];
+  var PB_FLIP_LEN = 90, PB_FLIP_SPEED = 21;
+  var PB_BALLS = 5;
+  var PB_FLIP_L = { x: 123, y: 750, rest: 0.384, active: -0.559 };
+  var PB_FLIP_R = { x: 432, y: 750, rest: 2.758, active: 3.700 };
+  var PB_LAUNCH_X = 420, PB_LAUNCH_Y = 695;
+  var PB_WIN_COINS = 25;
+  var PB_WIN_SCORE = 500;
+  function pbNewState() {
+    return {
+      active: false, phase: "ready", score: 0, balls: PB_BALLS,
+      lit: [false, false, false, false],
+      bumpT: [0, 0, 0, 0], slingT: [0, 0], rollT: [0, 0, 0, 0, 0, 0],
+      ball: { x: PB_LAUNCH_X, y: PB_LAUNCH_Y, vx: 0, vy: 0 },
+      flipL: { angle: PB_FLIP_L.rest, angVel: 0, held: false },
+      flipR: { angle: PB_FLIP_R.rest, angVel: 0, held: false },
+      stuckT: 0
+    };
+  }
+  function pbLaunch(pb) {
+    if (!pb.active || pb.phase !== "ready") return;
+    pb.phase = "playing";
+    pb.ball.x = PB_LAUNCH_X; pb.ball.y = PB_LAUNCH_Y;
+    pb.ball.vx = -80; pb.ball.vy = -1250;
+  }
+  function pbFlipMove(f, def, dt) {
+    var target = f.held ? def.active : def.rest;
+    var diff = target - f.angle;
+    var maxStep = PB_FLIP_SPEED * dt;
+    if (Math.abs(diff) <= maxStep) { f.angVel = diff / dt; f.angle = target; }
+    else { var dir = diff > 0 ? 1 : -1; f.angVel = dir * PB_FLIP_SPEED; f.angle += dir * maxStep; }
+  }
+  function pbSegBounce(pb, seg, e) {
+    var b = pb.ball;
+    var abx = seg.bx - seg.ax, aby = seg.by - seg.ay;
+    var len2 = abx * abx + aby * aby;
+    var t = len2 > 0 ? ((b.x - seg.ax) * abx + (b.y - seg.ay) * aby) / len2 : 0;
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    var cx = seg.ax + abx * t, cy = seg.ay + aby * t;
+    var dx = b.x - cx, dy = b.y - cy;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d >= PB_BALL_R || d < 0.001) return false;
+    var nx = dx / d, ny = dy / d;
+    b.x = cx + nx * PB_BALL_R; b.y = cy + ny * PB_BALL_R;
+    var vn = b.vx * nx + b.vy * ny;
+    if (vn >= 0) return false;
+    b.vx -= (1 + e) * vn * nx;
+    b.vy -= (1 + e) * vn * ny;
+    return true;
+  }
+  function pbFlipperCollide(pb, def, f) {
+    var b = pb.ball;
+    var tx = def.x + PB_FLIP_LEN * Math.cos(f.angle);
+    var ty = def.y + PB_FLIP_LEN * Math.sin(f.angle);
+    var abx = tx - def.x, aby = ty - def.y;
+    var len2 = abx * abx + aby * aby;
+    var t = len2 > 0 ? ((b.x - def.x) * abx + (b.y - def.y) * aby) / len2 : 0;
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    var cx = def.x + abx * t, cy = def.y + aby * t;
+    var dx = b.x - cx, dy = b.y - cy;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    var hitR = PB_BALL_R + 2;
+    if (d >= hitR) return;
+    var nx, ny;
+    if (d > 0.001) { nx = dx / d; ny = dy / d; }
+    else { nx = -Math.sin(f.angle); ny = Math.cos(f.angle); if (ny > 0) { nx = -nx; ny = -ny; } }
+    b.x = cx + nx * hitR; b.y = cy + ny * hitR;
+    var rx = cx - def.x, ry = cy - def.y;
+    var svx = f.angVel * -ry, svy = f.angVel * rx;
+    var rvn = (b.vx - svx) * nx + (b.vy - svy) * ny;
+    if (rvn < 0) {
+      // While the flipper is swinging, the ball bounces off it with a
+      // kick. While it is still, the ball just settles on it (no
+      // bounce), so she can trap the ball and time her flip.
+      var e = Math.abs(f.angVel) > 5 ? 0.35 : 0;
+      b.vx -= (1 + e) * rvn * nx;
+      b.vy -= (1 + e) * rvn * ny;
+    }
+  }
+  function pbSubstep(pb, dt) {
+    pbFlipMove(pb.flipL, PB_FLIP_L, dt);
+    pbFlipMove(pb.flipR, PB_FLIP_R, dt);
+    if (pb.phase === "ready" || pb.phase === "won" || pb.phase === "lost") return null;
+    var b = pb.ball;
+    b.vy += PB_GRAV * dt;
+    var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    if (sp > PB_MAXV) { b.vx *= PB_MAXV / sp; b.vy *= PB_MAXV / sp; }
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    if (b.x < PB_L + PB_BALL_R) { b.x = PB_L + PB_BALL_R; b.vx = Math.abs(b.vx) * PB_WALL_E; }
+    if (b.x > PB_R - PB_BALL_R) { b.x = PB_R - PB_BALL_R; b.vx = -Math.abs(b.vx) * PB_WALL_E; }
+    if (b.y < PB_T + PB_BALL_R) { b.y = PB_T + PB_BALL_R; b.vy = Math.abs(b.vy) * PB_WALL_E; }
+    var i, j, r;
+    for (i = 0; i < PB_BUMPERS.length; i++) {
+      var bp = PB_BUMPERS[i];
+      var dx = b.x - bp.x, dy = b.y - bp.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      var minD = bp.r + PB_BALL_R;
+      if (d < minD && d > 0.001) {
+        var nx = dx / d, ny = dy / d;
+        b.x = bp.x + nx * minD; b.y = bp.y + ny * minD;
+        var vn = b.vx * nx + b.vy * ny;
+        if (vn < 0) {
+          b.vx -= 2 * vn * nx; b.vy -= 2 * vn * ny;
+          b.vx += nx * 420; b.vy += ny * 420;
+          pb.score += 50;
+          pb.bumpT[i] = 12;
+          if (pb.score >= PB_WIN_SCORE) { pb.phase = "won"; return "won"; }
+          if (!pb.lit[i]) {
+            pb.lit[i] = true;
+            var all = true;
+            for (var k = 0; k < 4; k++) if (!pb.lit[k]) all = false;
+            if (all) { pb.phase = "won"; return "won"; }
+          }
+        }
+      }
+    }
+    for (j = 0; j < PB_POSTS.length; j++) {
+      var pp = PB_POSTS[j];
+      var pdx = b.x - pp.x, pdy = b.y - pp.y;
+      var pd = Math.sqrt(pdx * pdx + pdy * pdy);
+      var pmin = pp.r + PB_BALL_R;
+      if (pd < pmin && pd > 0.001) {
+        var pnx = pdx / pd, pny = pdy / pd;
+        b.x = pp.x + pnx * pmin; b.y = pp.y + pny * pmin;
+        var pvn = b.vx * pnx + b.vy * pny;
+        if (pvn < 0) {
+          b.vx -= 1.8 * pvn * pnx; b.vy -= 1.8 * pvn * pny;
+          pb.score += 5;
+        }
+      }
+    }
+    for (var s = 0; s < PB_SLINGS.length; s++) {
+      if (pbSegBounce(pb, PB_SLINGS[s], 0.9) && pb.slingT[s] <= 0) {
+        pb.score += 25; pb.slingT[s] = 20;
+        if (pb.score >= PB_WIN_SCORE) { pb.phase = "won"; return "won"; }
+      }
+    }
+    for (var g2 = 0; g2 < PB_GUIDES.length; g2++) pbSegBounce(pb, PB_GUIDES[g2], 0.6);
+    pbFlipperCollide(pb, PB_FLIP_L, pb.flipL);
+    pbFlipperCollide(pb, PB_FLIP_R, pb.flipR);
+    for (r = 0; r < PB_ROLLS.length; r++) {
+      var rp = PB_ROLLS[r];
+      var rdx = b.x - rp.x, rdy = b.y - rp.y;
+      if (rdx * rdx + rdy * rdy < 256 && pb.rollT[r] <= 0) {
+        pb.score += 10; pb.rollT[r] = 45;
+        if (pb.score >= PB_WIN_SCORE) { pb.phase = "won"; return "won"; }
+      }
+    }
+    if (b.y > PB_DRAIN_Y) {
+      pb.balls -= 1;
+      if (pb.balls <= 0) { pb.phase = "lost"; return "lost"; }
+      pb.ball.x = PB_LAUNCH_X; pb.ball.y = PB_LAUNCH_Y;
+      pb.ball.vx = 0; pb.ball.vy = 0;
+      pb.phase = "ready";
+      return "drained";
+    }
+    var spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    if (spd < 25 && b.y < 600) {
+      pb.stuckT += 1;
+      if (pb.stuckT > 150) {
+        b.vx = (Math.random() < 0.5 ? -1 : 1) * 120;
+        b.vy = -220;
+        pb.stuckT = 0;
+      }
+    } else pb.stuckT = 0;
+    return null;
+  }
+  function pbStep(pb, dt) {
+    for (var i = 0; i < 4; i++) if (pb.bumpT[i] > 0) pb.bumpT[i] -= 1;
+    for (var j = 0; j < 2; j++) if (pb.slingT[j] > 0) pb.slingT[j] -= 1;
+    for (var r = 0; r < PB_ROLLS.length; r++) if (pb.rollT[r] > 0) pb.rollT[r] -= 1;
+    var ev = null;
+    for (var s = 0; s < 2; s++) {
+      ev = pbSubstep(pb, dt / 2);
+      if (ev) return ev;
+    }
+    return null;
+  }
+  // PINBALL-TEST-END
+  var pinball = pbNewState();
+  function pinballNear() {
+    return g.room === "arcade" && Math.abs(g.px - PINBALL_X) < PINBALL_RANGE;
+  }
+  function pinballReset() {
+    pinball = pbNewState();
+    pinball.active = true;
+    var m = document.getElementById("pinballMsg");
+    if (m) m.hidden = true;
+    var rb = document.getElementById("pinballRetryBtn");
+    if (rb) rb.hidden = true;
+    pinballUpdateHUD();
+    pinballDraw();
+  }
+  function openPinball() {
+    if (pinball.active) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (!pinballNear()) return;
+    keys.left = keys.right = keys.up = keys.down = keys.fast = false;
+    var pop = document.getElementById("pinballPopup");
+    if (pop) pop.hidden = false;
+    pinballReset();
+  }
+  function closePinball() {
+    pinball.active = false;
+    keys.left = keys.right = keys.up = keys.down = keys.fast = false;
+    var pop = document.getElementById("pinballPopup");
+    if (pop) pop.hidden = true;
+  }
+  function pinballWon() {
+    var m = document.getElementById("pinballMsg");
+    var allLit = true;
+    for (var i = 0; i < 4; i++) if (!pinball.lit[i]) allLit = false;
+    var how = allLit ? "All four bumpers lit!" : pinball.score + " points!";
+    if (!g.arcadeMinigameDone) {
+      g.coinCount += PB_WIN_COINS;
+      setArcadeMinigameDone();
+      if (m) { m.hidden = false; m.textContent = how + " The machine clicks open a little drawer: a note inside reads \u201CThe arches in the floor are the way down.\u201D You got the hint, and +" + PB_WIN_COINS + " coins."; }
+    } else {
+      if (m) { m.hidden = false; m.textContent = how + " Nice playing."; }
+    }
+  }
+  function pinballLost() {
+    var m = document.getElementById("pinballMsg");
+    if (m) { m.hidden = false; m.textContent = "Out of balls. So close. Play again?"; }
+    var rb = document.getElementById("pinballRetryBtn");
+    if (rb) rb.hidden = false;
+  }
+  function pinballUpdateHUD() {
+    var s = document.getElementById("pinballScore");
+    if (s) s.textContent = pinball.score;
+    var b = document.getElementById("pinballBalls");
+    if (b) b.textContent = "\u25CF".repeat(pinball.balls) + "\u25CB".repeat(Math.max(0, PB_BALLS - pinball.balls));
+    var u = document.getElementById("pinballBumpers");
+    if (u) {
+      var n = 0;
+      for (var i = 0; i < 4; i++) if (pinball.lit[i]) n++;
+      u.textContent = n + "/4 bumpers";
+    }
+    var lb = document.getElementById("pinballLaunchBtn");
+    if (lb) lb.hidden = pinball.phase !== "ready";
+  }
+  function pbDrawFlipper(c, def, angle) {
+    var tx = def.x + PB_FLIP_LEN * Math.cos(angle);
+    var ty = def.y + PB_FLIP_LEN * Math.sin(angle);
+    c.strokeStyle = "#3a3a4a"; c.lineWidth = 16; c.lineCap = "round";
+    c.beginPath(); c.moveTo(def.x, def.y); c.lineTo(tx, ty); c.stroke();
+    c.strokeStyle = "#d8d8e8"; c.lineWidth = 11; c.lineCap = "round";
+    c.beginPath(); c.moveTo(def.x, def.y); c.lineTo(tx, ty); c.stroke();
+    c.strokeStyle = "#ffffff"; c.lineWidth = 3; c.lineCap = "round";
+    c.beginPath(); c.moveTo(def.x, def.y); c.lineTo(tx, ty); c.stroke();
+    c.fillStyle = "#8a8a9a";
+    c.beginPath(); c.arc(def.x, def.y, 5, 0, Math.PI * 2); c.fill();
+  }
+  function pinballDraw() {
+    var cv = document.getElementById("pinballCanvas");
+    if (!cv) return;
+    var c = cv.getContext("2d");
+    if (!c) return;
+    c.clearRect(0, 0, PB_W, PB_H);
+    if (pinballImg && pinballImg.complete && pinballImg.naturalWidth > 0) {
+      c.drawImage(pinballImg, 0, 0, PB_W, PB_H);
+    } else {
+      c.fillStyle = "#1a1030"; c.fillRect(0, 0, PB_W, PB_H);
+    }
+    var i, j;
+    for (i = 0; i < PB_BUMPERS.length; i++) {
+      var bp = PB_BUMPERS[i];
+      if (pinball.lit[i]) {
+        var pulse = 0.55 + 0.25 * Math.sin(Date.now() / 300 + i);
+        var g2 = c.createRadialGradient(bp.x, bp.y, 4, bp.x, bp.y, bp.r + 22);
+        g2.addColorStop(0, "rgba(255,215,119," + pulse + ")");
+        g2.addColorStop(1, "rgba(255,215,119,0)");
+        c.fillStyle = g2;
+        c.beginPath(); c.arc(bp.x, bp.y, bp.r + 22, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = "rgba(255,240,180,0.95)"; c.lineWidth = 3;
+        c.beginPath(); c.arc(bp.x, bp.y, bp.r + 3, 0, Math.PI * 2); c.stroke();
+      } else if (pinball.bumpT[i] > 0) {
+        c.strokeStyle = "rgba(255,240,180,0.7)"; c.lineWidth = 2;
+        c.beginPath(); c.arc(bp.x, bp.y, bp.r + 3, 0, Math.PI * 2); c.stroke();
+      }
+    }
+    for (j = 0; j < PB_ROLLS.length; j++) {
+      if (pinball.rollT[j] > 0) {
+        var rp = PB_ROLLS[j];
+        c.fillStyle = "rgba(255,215,119,0.8)";
+        c.beginPath(); c.arc(rp.x, rp.y, 8, 0, Math.PI * 2); c.fill();
+      }
+    }
+    pbDrawFlipper(c, PB_FLIP_L, pinball.flipL.angle);
+    pbDrawFlipper(c, PB_FLIP_R, pinball.flipR.angle);
+    var b = pinball.ball;
+    var bg = c.createRadialGradient(b.x - 3, b.y - 3, 1, b.x, b.y, PB_BALL_R);
+    bg.addColorStop(0, "#ffffff"); bg.addColorStop(0.6, "#c8c8d8"); bg.addColorStop(1, "#6a6a7a");
+    c.fillStyle = bg;
+    c.beginPath(); c.arc(b.x, b.y, PB_BALL_R, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = "rgba(0,0,0,0.5)"; c.lineWidth = 1;
+    c.beginPath(); c.arc(b.x, b.y, PB_BALL_R, 0, Math.PI * 2); c.stroke();
+  }
   var PROP_RANGE = 90;
   function propNear() {
     var list = PROPS[g.room];
@@ -2269,6 +2605,7 @@
     if (scooterNear()) { mountScooter(); return; }
     var prop = propNear();
     if (prop) { readProp(prop); return; }
+    if (pinballNear()) { openPinball(); return; }
     if (inspectNear()) { startInspect(); return; }
     if (fountainNear()) { makeWish(); return; }
     if (chestNear()) { openChest(); return; }
@@ -2318,7 +2655,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -2340,6 +2677,7 @@
       if (scooterNear()) acts.push({ id: "scooter", label: "Ride the scooter", run: mountScooter });
       var pr = propNear();
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
+      if (pinballNear()) acts.push({ id: "pinball", label: "Play pinball", run: openPinball });
       if (inspectNear()) acts.push({ id: "arch", label: g.inspect.active ? "Go down" : "Inspect", run: startInspect });
       if (fountainNear() && !g.fountainWished) acts.push({ id: "fountain", label: "Make a wish", run: makeWish });
       if (fountainNear() && g.fountainWished && !g.fountainSecret) acts.push({ id: "fountain", label: "Ask the fountain", run: makeWish });
@@ -5658,6 +5996,21 @@
       draw();
       return;
     }
+    if (pinball.active) {
+      // The pinball machine is open: the world waits behind the
+      // popup while the ball, flippers and bumpers run.
+      var eBtnPb = document.getElementById("actionList");
+      if (eBtnPb) eBtnPb.hidden = true;
+      var aBtnPb = document.getElementById("attackBtn");
+      if (aBtnPb) aBtnPb.hidden = true;
+      var ev = pbStep(pinball, 1 / 60);
+      if (ev === "won") pinballWon();
+      else if (ev === "lost") pinballLost();
+      pinballDraw();
+      pinballUpdateHUD();
+      draw();
+      return;
+    }
     if (g.talk.open && !vickyNear() && Math.abs(g.px - VICKY_X) > 180) g.talk.open = false;
     if (g.ownerTalk.open) {
       var otk = g.ownerTalk.key;
@@ -6222,6 +6575,13 @@
     return true;
   }
   window.addEventListener("keydown", function (e) {
+    if (pinball.active) {
+      if (e.code === "ArrowLeft" || e.code === "KeyZ" || e.code === "KeyA") { pinball.flipL.held = true; e.preventDefault(); return; }
+      if (e.code === "ArrowRight" || e.code === "KeyX" || e.code === "KeyD") { pinball.flipR.held = true; e.preventDefault(); return; }
+      if (e.code === "Space") { pbLaunch(pinball); e.preventDefault(); return; }
+      if (e.code === "Escape") { closePinball(); return; }
+      return;
+    }
     if (e.code === "KeyK") { tryKiss(); return; }
     if (e.code === "KeyH") { tryAttack(); return; }
     if (e.code === "KeyE") { if (g.proposal.active) { advanceProposal(); return; } tryEnter(); return; }
@@ -6250,7 +6610,14 @@
       if (r.bottom >= 0 && r.top <= window.innerHeight) e.preventDefault();
     }
   });
-  window.addEventListener("keyup", function (e) { setKey(e.code, false); });
+  window.addEventListener("keyup", function (e) {
+    if (pinball.active) {
+      if (e.code === "ArrowLeft" || e.code === "KeyZ" || e.code === "KeyA") { pinball.flipL.held = false; return; }
+      if (e.code === "ArrowRight" || e.code === "KeyX" || e.code === "KeyD") { pinball.flipR.held = false; return; }
+      return;
+    }
+    setKey(e.code, false);
+  });
   // Touch and mouse: hold the left or right side of the bar to walk
   // that way. A quick tap or click, without holding, is an attack.
   var pointerDir = 0;
@@ -6327,6 +6694,30 @@
   if (fashionBtn) fashionBtn.addEventListener("click", function (e) { e.stopPropagation(); openFashion(); });
   var fashionCloseBtn = document.getElementById("fashionCloseBtn");
   if (fashionCloseBtn) fashionCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeFashion(); });
+  var pinballCanvas = document.getElementById("pinballCanvas");
+  if (pinballCanvas) {
+    pinballCanvas.addEventListener("pointerdown", function (e) {
+      e.stopPropagation();
+      if (!pinball.active) return;
+      var r = pinballCanvas.getBoundingClientRect();
+      var x = (e.clientX - r.left) / r.width;
+      if (x < 0.5) pinball.flipL.held = true;
+      else pinball.flipR.held = true;
+    });
+    pinballCanvas.addEventListener("pointerup", function (e) { e.stopPropagation(); pinball.flipL.held = false; pinball.flipR.held = false; });
+    pinballCanvas.addEventListener("pointerleave", function (e) { pinball.flipL.held = false; pinball.flipR.held = false; });
+    pinballCanvas.addEventListener("pointercancel", function (e) { pinball.flipL.held = false; pinball.flipR.held = false; });
+  }
+  var pinballLaunchBtn = document.getElementById("pinballLaunchBtn");
+  if (pinballLaunchBtn) pinballLaunchBtn.addEventListener("click", function (e) { e.stopPropagation(); pbLaunch(pinball); });
+  var pinballRetryBtn = document.getElementById("pinballRetryBtn");
+  if (pinballRetryBtn) pinballRetryBtn.addEventListener("click", function (e) { e.stopPropagation(); pinballReset(); });
+  var pinballCloseBtn = document.getElementById("pinballCloseBtn");
+  if (pinballCloseBtn) pinballCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closePinball(); });
+  var pinballPopup = document.getElementById("pinballPopup");
+  if (pinballPopup) pinballPopup.addEventListener("click", function (e) { e.stopPropagation(); closePinball(); });
+  var pinballCard = document.getElementById("pinballCard");
+  if (pinballCard) pinballCard.addEventListener("click", function (e) { e.stopPropagation(); });
   var sleepConfirmBtn = document.getElementById("sleepConfirmBtn");
   if (sleepConfirmBtn) sleepConfirmBtn.addEventListener("click", function (e) { e.stopPropagation(); confirmSleep(); });
   var sleepCancelBtn = document.getElementById("sleepCancelBtn");
