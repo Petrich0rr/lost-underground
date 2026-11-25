@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=90" forces a fresh download: missions, the Vicky drink
+  // "?v=91" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=90"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=91"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -474,13 +474,7 @@
       { img: propMushroomImg, x: 1550, d: 0.8, h: 56, name: "Pale mushrooms", text: "Pale mushrooms growing on a rock. They glow faintly. Probably best not to eat them." },
       { img: propCrystalImg, x: 1900, d: 0.6, h: 58, name: "Pale crystals", text: "A cluster of pale crystals. They catch the light and throw it back in pieces." }
     ],
-    quarry: [
-      { img: propCrystalImg, x: 300, d: 0.7, h: 58, name: "Pale crystals", text: "A cluster of pale crystals. They catch the light and throw it back in pieces." },
-      { img: propRubbleImg, x: 700, d: 0.5, h: 62, name: "Rubble", text: "A pile of rubble. The ceiling is always falling, a little at a time." },
-      { img: propSackImg, x: 1100, d: 0.8, h: 60, name: "Torn sack", text: "A torn sack. Whatever was in it spilled out long ago." },
-      { img: propPaperImg, x: 1450, d: 0.6, h: 32, name: "Torn page", text: "A torn page from someone's journal. The stairs past the subway go UP. Three levels. Blue, then violet, then white. The top one is where they keep the way out. Something guards it. Do not go unprepared." },
-      { img: propBootImg, x: 1800, d: 0.7, h: 48, name: "Worn boot", text: "A worn boot with a hole in it. Someone walked a long way in this." }
-    ],
+    quarry: [],
     tunnels: [
       { img: propKeyImg, x: 300, d: 0.6, h: 44, name: "Old key", text: "An old key. It does not fit any door you know." },
       { img: propCassetteImg, x: 650, d: 0.8, h: 50, name: "Cracked cassette", text: "A cracked cassette tape. The music is gone, but the ribbon remembers." },
@@ -642,6 +636,7 @@
     // The quarry crystal mission: five glowing crystals in the
     // Crystal Quarry. Gather them all and the iron door opens.
     crystals: [0, 1, 2, 3, 4], crystalCount: 0, quarryMissionDone: false,
+    jumpT: 0,
     visited: { chamber: true, shopping: true },
     fountainSecret: null, secretOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
@@ -1658,7 +1653,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=90" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=91" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1714,7 +1709,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=90" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=91" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -3084,6 +3079,7 @@
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
     if (stoneDoorNear()) acts.push({ id: "stone", label: "Go deeper", run: enterDungeon2 });
       if (portalNear()) acts.push({ id: "portal", label: "Go to the quarry", run: goThroughPortal });
+      if (crystalNear()) acts.push({ id: "jump", label: "Jump up and grab it", run: tryJump });
       if (tunnelsHomeNear()) acts.push({ id: "tunnelshome", label: "Go home", run: goHomeFromTunnels });
     }
     var ids = acts.map(function (a) { return a.id + ":" + a.label; }).join("|");
@@ -3100,6 +3096,14 @@
       })(acts[i]);
     }
     list.hidden = acts.length === 0;
+  }
+  // Jumping: a little hop, straight up. She can jump to grab a
+  // crystal in the quarry, or just for fun. It is only a hop, so it
+  // never moves her sideways or through a door.
+  var JUMP_DUR = 28;
+  function tryJump() {
+    if (g.jumpT > 0 || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.scooter.riding || g.embrace.active) return;
+    g.jumpT = 1;
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
   function tryKiss() {
@@ -4058,17 +4062,18 @@
         g.coinCount += 1;
       }
     }
-    // Glowing crystals in the quarry; walking over one picks it up.
-    // Gather all five and the iron door in the tunnels opens.
+    // Glowing crystals in the quarry; walking into one picks it up.
+    // No depth check: she just has to reach the crystal. Gather all
+    // five and the iron door in the tunnels opens.
     if (g.room === "quarry" && !g.quarryMissionDone) {
-      var dr = depthRange();
       for (var k = g.crystals.length - 1; k >= 0; k--) {
         var sp = CRYSTAL_SPOTS[g.crystals[k]];
         if (!sp) continue;
-        var cDepth = -(1 - sp.d) * dr;
-        if (Math.abs(sp.x - g.px) < 60 && Math.abs(cDepth - g.depth) < 20) {
+        if (Math.abs(sp.x - g.px) < 70) {
           g.crystals.splice(k, 1);
           g.crystalCount += 1;
+          // She jumps up to snatch it as she grabs it.
+          if (g.jumpT <= 0) g.jumpT = 1;
           if (g.crystalCount >= QUARRY_CRYSTALS_NEEDED) {
             g.quarryMissionDone = true;
             completeMission("quarry");
@@ -4158,10 +4163,19 @@
     { x: 1500, d: 0.3 },
     { x: 1900, d: 0.6 }
   ];
+  function crystalNear() {
+    // True when an uncollected crystal is close enough to jump for.
+    if (g.room !== "quarry" || g.quarryMissionDone) return false;
+    for (var i = 0; i < g.crystals.length; i++) {
+      var s = CRYSTAL_SPOTS[g.crystals[i]];
+      if (s && Math.abs(s.x - g.px) < 120) return true;
+    }
+    return false;
+  }
   function drawCrystals() {
     if (g.room !== "quarry" || g.quarryMissionDone) return;
     var dr = depthRange();
-    var pulse = 0.55 + 0.25 * Math.sin(Date.now() / 400);
+    var pulse = 0.65 + 0.3 * Math.sin(Date.now() / 400);
     for (var i = 0; i < g.crystals.length; i++) {
       var s = CRYSTAL_SPOTS[g.crystals[i]];
       if (!s) continue;
@@ -4172,13 +4186,16 @@
       var depth = -(1 - s.d) * dr;
       var feetY = groundY() + depth;
       var x = s.x * scale() - g.camX;
+      // The crystals float just above the floor, bobbing gently.
+      var floatY = feetY - 12 + Math.sin(Date.now() / 500 + i * 1.7) * 5;
       shadow(x, feetY, w);
-      // A soft blue glow behind each crystal, so they read as
-      // special, not just another piece of junk on the floor.
-      drawQuarryGlow(x, feetY - h / 2, w * 1.6, h * 1.2);
+      // A strong blue glow, layered twice so it reads clearly blue,
+      // not just another pale thing on the floor.
+      drawQuarryGlow(x, floatY - h / 2, w * 2.0, h * 1.5);
+      drawQuarryGlow(x, floatY - h / 2, w * 2.0, h * 1.5);
       ctx.save();
       ctx.globalAlpha = pulse;
-      ctx.drawImage(img, x - w / 2, feetY - h, w, h);
+      ctx.drawImage(img, x - w / 2, floatY - h, w, h);
       ctx.restore();
     }
   }
@@ -4260,10 +4277,14 @@
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + g.depth;
     var x = g.px * scale() - g.camX;
+    // Jumping: she rises in a little hop and comes back down.
+    // The shadow stays on the ground where she left it.
+    var jumpH = 0;
+    if (g.jumpT > 0) jumpH = Math.sin((g.jumpT / JUMP_DUR) * Math.PI) * sylviaH() * 0.22;
     shadow(x, feetY, w);
-    drawQuarryGlow(x, feetY - h / 2, w, h);
+    drawQuarryGlow(x, feetY - jumpH - h / 2, w, h);
     ctx.save();
-    ctx.translate(x, feetY - h / 2);
+    ctx.translate(x, feetY - jumpH - h / 2);
     // Sylvia's walk frames face right, so flip them when she faces left.
     // Her stance and kick face right too, so they flip as well, and she
     // attacks the way she is facing. Front and back views are never flipped.
@@ -6365,6 +6386,7 @@
   function tick() {
     requestAnimationFrame(tick);
     g.time += 1;
+    if (g.jumpT > 0) { g.jumpT += 1; if (g.jumpT > JUMP_DUR) g.jumpT = 0; }
     // The title screen: the world waits until she picks Continue
     // or New Game. The chamber still draws behind it.
     if (!g.started) { draw(); return; }
@@ -7078,6 +7100,7 @@
     }
     if (e.code === "KeyK") { tryKiss(); return; }
     if (e.code === "KeyH") { tryAttack(); return; }
+    if (e.code === "KeyJ") { tryJump(); return; }
     if (e.code === "KeyE") { if (g.proposal.active) { advanceProposal(); return; } tryEnter(); return; }
     if (e.code === "KeyI") { startInspect(); return; }
     if (e.code === "KeyT") { if (g.proposal.active) { advanceProposal(); return; } pressT(); return; }
