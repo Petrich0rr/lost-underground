@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=91" forces a fresh download: missions, the Vicky drink
+  // "?v=92" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=91"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=92"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1653,7 +1653,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=91" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=92" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1709,7 +1709,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=91" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=92" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -1872,6 +1872,7 @@
     if (g.mirror.active || g.photo.active || g.dungeonControls.open || g.map.active) return;
     g.map.active = true;
     updateMapImage();
+    renderMissions();
     var pin = MAP_PINS[g.room] || MAP_PINS.chamber;
     var ps = document.getElementById("pinSylvia");
     var pr = document.getElementById("pinRay");
@@ -1902,8 +1903,6 @@
     if (pop) pop.hidden = true;
   }
   function renderMissions() {
-    var list = document.getElementById("missionsList");
-    if (!list) return;
     var cur = currentMission();
     var html = "";
     for (var i = 0; i < MISSIONS.length; i++) {
@@ -1914,7 +1913,12 @@
       var mark = done ? "✓" : (isCur ? "→" : "·");
       html += '<div class="missionRow ' + cls + '"><span class="missionMark">' + mark + '</span><div><div class="missionTitle">' + (i + 1) + ". " + m.title + '</div><div class="missionHint">' + m.hint + '</div></div></div>';
     }
-    list.innerHTML = html;
+    // The same list lives in two places: the standalone missions
+    // panel and the right side of the world map popup.
+    var list = document.getElementById("missionsList");
+    if (list) list.innerHTML = html;
+    var mapList = document.getElementById("mapMissionsList");
+    if (mapList) mapList.innerHTML = html;
   }
   // Dev shortcut: jump straight to a room from the world map. Tap
   // anywhere on the map and they go to the room nearest that spot.
@@ -7206,6 +7210,8 @@
   if (missionsCloseBtn) missionsCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeMissions(); });
   var mapWrap = document.getElementById("mapWrap");
   if (mapWrap) mapWrap.addEventListener("click", function (e) { e.stopPropagation(); mapJump(e); });
+  var mapMissions = document.getElementById("mapMissions");
+  if (mapMissions) mapMissions.addEventListener("click", function (e) { e.stopPropagation(); });
   var shopBtn = document.getElementById("shopBtn");
   if (shopBtn) shopBtn.addEventListener("click", function (e) { e.stopPropagation(); openShop(); });
   var shopBuyBtn = document.getElementById("shopBuyBtn");
