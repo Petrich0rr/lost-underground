@@ -49,12 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=81" forces a fresh download: the garden unlocks from the
-  // Mayor on Day 3, the subway unlocks from X once the dungeon is
-  // done, the arcade drops to the tunnels, the tunnels portal goes
-  // to the quarry, and the quarry glows blue. A browser that cached
-  // ?v=80 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=81"; return img; }
+  // "?v=82" forces a fresh download: Diego is a tiny bit shorter
+  // than Ray, and the map fog is gone entirely. A browser that
+  // cached ?v=81 picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=82"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -474,7 +472,6 @@
     subwayUnlocked: false, dungeonCleared: {},
     xCutsceneDone: false, xCutscene: { active: false, step: 0, t: 0 },
     arcadeMinigameDone: false, subwayPuzzlesDone: false,
-    visited: { chamber: true, shopping: true },
     fountainSecret: null, secretOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
     dungeonMsg: "", dungeonMsgT: 0,
@@ -1431,56 +1428,9 @@
     earthen: "The Earthen Tunnel",
     surface: "The Surface"
   };
-  // Map fog: places she has not visited yet are blurred on the
-  // world map, so a new player cannot see the whole world at a
-  // glance. Her room and the Shopping District, with the bar and the
-  // shops on its street, are never fogged. Visiting a place clears
-  // its fog, and the fog is saved with the game.
-  var MAP_FOG = {
-    subway: { x: 0.04, y: 0.28, w: 0.28, h: 0.18 },
-    quarry: { x: 0.01, y: 0.68, w: 0.26, h: 0.22 },
-    tunnels: { x: 0.36, y: 0.72, w: 0.28, h: 0.20 },
-    dungeon: { x: 0.72, y: 0.66, w: 0.24, h: 0.20 },
-    dungeon2: { x: 0.80, y: 0.78, w: 0.16, h: 0.08 },
-    dungeon3: { x: 0.82, y: 0.84, w: 0.16, h: 0.08 },
-    dungeon4: { x: 0.84, y: 0.90, w: 0.16, h: 0.08 },
-    cistern: { x: 0.58, y: 0.50, w: 0.24, h: 0.20 },
-    garden: { x: 0.75, y: 0.36, w: 0.22, h: 0.22 },
-    upper1: { x: 0.38, y: 0.26, w: 0.28, h: 0.18 },
-    upper2: { x: 0.46, y: 0.18, w: 0.26, h: 0.16 },
-    upper3: { x: 0.54, y: 0.10, w: 0.20, h: 0.12 },
-    earthen: { x: 0.60, y: 0.06, w: 0.14, h: 0.10 },
-    surface: { x: 0.68, y: 0.02, w: 0.30, h: 0.14 },
-    surfaceText: { x: 0.68, y: 0.14, w: 0.28, h: 0.18, for: "surface" }
-  };
-  var mapFogEls = {};
-  function markVisited(room) {
-    if (!room || !ROOMS[room]) return;
-    g.visited[room] = true;
-  }
-  function refreshMapFog() {
-    var wrap = document.getElementById("mapWrap");
-    if (!wrap) return;
-    Object.keys(MAP_FOG).forEach(function (room) {
-      var r = MAP_FOG[room];
-      var el = mapFogEls[room];
-      if (!el) {
-        el = document.createElement("div");
-        el.className = "mapFog";
-        el.style.left = (r.x * 100) + "%";
-        el.style.top = (r.y * 100) + "%";
-        el.style.width = (r.w * 100) + "%";
-        el.style.height = (r.h * 100) + "%";
-        wrap.appendChild(el);
-        mapFogEls[room] = el;
-      }
-      el.hidden = !!g.visited[r.for || room];
-    });
-  }
   function openMap() {
     if (g.mirror.active || g.photo.active || g.map.active) return;
     g.map.active = true;
-    refreshMapFog();
     var pin = MAP_PINS[g.room] || MAP_PINS.chamber;
     var ps = document.getElementById("pinSylvia");
     var pr = document.getElementById("pinRay");
@@ -1515,7 +1465,6 @@
     // street entrance, so it is never left riding in another room.
     if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; g.scooter.room = "shopping"; }
     g.room = roomKey;
-    markVisited(roomKey);
     if (isDungeonRoom(roomKey)) spawnMonsters();
     else clearMonsters();
     g.px = 110; g.facing = 1; g.depth = 0;
@@ -2086,7 +2035,6 @@
     }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
-    markVisited(to);
     if (g.scooter.riding) g.scooter.room = to;
     if (isDungeonRoom(to)) spawnMonsters();
     else if (isDungeonRoom(from)) clearMonsters();
@@ -2899,7 +2847,7 @@
       day: g.day, hp: g.hp, energy: g.energy, coinCount: g.coinCount,
       room: g.room, px: g.px, depth: g.depth, facing: g.facing,
       scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
-      fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, visited: Object.keys(g.visited), proposed: g.proposed,
+      fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, proposed: g.proposed,
       gardenUnlocked: g.gardenUnlocked, mayorCutsceneDone: g.mayorCutsceneDone,
       subwayUnlocked: g.subwayUnlocked, dungeonCleared: g.dungeonCleared,
       xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
@@ -2999,9 +2947,6 @@
     g.xCutsceneDone = !!s.xCutsceneDone;
     g.arcadeMinigameDone = !!s.arcadeMinigameDone;
     g.subwayPuzzlesDone = !!s.subwayPuzzlesDone;
-    g.visited = { chamber: true, shopping: true };
-    (s.visited || []).forEach(function (r) { g.visited[r] = true; });
-    g.visited[g.room] = true;
     if (s.chestDay === s.day && Array.isArray(s.chestLayout)) {
       g.chestDay = s.chestDay;
       g.chestLayout = s.chestLayout.slice();
@@ -4171,7 +4116,8 @@
     if (!img || !img.complete || img.naturalWidth === 0) img = diegoIdleImg;
     if (!img || !img.complete || img.naturalWidth === 0) return;
     var t = (dg.depth + depthRange()) / depthRange();
-    var h = rayH() * (0.92 + 0.08 * t);
+    // Diego is a tiny bit shorter than Ray: not everyone is the same height.
+    var h = rayH() * 0.94 * (0.92 + 0.08 * t);
     var w = h * (img.naturalWidth / img.naturalHeight);
     var feetY = groundY() + dg.depth - 6;
     var x = dg.x * scale() - g.camX;
@@ -6273,7 +6219,6 @@
     if (newGameBtn) newGameBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       clearSave();
-      g.visited = { chamber: true, shopping: true };
       rollChests();
       startGame();
     });
