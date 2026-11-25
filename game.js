@@ -49,11 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=83" forces a fresh download: the world map is now 20
-  // pre-rendered variants with unvisited places pixelated in the
-  // art, and the pins are re-measured for the new map. A browser
-  // that cached ?v=82 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=83"; return img; }
+  // "?v=84" forces a fresh download: missions, the Vicky drink
+  // cutscene and the Mayor cutscene art, and the Mayor appearing
+  // from Day 2. A browser that cached ?v=83 picks it up.
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=84"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -171,6 +170,11 @@
   var adlerTalkImg = loadImg("assets/adler-talk.png");
   var adlerSurprisedImg = loadImg("assets/adler-surprised.png");
   var adlerLaughImg = loadImg("assets/adler-laugh.png");
+  // Cutscene art: Vicky serving drinks at the bar, and the Mayor
+  // talking to Sylvia and Ray. Both are full-screen backdrops
+  // for their cutscenes, drawn at full height with the sides cropped.
+  var vickyCutsceneImg = loadImg("assets/cutscene-vicky.jpg");
+  var mayorCutsceneImg = loadImg("assets/cutscene-mayor.jpg");
   // Mika, a Filipina girl who lives in the Flooded Cistern. Four
   // walk frames (facing right), a standing pose, talk, surprised
   // and laughing poses, and a sitting pose: she is mostly sitting
@@ -470,6 +474,15 @@
     fountainWished: false, fountainMsg: "", fountainMsgT: 0,
     gardenUnlocked: false, mayorCutsceneDone: false,
     mayorCutscene: { active: false, step: 0, t: 0 },
+    // Vicky's drink cutscene: the first mission, talking to her
+    // at the bar. One time only.
+    vickyCutsceneDone: false,
+    vickyCutscene: { active: false, step: 0, t: 0 },
+    // Missions: the story in order, from talking to Vicky to the
+    // proposal on the Surface. missionsDone is a set of completed
+    // mission ids; the current one is the first not yet done.
+    missionsDone: {},
+    missionsOpen: false,
     subwayUnlocked: false, dungeonCleared: {},
     xCutsceneDone: false, xCutscene: { active: false, step: 0, t: 0 },
     arcadeMinigameDone: false, subwayPuzzlesDone: false,
@@ -542,17 +555,25 @@
     "I might be shy, but I am not small. I am going to build a beautiful life up there."
   ];
   var VICKY_X = 560; // the bartender in the background, behind the bar
-  var VICKY_LINES = [
-    "You're new. I can tell. The new ones always stare at the ceiling like it's gonna open up.",
-    "If you're looking for a way out, take the stairs on the right. They go up. Nobody ever comes back down to tell me what's up there, though.",
-    "I've been pouring drinks in this basement since I was old enough to reach the top shelf. My mom worked this bar before me. Her mom before that.",
-    "House rules: no fighting, no crying, no asking about the stairs. Okay, you can ask about the stairs.",
-    "Everybody down here is looking for the exit. Most of them just order another drink instead.",
-    "That dress? Bold choice for a basement. I respect it.",
-    "Ray's been in here three times this week looking for you. He's sweet. Don't tell him I said that.",
-    "The tunnel past the jukebox leads out. Or deeper. Honestly, I've never checked. Somebody has to stay and pour.",
-    "You two are cute. Gross, but cute.",
-    "Been here most of my life. The taps have never once run dry. Weird, right?"
+  // Her head in the bar art sits a little right of where she stands,
+  // so the talk bubble points at her head, not at her feet.
+  var VICKY_HEAD_X = 585;
+  // Vicky's drink cutscene: the first mission. She has poured drinks
+  // here forever, she tells them the stairs go up, the Mayor comes
+  // tomorrow, and the drinks are on her. Kept short so each step
+  // fits two rows in the story bubble.
+  var VICKY_CUTSCENE_LINES = [
+    "A new face! Sit, sit. I have poured drinks here since I could reach the top shelf.",
+    "My mom worked this bar before me. Her mom before that. We never leave.",
+    "The stairs to the right? They go up. Nobody ever comes back to tell me what is up there.",
+    "But the Mayor will be here tomorrow. Come back and ask him. He knows things.",
+    "Furthest I have ever been is the Flooded Cistern, past the shops. Now, drinks are on me."
+  ];
+  // After the cutscene, talking to Vicky again is short and warm.
+  var VICKY_AFTER_LINES = [
+    "Drinks are on me, hon. You two look like you need one.",
+    "The Mayor was in here again. He talks a lot when he drinks. You should listen.",
+    "You are still here? Go on. The stairs are not going anywhere. Probably."
   ];
   // Char, the clothing store owner: a fashion diva with a fur coat and
   // a cigar. Dramatic, knows her worth, dresses the whole district.
@@ -798,9 +819,9 @@
     "Be careful down there. The dungeon does not forgive, and neither does exhaustion.",
     "I will be going now. Sleep, eat something, and take it slow tomorrow."
   ];
-  // The Mayor, drunk on Day 3 in the bar, slips up and tells them
+  // The Mayor, drunk in the bar from Day 2, slips up and tells them
   // where the hidden garden is. This is the only way the garden
-  // unlocks.
+  // unlocks. It plays when Sylvia talks to him, not on walking in.
   var MAYOR_CUTSCENE_LINES = [
     "Sylvia! Ray! Sit, sit. The Mayor of the whole underground city is allowed a few drinks.",
     "You want to know something? There is a garden. A real one, blooming in the dark, past the Flooded Cistern. Go right, past the water, and there it is.",
@@ -943,7 +964,10 @@
       g.stranger.surprisedT = 0;
     }
   }
-  function adlerNear() { return g.room === g.adler.room && Math.abs(g.px - g.adler.x) < 150; }
+  // The Mayor only appears from the second day, so he is not in
+  // the bar on Day 1 at all.
+  function mayorHere() { return g.day >= 2; }
+  function adlerNear() { return mayorHere() && g.room === g.adler.room && Math.abs(g.px - g.adler.x) < 150; }
   function adlerTalkLine() {
     var first = !g.adlerTalk.open;
     var idx;
@@ -970,14 +994,34 @@
   function vickyNear() { return g.room === "bar" && Math.abs(g.px - VICKY_X) < 140; }
   function talkLine() {
     var idx;
-    do { idx = Math.floor(Math.random() * VICKY_LINES.length); }
-    while (VICKY_LINES.length > 1 && idx === g.talk.idx);
+    do { idx = Math.floor(Math.random() * VICKY_AFTER_LINES.length); }
+    while (VICKY_AFTER_LINES.length > 1 && idx === g.talk.idx);
     g.talk.idx = idx; g.talk.open = true;
+  }
+  // Talking to Vicky: the first time, it is the drink cutscene
+  // (the first mission). After that, her short lines.
+  function talkToVicky() {
+    if (!g.vickyCutsceneDone) {
+      startVickyCutscene();
+      if (g.vickyCutscene.active) return;
+    }
+    talkLine();
+  }
+  // Talking to the Mayor: from Day 2, the first time it is the
+  // drunk garden cutscene (the second mission). After that, his
+  // regular lines.
+  function talkToMayor() {
+    if (!g.mayorCutsceneDone && g.day >= 2) {
+      startMayorCutscene();
+      if (g.mayorCutscene.active) return;
+    }
+    adlerTalkLine();
   }
   function pressT() {
     if (g.proposal.active) { advanceProposal(); return; }
     if (g.rescue.active) { advanceRescue(); return; }
     if (g.mayorCutscene.active) { advanceMayorCutscene(); return; }
+    if (g.vickyCutscene.active) { advanceVickyCutscene(); return; }
     if (g.xCutscene.active) { advanceXCutscene(); return; }
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding) return;
     if (g.propRead.open) { closePropRead(); return; }
@@ -996,7 +1040,7 @@
     if (g.rayTalk.open) { advanceRayTalk(); return; }
     // One conversation at a time: the room's own NPC wins, and Ray
     // is the fallback when nobody else is near to talk to.
-    if (vickyNear()) { talkLine(); return; }
+    if (vickyNear()) { talkToVicky(); return; }
     var key = ownerNear();
     if (key) { ownerTalkLine(key); return; }
     var kid = kidNear();
@@ -1007,7 +1051,7 @@
     if (diegoNear()) { diegoTalkLine(); return; }
     if (kianNear()) { kianTalkLine(); return; }
     if (yutoNear()) { yutoTalkLine(); return; }
-    if (adlerNear()) { adlerTalkLine(); return; }
+    if (adlerNear()) { talkToMayor(); return; }
     if (mikaNear()) { mikaTalkLine(); return; }
     if (strangerNear()) { strangerTalkLine(); return; }
     if (rayNear()) rayTalkLine();
@@ -1515,6 +1559,35 @@
     var pop = document.getElementById("mapPopup");
     if (pop) pop.hidden = true;
   }
+  // Missions: the story in order. The button at the top left opens
+  // the list; the current mission is the first one not yet done.
+  function openMissions() {
+    if (g.mirror.active || g.photo.active || g.map.active || g.missionsOpen) return;
+    g.missionsOpen = true;
+    renderMissions();
+    var pop = document.getElementById("missionsPanel");
+    if (pop) pop.hidden = false;
+  }
+  function closeMissions() {
+    g.missionsOpen = false;
+    var pop = document.getElementById("missionsPanel");
+    if (pop) pop.hidden = true;
+  }
+  function renderMissions() {
+    var list = document.getElementById("missionsList");
+    if (!list) return;
+    var cur = currentMission();
+    var html = "";
+    for (var i = 0; i < MISSIONS.length; i++) {
+      var m = MISSIONS[i];
+      var done = !!g.missionsDone[m.id];
+      var isCur = cur && cur.id === m.id;
+      var cls = done ? "missionDone" : (isCur ? "missionCurrent" : "missionNext");
+      var mark = done ? "✓" : (isCur ? "→" : "·");
+      html += '<div class="missionRow ' + cls + '"><span class="missionMark">' + mark + '</span><div><div class="missionTitle">' + (i + 1) + ". " + m.title + '</div><div class="missionHint">' + m.hint + '</div></div></div>';
+    }
+    list.innerHTML = html;
+  }
   // Dev shortcut: jump straight to a room from the world map. Tap
   // anywhere on the map and they go to the room nearest that spot.
   // For developing and testing, so she can hop around without
@@ -1535,6 +1608,7 @@
     if (g.scooter.riding) { g.scooter.riding = false; g.scooter.x = SCOOTER_X; g.scooter.room = "shopping"; }
     g.room = roomKey;
     markVisited(roomKey);
+    onEnterRoom(roomKey);
     updateMapImage();
     if (isDungeonRoom(roomKey)) spawnMonsters();
     else clearMonsters();
@@ -2099,7 +2173,7 @@
       return;
     }
     // The garden stays shut until the Mayor tells them where it is,
-    // in the Day 3 bar cutscene.
+    // in the bar cutscene.
     if (from === "cistern" && to === "garden" && !g.gardenUnlocked) {
       showDungeonMsg("The way is dark. You do not know where the garden is yet.");
       return;
@@ -2107,6 +2181,7 @@
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
     markVisited(to);
+    onEnterRoom(to);
     updateMapImage();
     if (g.scooter.riding) g.scooter.room = to;
     if (isDungeonRoom(to)) spawnMonsters();
@@ -2182,6 +2257,7 @@
     if (g.embrace.active) return;
     if (g.proposal.active) { advanceProposal(); return; }
     if (g.mayorCutscene.active) { advanceMayorCutscene(); return; }
+    if (g.vickyCutscene.active) { advanceVickyCutscene(); return; }
     if (g.xCutscene.active) { advanceXCutscene(); return; }
     if (g.sleeping) { wakeUp(); return; }
     if (g.photo.active) { closePhoto(); return; }
@@ -2225,7 +2301,7 @@
       acts.push({ id: "talk-next", label: "Next", run: pressT });
       return;
     }
-    if (vickyNear()) acts.push({ id: "talk-vicky", label: "Talk to Vicky", run: talkLine });
+    if (vickyNear()) acts.push({ id: "talk-vicky", label: "Talk to Vicky", run: talkToVicky });
     var ow = ownerNear();
     if (ow) acts.push({ id: "talk-owner-" + ow, label: "Talk to " + OWNERS[ow].name, run: function () { ownerTalkLine(ow); } });
     var kids = kidsNear();
@@ -2238,7 +2314,7 @@
     if (diegoNear()) acts.push({ id: "talk-diego", label: "Talk to Diego", run: diegoTalkLine });
     if (kianNear()) acts.push({ id: "talk-kian", label: "Talk to Dr. Kian", run: kianTalkLine });
     if (yutoNear()) acts.push({ id: "talk-yuto", label: "Talk to Yuto", run: yutoTalkLine });
-    if (adlerNear()) acts.push({ id: "talk-adler", label: "Talk to Mayor Adler", run: adlerTalkLine });
+    if (adlerNear()) acts.push({ id: "talk-adler", label: "Talk to Mayor Adler", run: talkToMayor });
     if (mikaNear()) acts.push({ id: "talk-mika", label: "Talk to Mika", run: mikaTalkLine });
     if (strangerNear()) acts.push({ id: "talk-stranger", label: "Talk to X", run: strangerTalkLine });
     if (acts.length === 0 && rayNear()) acts.push({ id: "talk-ray", label: "Talk to Ray", run: rayTalkLine });
@@ -2247,7 +2323,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -2476,6 +2552,7 @@
       g.coinCount += FOUNTAIN_COINS;
       g.fountainMsg = "+100 coins! The garden heard your wish.";
       g.fountainMsgT = 180;
+      completeMission("fountain");
       saveGame();
       return;
     }
@@ -2922,6 +2999,7 @@
       scooterOwned: g.scooter.owned, scooterRoom: g.scooter.room, scooterX: g.scooter.x,
       fountainWished: g.fountainWished, fountainSecret: g.fountainSecret, visited: Object.keys(g.visited), proposed: g.proposed,
       gardenUnlocked: g.gardenUnlocked, mayorCutsceneDone: g.mayorCutsceneDone,
+      vickyCutsceneDone: g.vickyCutsceneDone, missionsDone: Object.keys(g.missionsDone),
       subwayUnlocked: g.subwayUnlocked, dungeonCleared: g.dungeonCleared,
       xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
       subwayPuzzlesDone: g.subwayPuzzlesDone,
@@ -3015,6 +3093,9 @@
     g.fountainSecret = s.fountainSecret || null;
     g.gardenUnlocked = !!s.gardenUnlocked;
     g.mayorCutsceneDone = !!s.mayorCutsceneDone;
+    g.vickyCutsceneDone = !!s.vickyCutsceneDone;
+    g.missionsDone = {};
+    (s.missionsDone || []).forEach(function (id) { g.missionsDone[id] = true; });
     g.subwayUnlocked = !!s.subwayUnlocked;
     g.dungeonCleared = s.dungeonCleared || {};
     g.xCutsceneDone = !!s.xCutsceneDone;
@@ -3153,6 +3234,58 @@
   function dungeonAllCleared() {
     return g.dungeonCleared.dungeon && g.dungeonCleared.dungeon2 && g.dungeonCleared.dungeon3 && g.dungeonCleared.dungeon4;
   }
+  // Missions: the story in the best order, from talking to Vicky
+  // to the proposal on the Surface. Two of them cannot be finished
+  // yet: the arcade's secret needs the minigame (Erika is building
+  // it), and the subway stairs need the puzzles (not built yet).
+  // A mission completes when its moment happens, even out of order;
+  // the current one is simply the first not yet done.
+  var MISSIONS = [
+    { id: "vicky", title: "Talk to Vicky", hint: "Vicky has been pouring drinks at the bar forever. Go say hi.", room: "bar" },
+    { id: "mayor", title: "Talk to the Mayor", hint: "The Mayor will be at the bar tomorrow. He knows things.", room: "bar" },
+    { id: "garden", title: "Find the Secret Garden", hint: "Past the Flooded Cistern, past the shopping district. The Mayor let it slip.", room: "garden" },
+    { id: "fountain", title: "Make a wish", hint: "The fountain in the garden grants one wish.", room: "garden" },
+    { id: "arcade", title: "The arcade's secret", hint: "The arcade's arches hide a way down. Find the hint that opens them.", room: "arcade" },
+    { id: "dungeon", title: "Clear the dungeon", hint: "The iron door in the Old Service Tunnels leads down. Clear every level.", room: "dungeon4" },
+    { id: "x", title: "Meet X", hint: "Something waits at the bottom of the dungeon.", room: "dungeon4" },
+    { id: "subway", title: "Solve the subway puzzles", hint: "The stairs in the Forgotten Subway are sealed by a puzzle.", room: "subway" },
+    { id: "surface", title: "Reach the Surface", hint: "Up through the Upper Levels and the Earthen Tunnel.", room: "surface" },
+    { id: "proposal", title: "The proposal", hint: "Walk to the edge of the world with Ray.", room: "surface" }
+  ];
+  function missionDone(id) { return !!g.missionsDone[id]; }
+  function currentMission() {
+    for (var i = 0; i < MISSIONS.length; i++) {
+      if (!g.missionsDone[MISSIONS[i].id]) return MISSIONS[i];
+    }
+    return null;
+  }
+  function completeMission(id) {
+    if (g.missionsDone[id]) return;
+    var m = null;
+    for (var i = 0; i < MISSIONS.length; i++) if (MISSIONS[i].id === id) m = MISSIONS[i];
+    if (!m) return;
+    g.missionsDone[id] = true;
+    showDungeonMsg("Mission complete: " + m.title);
+    saveGame();
+  }
+  // Entering a room can finish a mission: the garden, and the Surface.
+  function onEnterRoom(roomKey) {
+    if (roomKey === "garden") completeMission("garden");
+    if (roomKey === "surface") completeMission("surface");
+  }
+  // The two gates that are not built yet: when the arcade minigame
+  // and the subway puzzles are built, they call these, which unlock
+  // the way and finish the mission.
+  function setArcadeMinigameDone() {
+    g.arcadeMinigameDone = true;
+    completeMission("arcade");
+    saveGame();
+  }
+  function setSubwayPuzzlesDone() {
+    g.subwayPuzzlesDone = true;
+    completeMission("subway");
+    saveGame();
+  }
   function showDungeonMsg(text) {
     g.dungeonMsg = text;
     g.dungeonMsgT = 180;
@@ -3250,7 +3383,10 @@
         g.monsters.splice(i, 1);
         // The level is cleared the moment its last monster falls.
         // This is what the subway unlock counts on.
-        if (g.monsters.length === 0) g.dungeonCleared[g.room] = true;
+        if (g.monsters.length === 0) {
+          g.dungeonCleared[g.room] = true;
+          if (dungeonAllCleared()) completeMission("dungeon");
+        }
       }
     }
   }
@@ -3453,8 +3589,8 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
-    if (g.rescue.active || g.mayorCutscene.active || g.xCutscene.active) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
@@ -3474,18 +3610,19 @@
   function endProposal() {
     g.proposal.active = false;
     g.proposed = true;
+    completeMission("proposal");
     saveGame();
   }
-  // The Mayor's garden cutscene: on Day 3, when she walks into the
-  // bar, the Mayor is drunk and slips up about the hidden garden.
-  // After it, the garden is unlocked. One time only.
+  // The Mayor's garden cutscene: from Day 2, when Sylvia talks to
+  // him in the bar, the Mayor is drunk and slips up about the hidden
+  // garden. After it, the garden is unlocked. One time only.
   function startMayorCutscene() {
     if (g.mayorCutsceneDone || g.mayorCutscene.active) return;
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
-    if (g.proposal.active || g.rescue.active || g.xCutscene.active) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.proposal.active || g.rescue.active || g.vickyCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.mayorCutscene.active = true;
     g.mayorCutscene.step = 0;
@@ -3498,13 +3635,44 @@
     if (!g.mayorCutscene.active) return;
     g.mayorCutscene.step += 1;
     g.mayorCutscene.t = 0;
-    if (g.mayorCutscene.step > 2) endMayorCutscene();
+    if (g.mayorCutscene.step >= MAYOR_CUTSCENE_LINES.length) endMayorCutscene();
   }
   function endMayorCutscene() {
     g.mayorCutscene.active = false;
     g.mayorCutsceneDone = true;
     g.gardenUnlocked = true;
     g.ray.pause = 0;
+    completeMission("mayor");
+    saveGame();
+  }
+  // Vicky's drink cutscene: the first mission. She has poured drinks
+  // here forever, she tells them the stairs go up, the Mayor comes
+  // tomorrow, and the drinks are on her. One time only.
+  function startVickyCutscene() {
+    if (g.vickyCutsceneDone || g.vickyCutscene.active) return;
+    if (g.sleeping || g.kiss.active || g.embrace.active) return;
+    if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.xCutscene.active) return;
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
+    g.vickyCutscene.active = true;
+    g.vickyCutscene.step = 0;
+    g.vickyCutscene.t = 0;
+    g.ray.dir = VICKY_X > g.ray.x ? 1 : -1;
+    g.ray.pause = 9999;
+  }
+  function advanceVickyCutscene() {
+    if (!g.vickyCutscene.active) return;
+    g.vickyCutscene.step += 1;
+    g.vickyCutscene.t = 0;
+    if (g.vickyCutscene.step >= VICKY_CUTSCENE_LINES.length) endVickyCutscene();
+  }
+  function endVickyCutscene() {
+    g.vickyCutscene.active = false;
+    g.vickyCutsceneDone = true;
+    g.ray.pause = 0;
+    completeMission("vicky");
     saveGame();
   }
   // X's appearance: once the whole dungeon is cleared, he shows
@@ -3515,8 +3683,8 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.map.active || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
-    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active) return;
+    if (g.photo.active || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.xCutscene.active = true;
     g.xCutscene.step = 0;
@@ -3539,12 +3707,13 @@
     g.subwayUnlocked = true;
     g.sylviaSurprisedT = 90;
     g.ray.pause = 0;
+    completeMission("x");
     saveGame();
   }
   function startRescue() {
     if (g.rescue.active) return;
-    if (g.sleeping || g.proposal.active || g.mayorCutscene.active || g.xCutscene.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
-    if (g.kiss.active || g.embrace.active || g.mirror.active || g.map.active || g.photo.active) return;
+    if (g.sleeping || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.kiss.active || g.embrace.active || g.mirror.active || g.map.active || g.missionsOpen || g.photo.active) return;
     if (g.shopOpen || g.fashionOpen || g.sleepConfirmOpen || g.chestOpen) return;
     if (g.portal.active) return;
     g.rescue.active = true;
@@ -3694,7 +3863,17 @@
     var lineW = ctx.measureText(line).width;
     var maxW = Math.min(440, g.w - 60);
     var bw = Math.min(maxW, Math.max(nameW, lineW)) + 36;
-    var bh = 24 + 22 + 18;
+    // Wrap the line first, then size the bubble to fit however many
+    // rows it needs, so a long line never spills past the bottom.
+    var words = line.split(" ");
+    var lines = [], cur = "";
+    for (var k = 0; k < words.length; k++) {
+      var test = cur ? cur + " " + words[k] : words[k];
+      if (ctx.measureText(test).width > bw - 36 && cur) { lines.push(cur); cur = words[k]; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    var bh = 24 + lines.length * 20 + 8;
     var bx = cx - bw / 2;
     var by = 56;
     ctx.fillStyle = "rgba(255,255,255,0.96)";
@@ -3716,19 +3895,24 @@
     ctx.fillText(name, cx, by + 20);
     ctx.fillStyle = "#222";
     ctx.font = "16px 'Open Sans', sans-serif";
-    var words = line.split(" ");
-    var lines = [], cur = "";
-    for (var k = 0; k < words.length; k++) {
-      var test = cur ? cur + " " + words[k] : words[k];
-      if (ctx.measureText(test).width > bw - 36 && cur) { lines.push(cur); cur = words[k]; }
-      else cur = test;
-    }
-    if (cur) lines.push(cur);
     for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], cx, by + 42 + j * 20);
     ctx.restore();
   }
+  // A cutscene backdrop: the art drawn full height, cropped on the
+  // sides, like the room backgrounds. The story bubble goes on top.
+  function drawCutsceneImage(img) {
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var w = g.h * (img.naturalWidth / img.naturalHeight);
+    ctx.drawImage(img, (g.w - w) / 2, 0, w, g.h);
+  }
+  function drawVickyCutsceneBubble() {
+    if (!g.vickyCutscene.active) return;
+    drawCutsceneImage(vickyCutsceneImg);
+    drawStoryBubble("VICKY", VICKY_CUTSCENE_LINES[g.vickyCutscene.step], "#d6336c");
+  }
   function drawMayorCutsceneBubble() {
     if (!g.mayorCutscene.active) return;
+    drawCutsceneImage(mayorCutsceneImg);
     drawStoryBubble("MAYOR ADLER", MAYOR_CUTSCENE_LINES[g.mayorCutscene.step], "#7a5fd0");
   }
   function drawXCutsceneBubble() {
@@ -4286,7 +4470,7 @@
   // shows his surprised pose for the greeting, his talk pose for
   // the line, and his laughing pose right after one of his lines.
   function drawAdler() {
-    if (g.room !== g.adler.room) return;
+    if (!mayorHere() || g.room !== g.adler.room) return;
     var ad = g.adler;
     var talking = g.adlerTalk.open;
     var walking = !talking && ad.pause <= 0;
@@ -4342,13 +4526,13 @@
     return lines;
   }
   function drawTalk() {
-    // Speech bubble above Vicky, tail pointing down to her.
+    // Speech bubble just above Vicky, tail pointing down to her head.
     if (!g.talk.open) return;
-    var vx = VICKY_X * scale() - g.camX;
+    var vx = VICKY_HEAD_X * scale() - g.camX;
     var maxW = Math.min(g.w * 0.6, 420);
     ctx.save();
     ctx.font = "400 14px 'Open Sans', sans-serif";
-    var lines = wrapText(VICKY_LINES[g.talk.idx], maxW - 32);
+    var lines = wrapText(VICKY_AFTER_LINES[g.talk.idx], maxW - 32);
     var bw = 0;
     ctx.font = "700 12px 'Open Sans', sans-serif";
     bw = Math.max(bw, ctx.measureText("VICKY").width);
@@ -4357,7 +4541,7 @@
     bw = Math.min(maxW, bw + 32);
     var bh = 24 + lines.length * 18 + 20;
     var bx = Math.max(8, Math.min(g.w - bw - 8, vx - bw / 2));
-    var by = g.h * 0.32 - bh - 12;
+    var by = g.h * 0.41 - bh - 12;
     if (by < 8) by = 8;
     var tx = Math.max(bx + 18, Math.min(bx + bw - 18, vx));
     ctx.fillStyle = "#ffffff";
@@ -5443,6 +5627,7 @@
     drawStrangerTalk();
     drawRescueKian();
     drawRescueBubble();
+    drawVickyCutsceneBubble();
     drawMayorCutsceneBubble();
     drawXCutsceneBubble();
     drawRayTalk();
@@ -5462,9 +5647,6 @@
     // intro line for the place she just walked into.
     if (g.room !== g.lastRoom) {
       g.lastRoom = g.room; showRoomIntro();
-      // On Day 3, walking into the bar starts the Mayor's cutscene:
-      // drunk, he slips up and tells them where the hidden garden is.
-      if (g.room === "bar" && g.day >= 3 && !g.mayorCutsceneDone) startMayorCutscene();
     }
     if (g.mirror.active) {
       // Looking in the mirror: she blinks once in a while, and
@@ -5678,6 +5860,13 @@
       // The Mayor's garden cutscene in the bar: his lines play, and
       // nothing else moves until it is done.
       g.mayorCutscene.t += 1;
+      draw();
+      return;
+    }
+    if (g.vickyCutscene.active) {
+      // Vicky's drink cutscene at the bar: her lines play, and
+      // nothing else moves until it is done.
+      g.vickyCutscene.t += 1;
       draw();
       return;
     }
@@ -6065,7 +6254,7 @@
     var ad = g.adler;
     if (ad.laughT > 0) ad.laughT -= 1;
     if (ad.surprisedT > 0) ad.surprisedT -= 1;
-    if (g.room === ad.room && !g.adlerTalk.open) {
+    if (mayorHere() && g.room === ad.room && !g.adlerTalk.open) {
       if (ad.pause > 0) { ad.pause -= 1; }
       else {
         ad.x += ad.dir * 0.4;
@@ -6165,7 +6354,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.secretOpen) { closeSecret(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.map.active) { closeMap(); return; } if (g.missionsOpen) { closeMissions(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.secretOpen) { closeSecret(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active) return;
     if (g.map.active) return;
@@ -6209,6 +6398,7 @@
         if (g.proposal.active) { advanceProposal(); pointerDownAt = 0; return; }
     if (g.rescue.active) { advanceRescue(); pointerDownAt = 0; return; }
     if (g.mayorCutscene.active) { advanceMayorCutscene(); pointerDownAt = 0; return; }
+    if (g.vickyCutscene.active) { advanceVickyCutscene(); pointerDownAt = 0; return; }
     if (g.xCutscene.active) { advanceXCutscene(); pointerDownAt = 0; return; }
         tryAttack();
       }
@@ -6237,6 +6427,14 @@
   if (mapBtn) mapBtn.addEventListener("click", function (e) { e.stopPropagation(); openMap(); });
   var mapPopup = document.getElementById("mapPopup");
   if (mapPopup) mapPopup.addEventListener("click", function (e) { e.stopPropagation(); closeMap(); });
+  var missionsBtn = document.getElementById("missionsBtn");
+  if (missionsBtn) missionsBtn.addEventListener("click", function (e) { e.stopPropagation(); openMissions(); });
+  var missionsPanel = document.getElementById("missionsPanel");
+  if (missionsPanel) missionsPanel.addEventListener("click", function (e) { e.stopPropagation(); closeMissions(); });
+  var missionsCard = document.getElementById("missionsCard");
+  if (missionsCard) missionsCard.addEventListener("click", function (e) { e.stopPropagation(); });
+  var missionsCloseBtn = document.getElementById("missionsCloseBtn");
+  if (missionsCloseBtn) missionsCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeMissions(); });
   var mapWrap = document.getElementById("mapWrap");
   if (mapWrap) mapWrap.addEventListener("click", function (e) { e.stopPropagation(); mapJump(e); });
   var shopBtn = document.getElementById("shopBtn");
@@ -6297,6 +6495,15 @@
       e.stopPropagation();
       clearSave();
       g.visited = { chamber: true, shopping: true };
+      g.missionsDone = {};
+      g.vickyCutsceneDone = false;
+      g.mayorCutsceneDone = false;
+      g.gardenUnlocked = false;
+      g.subwayUnlocked = false;
+      g.dungeonCleared = {};
+      g.xCutsceneDone = false;
+      g.arcadeMinigameDone = false;
+      g.subwayPuzzlesDone = false;
       updateMapImage();
       rollChests();
       startGame();
