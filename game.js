@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=97" forces a fresh download: missions, the Vicky drink
+  // "?v=98" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=97"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=98"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1727,7 +1727,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=97" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=98" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1783,7 +1783,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=97" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=98" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -4053,9 +4053,9 @@
     return g.dungeonCleared.dungeon && g.dungeonCleared.dungeon2 && g.dungeonCleared.dungeon3 && g.dungeonCleared.dungeon4;
   }
   // Missions: the story in the best order, from talking to Vicky
-  // to the proposal on the Surface. Two of them cannot be finished
-  // yet: the arcade's secret needs the minigame (Erika is building
-  // it), and the subway stairs need the puzzles (not built yet).
+  // to exploring the land on the Surface. All eleven can be
+  // finished now: the arcade's secret opens with a pinball win,
+  // and the subway stairs open with the ticket puzzle.
   // A mission completes when its moment happens, even out of order;
   // the current one is simply the first not yet done.
   var MISSIONS = [
@@ -4069,7 +4069,7 @@
     { id: "x", title: "Meet X", hint: "Something waits at the bottom of the dungeon.", room: "dungeon4" },
     { id: "subway", title: "Solve the subway puzzles", hint: "The stairs in the Forgotten Subway are sealed by a puzzle.", room: "subway" },
     { id: "surface", title: "Reach the Surface", hint: "Up through the Upper Levels and the Earthen Tunnel.", room: "surface" },
-    { id: "proposal", title: "The proposal", hint: "Walk to the edge of the world with Ray.", room: "surface" }
+    { id: "proposal", title: "Explore the land", hint: "The Surface is wide open. Walk all the way to the far side.", room: "surface" }
   ];
   function missionDone(id) { return !!g.missionsDone[id]; }
   function currentMission() {
