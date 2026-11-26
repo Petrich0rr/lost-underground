@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=99" forces a fresh download: missions, the Vicky drink
+  // "?v=100" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=99"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=100"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -641,6 +641,7 @@
     halluDone: false,
     hallu: { active: false, t: 0, spawned: false },
     halluMen: [],
+    halluKiss: { active: false, t: 0, man: null },
     arcadeMinigameDone: false, subwayPuzzlesDone: false,
     // The quarry crystal mission: five glowing crystals in the
     // Crystal Quarry. Gather them all and the iron door opens.
@@ -1750,7 +1751,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=99" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=100" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1806,7 +1807,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=99" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=100" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -3193,7 +3194,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.kiss.active || g.halluKiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -4473,6 +4474,25 @@
     var my = feetY - h - 22 + Math.sin(g.kiss.t * 0.12) * 4;
     drawHeart(mx, my, 11 + Math.sin(g.kiss.t * 0.2) * 2, "#ff5c8a");
   }
+  function drawHalluKiss() {
+    // Kissing a hallucination plays the same kiss frame, centered
+    // on Sylvia and the man she kissed instead of the real Ray.
+    if (!g.halluKiss.active || !g.halluKiss.man) return;
+    if (!kissImg || !kissImg.complete || kissImg.naturalWidth === 0) return;
+    var man = g.halluKiss.man;
+    var h = rayH();
+    var w = h * (kissImg.naturalWidth / kissImg.naturalHeight);
+    var feetY = groundY() - 6;
+    var mx = (g.px + man.x) / 2 * scale() - g.camX;
+    shadow(mx, feetY, w);
+    ctx.save();
+    ctx.translate(mx, feetY - h / 2);
+    if (g.px > man.x) ctx.scale(-1, 1);
+    ctx.drawImage(kissImg, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    var my = feetY - h - 22 + Math.sin(g.halluKiss.t * 0.12) * 4;
+    drawHeart(mx, my, 11 + Math.sin(g.halluKiss.t * 0.2) * 2, "#ff5c8a");
+  }
 
   // The proposal on the Surface. When they walk all the way to the
   // right edge of the outside, Ray gets down on one knee. The four
@@ -4654,10 +4674,10 @@
   // and the way out opens. Kiss the wrong one and the smoke stings:
   // half her health, and that face dissolves.
   var HALLU_MEN = [
-    { who: "ray", img: rayIdleImg },
     { who: "diego", img: diegoIdleImg },
     { who: "kian", img: kianIdleImg },
     { who: "yuto", img: yutoIdleImg },
+    { who: "ray", img: rayIdleImg },
     { who: "adler", img: adlerIdleImg },
     { who: "gunner", img: gunnerIdleImg },
     { who: "mikey", img: mikeyIdleImg }
@@ -4704,7 +4724,16 @@
     return best;
   }
   function tryHalluKiss() {
+    if (g.halluKiss.active) return;
     var man = halluKissNear();
+    if (!man) return;
+    // The kiss frame plays first (120 ticks, like a real kiss),
+    // and the outcome lands when it ends.
+    g.halluKiss.active = true;
+    g.halluKiss.t = 0;
+    g.halluKiss.man = man;
+  }
+  function resolveHalluKiss(man) {
     if (!man) return;
     if (man.who === "ray") {
       g.halluDone = true;
@@ -4725,6 +4754,7 @@
     if (g.portal.active) return;
     g.rescue.active = true;
     if (g.hallu.active) clearHallu();
+    g.halluKiss.active = false; g.halluKiss.t = 0; g.halluKiss.man = null;
     g.rescue.phase = "carry";
     g.rescue.t = 0;
     g.rescue.line = 0;
@@ -6650,6 +6680,7 @@
     drawChestPrompt();
     drawGardenDoorPrompt();
     if (g.kiss.active) { drawKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); drawStrangerTalk(); return; }
+    if (g.halluKiss.active) { drawHalluKiss(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); drawStrangerTalk(); return; }
     if (g.embrace.active) { drawEmbrace(); drawTalk(); drawOwnerTalk(); drawKidTalk(); drawEveTalk(); drawAlexisTalk(); drawPriyaTalk(); drawDiegoTalk(); drawKianTalk(); drawYutoTalk(); drawAdlerTalk(); drawMikaTalk(); drawStrangerTalk(); return; }
     if (g.proposal.active) { drawProposal(); return; }
     if (g.rescue.active && g.rescue.phase === "carry") { drawRescue(); return; }
@@ -7009,6 +7040,22 @@
         g.px += step; g.ray.x -= step;
       }
       if (g.kiss.t >= 120) { g.kiss.active = false; g.ray.pause = 60; }
+      draw();
+      return;
+    }
+    if (g.halluKiss.active) {
+      g.halluKiss.t += 1;
+      var hman = g.halluKiss.man;
+      if (!hman) { g.halluKiss.active = false; draw(); return; }
+      // Face each other and lean in until cheek to cheek, same as a
+      // real kiss. The outcome lands when the kiss ends.
+      g.facing = hman.x > g.px ? 1 : -1;
+      var hgap = hman.x - g.px;
+      if (Math.abs(hgap) > 55) {
+        var hstep = hgap > 0 ? 0.8 : -0.8;
+        g.px += hstep; hman.x -= hstep;
+      }
+      if (g.halluKiss.t >= 120) { g.halluKiss.active = false; resolveHalluKiss(hman); }
       draw();
       return;
     }
