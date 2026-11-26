@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=93" forces a fresh download: missions, the Vicky drink
+  // "?v=94" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=93"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=94"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1448,7 +1448,10 @@
     // The tunnels have no edge exits on purpose: going home is a
     // choice (press E at the left edge), not an automatic walk-out.
     tunnels: {},
-    dungeon: { left: "tunnels" },
+    // The dungeon has no edge exit: the way out is the first door,
+    // the barred iron door on the left (press E), which drops her
+    // back in the tunnels at the iron door she came in through.
+    dungeon: {},
     dungeon2: { left: "dungeon", right: "dungeon3" },
     dungeon3: { left: "dungeon2", right: "dungeon4" },
     dungeon4: { left: "dungeon3" },
@@ -1672,7 +1675,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=93" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=94" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1728,7 +1731,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=93" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=94" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -2675,6 +2678,45 @@
     g.ray.x = 60; g.ray.dir = 1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
     g.camX = 0;
   }
+  // The first door in the Ancient Dungeon: the barred iron door on
+  // the left, the first one she meets after walking in. Press E to
+  // go back out through it, and she comes out in the tunnels right
+  // at the iron door she came in through.
+  var DUNGEON_EXIT_DOOR_X = 650, DUNGEON_EXIT_DOOR_RANGE = 110;
+  function dungeonExitDoorNear() {
+    return g.room === "dungeon" && Math.abs(g.px - DUNGEON_EXIT_DOOR_X) < DUNGEON_EXIT_DOOR_RANGE;
+  }
+  function exitDungeonToTunnels() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (!dungeonExitDoorNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
+    clearMonsters();
+    g.room = "tunnels";
+    markVisited("tunnels");
+    onEnterRoom("tunnels");
+    updateMapImage();
+    g.px = IRON_DOOR_X; g.facing = -1; g.depth = 0;
+    g.ray.x = IRON_DOOR_X - 50; g.ray.dir = -1; g.ray.depth = 0; g.ray.pause = 0; g.ray.fight.active = false;
+    g.camX = Math.max(0, Math.min(worldW() - g.w, g.px * scale() - g.w * 0.38));
+  }
+  function drawDungeonExitDoorPrompt() {
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.inspect.active || g.portal.active) return;
+    if (!dungeonExitDoorNear()) return;
+    var x = DUNGEON_EXIT_DOOR_X * scale() - g.camX;
+    var y = groundY() - sylviaH() - 34;
+    ctx.save();
+    ctx.font = "700 13px 'Open Sans', sans-serif";
+    ctx.textAlign = "center";
+    var label = "Press E to leave the dungeon";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(20,10,30,0.72)";
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2 - 10, y - 13, tw + 20, 26, 13);
+    else ctx.rect(x - tw / 2 - 10, y - 13, tw + 20, 26);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(label, x, y + 5);
+    ctx.restore();
+  }
   // The round blue tunnel mouth in the Old Service Tunnels: the
   // dark arch with the teal glow, on the left side, right where you
   // first walk in from the quarry. Going through it takes them to
@@ -3023,6 +3065,7 @@
     if (chestNear()) { openChest(); return; }
     if (gardenDoorNear()) { startHomeWalk(); return; }
     if (ironDoorNear()) { enterDungeonFromIronDoor(); return; }
+    if (dungeonExitDoorNear()) { exitDungeonToTunnels(); return; }
     if (stoneDoorNear()) { enterDungeon2(); return; }
     if (portalNear()) { goThroughPortal(); return; }
   }
@@ -3098,6 +3141,7 @@
       if (chestNear()) acts.push({ id: "chest", label: "Open the chest", run: openChest });
       if (gardenDoorNear()) acts.push({ id: "homedoor", label: "Go home", run: startHomeWalk });
       if (ironDoorNear()) acts.push({ id: "iron", label: "Dungeon", run: enterDungeonFromIronDoor });
+      if (dungeonExitDoorNear()) acts.push({ id: "dungeonexit", label: "Leave the dungeon", run: exitDungeonToTunnels });
     if (stoneDoorNear()) acts.push({ id: "stone", label: "Go deeper", run: enterDungeon2 });
       if (portalNear()) acts.push({ id: "portal", label: "Go to the quarry", run: goThroughPortal });
       if (crystalNear()) acts.push({ id: "jump", label: "Jump up and grab it", run: tryJump });
@@ -6353,6 +6397,7 @@
     drawInspectPrompt();
     drawPropPrompt();
     drawIronDoorPrompt();
+    drawDungeonExitDoorPrompt();
   drawStoneDoorPrompt();
     drawPortalPrompt();
     drawScooterPrompt();
