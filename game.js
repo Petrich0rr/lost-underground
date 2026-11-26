@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=96" forces a fresh download: missions, the Vicky drink
+  // "?v=97" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=96"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=97"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -1727,7 +1727,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=96" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=97" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1783,7 +1783,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=96" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=97" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -4133,7 +4133,7 @@
   function clearMonsters() { g.monsters = []; g.coins = []; }
   function monsterH(m) { return g.h * MONSTERS[m.type].h; }
   function updateMonsters() {
-    if (!isDungeonRoom(g.room)) return;
+    if (isDungeonRoom(g.room)) {
     for (var i = g.monsters.length - 1; i >= 0; i--) {
       var m = g.monsters[i];
       var def = MONSTERS[m.type];
@@ -4172,6 +4172,7 @@
         // Shove the monster back so it does not sit on top of her.
         m.x += (m.x < g.px ? -1 : 1) * 50;
       }
+    }
     }
     // Coins spin on the floor; walking over one picks it up.
     for (var j = g.coins.length - 1; j >= 0; j--) {
