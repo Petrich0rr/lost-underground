@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=100" forces a fresh download: missions, the Vicky drink
+  // "?v=101" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=100"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=101"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -642,6 +642,10 @@
     hallu: { active: false, t: 0, spawned: false },
     halluMen: [],
     halluKiss: { active: false, t: 0, man: null },
+    // Upper Level 2: the choice. Rescue everyone from the
+    // underground, or leave them behind and start a new life.
+    // Secretly a vote for the next game, sent to a form Erika reads.
+    lvl2Open: false, lvl2Choice: null,
     arcadeMinigameDone: false, subwayPuzzlesDone: false,
     // The quarry crystal mission: five glowing crystals in the
     // Crystal Quarry. Gather them all and the iron door opens.
@@ -1683,6 +1687,86 @@
     var note = document.getElementById("ticketNote");
     if (note) note.textContent = "That line doesn't climb to the top. Look at the map on the wall and try again.";
   }
+  // Upper Level 2: the choice. The way up is open, but everyone
+  // they love is still down there. Rescue everyone, or leave them
+  // behind and start a new life. It is a hard decision, and secretly
+  // a vote for the next game: the choice is sent to a form Erika
+  // reads, so she can see what players picked.
+  var LVL2_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScX4AgVX1Dgd0YDF86BZkOk47hnViTRreeFjJW8zVzBcbw3wA/formResponse";
+  var LVL2_FORM_ENTRY = "entry.2093933407";
+  var LVL2_CHOICE_TEXT = { rescue: "Rescue everyone", leave: "Leave them behind and start a new life" };
+  function openLvl2() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.mirror.active || g.photo.active || g.subwayMap.active || g.lvl2Open) return;
+    if (g.lvl2Choice) return;
+    if (g.room !== "upper2") return;
+    g.talk.open = false; g.ownerTalk.open = false;
+    g.lvl2Open = true;
+    refreshLvl2Panel();
+    var p = document.getElementById("lvl2Panel");
+    if (p) p.hidden = false;
+  }
+  function closeLvl2() {
+    g.lvl2Open = false;
+    var p = document.getElementById("lvl2Panel");
+    if (p) p.hidden = true;
+  }
+  function refreshLvl2Panel() {
+    var a1 = document.getElementById("lvl2A1");
+    var a2 = document.getElementById("lvl2A2");
+    var txt = document.getElementById("lvl2Text");
+    var note = document.getElementById("lvl2Note");
+    var closeBtn = document.getElementById("lvl2CloseBtn");
+    var qs = document.getElementById("lvl2Answers");
+    if (!a1 || !txt || !note || !closeBtn || !qs) return;
+    if (g.lvl2Choice) {
+      qs.hidden = true;
+      txt.textContent = g.lvl2Choice === "rescue" ? "You chose to go back for everyone. The way up will still be there." : "You chose to start your new life. The way up is open.";
+      note.textContent = "";
+      closeBtn.textContent = "Close";
+      return;
+    }
+    qs.hidden = false;
+    txt.textContent = "The way up is open. But everyone we love is still down there, in the dark. Going back for them means risking everything, and we might not make it out at all. Leaving now means we start our new life right away, free and safe, but they stay behind in the dark, forever. There is no right answer. What do we do?";
+    note.textContent = "";
+    closeBtn.textContent = "Not yet";
+  }
+  function chooseLvl2(choice) {
+    if (!g.lvl2Open || g.lvl2Choice) return;
+    if (choice !== "rescue" && choice !== "leave") return;
+    g.lvl2Choice = choice;
+    closeLvl2();
+    submitLvl2Vote(choice);
+    showDungeonMsg(choice === "rescue" ? "You chose to go back for everyone." : "You chose to start your new life.");
+    saveGame();
+  }
+  function submitLvl2Vote(choice) {
+    // Send the vote to the form Erika reads. A hidden form posts
+    // into a hidden iframe, so there is no page reload and no CORS
+    // problem. If it fails, the vote is still saved locally.
+    try {
+      var frame = document.getElementById("lvl2VoteFrame");
+      if (!frame) {
+        frame = document.createElement("iframe");
+        frame.id = "lvl2VoteFrame";
+        frame.name = "lvl2VoteFrame";
+        frame.style.display = "none";
+        document.body.appendChild(frame);
+      }
+      var f = document.createElement("form");
+      f.method = "POST";
+      f.action = LVL2_FORM_URL;
+      f.target = "lvl2VoteFrame";
+      f.style.display = "none";
+      var inp = document.createElement("input");
+      inp.type = "hidden";
+      inp.name = LVL2_FORM_ENTRY;
+      inp.value = LVL2_CHOICE_TEXT[choice] || choice;
+      f.appendChild(inp);
+      document.body.appendChild(f);
+      f.submit();
+      setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 5000);
+    } catch (e) { /* the vote is still saved locally */ }
+  }
   // The dungeon controls card: the first time she walks into any
   // dungeon room in a session, a card pops up with the fight
   // controls, and the world waits until she closes it.
@@ -1751,7 +1835,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=100" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=101" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1807,7 +1891,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=100" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=101" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -2522,34 +2606,11 @@
   // A little line when she walks into a new room, so each place
   // gets its own first impression. No box, no border, just the words
   // at the top of the screen for a few seconds, then they fade.
-  var ROOM_INTRO = {
-    bar: "This place reeks of cheap beer and old smoke.",
-    chamber: "Our room. Small, warm, and ours.",
-    subway: "Looks like an old abandoned subway...",
-    shopping: "It's beautiful here, but it could be better.",
-    repair: "It smells like oil and rust in here.",
-    clothing: "Char's shop. It smells like perfume and big dreams.",
-    salon: "Mikey's place. Hairspray, gossip, and good lighting.",
-    arcade: "The arcade never really turns off.",
-    cistern: "The water is still. Too still.",
-    garden: "A hidden garden, blooming in the dark. It smells like rain and wisteria.",
-    quarry: "Pretty crystals. And a little bit wrong.",
-    tunnels: "The tunnels smell like damp earth and old metal.",
-    dungeon: "Something bad happened here. You can feel it.",
-    dungeon2: "Tombs and candles. Something is buried down here.",
-    dungeon3: "Cages hang from the ceiling. Best not to look inside.",
-    dungeon4: "A ruined courtroom. Justice is blind, but she is watching.",
-    upper1: "Upper Level 1. Blue, cold, and the air feels thinner.",
-    upper2: "Upper Level 2. Violet and quiet. Too quiet.",
-    upper3: "Upper Level 3. White and bright. And it watches you.",
-    earthen: "A cramped earthen tunnel. The air smells like soil and roots. Almost there.",
-    surface: "The sun. The sky. We finally made it out."
-  };
   var roomIntroTimer = null;
   function showRoomIntro() {
     var el = document.getElementById("roomIntro");
     if (!el) return;
-    var line = ROOM_INTRO[g.room];
+    var line = MAP_ROOM_NAMES[g.room];
     if (!line) return;
     // If she is reading a piece of junk, the panel wins and the
     // intro waits for the next room.
@@ -3194,7 +3255,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.kiss.active || g.halluKiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen || g.kiss.active || g.halluKiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -3217,6 +3278,7 @@
       if (scooterNear()) acts.push({ id: "scooter", label: "Ride the scooter", run: mountScooter });
       if (subwayMapNear()) acts.push({ id: "subwaymap", label: "Look at the map", run: openSubwayMap });
       if (ticketBoothNear()) acts.push({ id: "ticket", label: "Ticket machine", run: openTicket });
+      if (g.room === "upper2" && !g.lvl2Choice && !g.lvl2Open) acts.push({ id: "lvl2", label: "The choice", run: openLvl2 });
       if (halluKissNear()) acts.push({ id: "hallukiss", label: "Kiss", run: tryHalluKiss });
       var pr = propNear();
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
@@ -3253,7 +3315,7 @@
   // never moves her sideways or through a door.
   var JUMP_DUR = 28;
   function tryJump() {
-    if (g.jumpT > 0 || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.scooter.riding || g.embrace.active) return;
+    if (g.jumpT > 0 || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen || g.scooter.riding || g.embrace.active) return;
     g.jumpT = 1;
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
@@ -3841,6 +3903,7 @@
       xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
       subwayPuzzlesDone: g.subwayPuzzlesDone,
       upper1CutsceneDone: g.upper1CutsceneDone, halluDone: g.halluDone,
+      lvl2Choice: g.lvl2Choice,
       crystals: g.crystals.slice(), crystalCount: g.crystalCount, quarryMissionDone: g.quarryMissionDone,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
@@ -3942,6 +4005,7 @@
     g.arcadeMinigameDone = !!s.arcadeMinigameDone;
     g.subwayPuzzlesDone = !!s.subwayPuzzlesDone;
     g.upper1CutsceneDone = !!s.upper1CutsceneDone; g.halluDone = !!s.halluDone;
+    g.lvl2Choice = s.lvl2Choice || null;
     g.crystals = Array.isArray(s.crystals) ? s.crystals.slice() : [0, 1, 2, 3, 4];
     g.crystalCount = s.crystalCount || 0;
     g.quarryMissionDone = !!s.quarryMissionDone;
@@ -4514,7 +4578,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen) return;
     if (g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
@@ -4546,7 +4610,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.mayorCutscene.active = true;
@@ -4578,7 +4642,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.vickyCutscene.active = true;
@@ -4608,7 +4672,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.xCutscene.active = true;
@@ -4644,7 +4708,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.upper1Cutscene.active = true;
@@ -4687,7 +4751,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.lvl2Open || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.hallu.active = true;
@@ -6867,6 +6931,20 @@
       draw();
       return;
     }
+    if (g.lvl2Open) {
+      // The choice on Upper Level 2 is open: the panel is over the
+      // game. Nothing moves until she chooses or steps away.
+      var eBtnLvl2 = document.getElementById("actionList");
+      if (eBtnLvl2) eBtnLvl2.hidden = true;
+      var aBtnLvl2 = document.getElementById("attackBtn");
+      if (aBtnLvl2) aBtnLvl2.hidden = true;
+      var sBtnLvl2 = document.getElementById("shopBtn");
+      if (sBtnLvl2) sBtnLvl2.hidden = true;
+      var fBtnLvl2 = document.getElementById("fashionBtn");
+      if (fBtnLvl2) fBtnLvl2.hidden = true;
+      draw();
+      return;
+    }
     if (pinball.active) {
       // The pinball machine is open: the world waits behind the
       // popup while the ball, flippers and bumpers run.
@@ -7441,6 +7519,7 @@
     // and turn to face him, and he tells them the subway is open.
     if (!g.xCutsceneDone && g.room === "dungeon4" && dungeonCleared() && dungeonAllCleared()) startXCutscene();
     if (!g.upper1CutsceneDone && g.room === "upper1" && !g.climb.active) startUpper1Cutscene();
+    if (!g.lvl2Choice && g.room === "upper2" && !g.climb.active) openLvl2();
     // Upper Level 3: the smoke. Ray is gone and the men appear as
     // hallucinations after three seconds, until she kisses Ray.
     if (!g.halluDone && g.room === "upper3" && !g.climb.active) startHallu();
@@ -7504,7 +7583,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.subwayMap.active) { closeSubwayMap(); return; } if (g.dungeonControls.open) { closeDungeonControls(); return; } if (g.map.active) { closeMap(); return; } if (g.missionsOpen) { closeMissions(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.secretOpen) { closeSecret(); return; } if (g.ticketOpen) { closeTicket(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.subwayMap.active) { closeSubwayMap(); return; } if (g.dungeonControls.open) { closeDungeonControls(); return; } if (g.map.active) { closeMap(); return; } if (g.missionsOpen) { closeMissions(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.secretOpen) { closeSecret(); return; } if (g.ticketOpen) { closeTicket(); return; } if (g.lvl2Open) { closeLvl2(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active || g.subwayMap.active) return;
     if (g.dungeonControls.open) return;
@@ -7666,6 +7745,12 @@
   if (ticketA3) ticketA3.addEventListener("click", function (e) { e.stopPropagation(); answerTicket("grey"); });
   var ticketCloseBtn = document.getElementById("ticketCloseBtn");
   if (ticketCloseBtn) ticketCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeTicket(); });
+  var lvl2A1 = document.getElementById("lvl2A1");
+  if (lvl2A1) lvl2A1.addEventListener("click", function (e) { e.stopPropagation(); chooseLvl2("rescue"); });
+  var lvl2A2 = document.getElementById("lvl2A2");
+  if (lvl2A2) lvl2A2.addEventListener("click", function (e) { e.stopPropagation(); chooseLvl2("leave"); });
+  var lvl2CloseBtn = document.getElementById("lvl2CloseBtn");
+  if (lvl2CloseBtn) lvl2CloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeLvl2(); });
   // The title screen: Continue when a save exists, New Game always.
   // The world waits behind it until she picks one.
   var titleScreen = document.getElementById("titleScreen");
@@ -7708,6 +7793,7 @@
       g.arcadeMinigameDone = false;
       g.subwayPuzzlesDone = false;
       g.upper1CutsceneDone = false; g.halluDone = false;
+      g.lvl2Choice = null; g.lvl2Open = false;
       g.hallu = { active: false, t: 0, spawned: false }; g.halluMen = [];
       g.crystals = [0, 1, 2, 3, 4];
       g.crystalCount = 0;
