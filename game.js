@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=98" forces a fresh download: missions, the Vicky drink
+  // "?v=99" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=98"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=99"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -632,6 +632,15 @@
     missionsOpen: false,
     subwayUnlocked: false, dungeonCleared: {},
     xCutsceneDone: false, xCutscene: { active: false, step: 0, t: 0 },
+    // Upper Level 1: the Mayor blocks them and X argues with him.
+    // One time only; after it the way back down is sealed.
+    upper1CutsceneDone: false,
+    upper1Cutscene: { active: false, step: 0, t: 0 },
+    // Upper Level 3: the smoke. Ray is gone and the men appear as
+    // hallucinations. Kiss the real Ray and the way out opens.
+    halluDone: false,
+    hallu: { active: false, t: 0, spawned: false },
+    halluMen: [],
     arcadeMinigameDone: false, subwayPuzzlesDone: false,
     // The quarry crystal mission: five glowing crystals in the
     // Crystal Quarry. Gather them all and the iron door opens.
@@ -996,6 +1005,18 @@
     "The subway is open to you now. It has been locked for longer than you have been alive.",
     "The bar leads to it. The stairs at the far end of the bar. Go. And do not look back."
   ];
+  // Upper Level 1: the Mayor blocks them and X argues with him.
+  // The Mayor is only trying to protect everyone, but the deal is
+  // one-way: go on if you want, but you are not allowed back in.
+  var UPPER1_CUTSCENE_LINES = [
+    { n: "MAYOR ADLER", t: "Stop there. What do you think you are doing?" },
+    { n: "X", t: "Let them pass. This whole underground city is a fluke. It was never meant to last." },
+    { n: "MAYOR ADLER", t: "A fluke? People live here. Families. I am just trying to protect everyone." },
+    { n: "X", t: "Protect them from what? From the sky? You keep them in the dark and call it safety." },
+    { n: "MAYOR ADLER", t: "The dark is all we have ever known. Out there is not safe for us." },
+    { n: "X", t: "Then let them choose. They are not yours to keep." },
+    { n: "MAYOR ADLER", t: "Go on, then, if you want. But hear me: you are not allowed back in." }
+  ];
   function kianNear() { return g.room === g.kian.room && Math.abs(g.px - g.kian.x) < 150; }
   function kianTalkLine() {
     var first = !g.kianTalk.open;
@@ -1183,6 +1204,7 @@
     if (g.mayorCutscene.active) { advanceMayorCutscene(); return; }
     if (g.vickyCutscene.active) { advanceVickyCutscene(); return; }
     if (g.xCutscene.active) { advanceXCutscene(); return; }
+    if (g.upper1Cutscene.active) { advanceUpper1Cutscene(); return; }
     if (g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.scooter.riding) return;
     if (g.propRead.open) { closePropRead(); return; }
     if (g.talk.open) { talkLine(); return; }
@@ -1489,6 +1511,7 @@
     // puzzles down there are solved.
     if (key === "bar" && !g.subwayUnlocked) { showDungeonMsg("The stairs are sealed. The dungeon must be finished first."); return; }
     if (key === "subway" && !g.subwayPuzzlesDone) { showDungeonMsg("The stairs are sealed by a puzzle. Something here needs solving first."); return; }
+    if (key === "upper3" && !g.halluDone) { showDungeonMsg("The way out is sealed by smoke. Find Ray."); return; }
     g.talk.open = false; g.ownerTalk.open = false;
     var s = STAIRS[key];
     g.climb.active = true; g.climb.t = 0; g.climb.kind = "stairs"; g.climb.to = s.to;
@@ -1727,7 +1750,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=98" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=99" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1783,7 +1806,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=98" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=99" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -3006,6 +3029,12 @@
       showDungeonMsg("The way is dark. You do not know where the garden is yet.");
       return;
     }
+    // After the argument on Upper Level 1, the way back down to the
+    // subway is sealed. The Mayor's word stands: no going back in.
+    if (from === "upper1" && to === "subway" && g.upper1CutsceneDone) {
+      showDungeonMsg("The way back is sealed. The Mayor's word stands.");
+      return;
+    }
     g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; g.diegoTalk.open = false; g.kianTalk.open = false; g.yutoTalk.open = false; g.adlerTalk.open = false; g.mikaTalk.open = false; g.strangerTalk.open = false;
     g.room = to;
     markVisited(to);
@@ -3091,6 +3120,7 @@
     if (g.mayorCutscene.active) { advanceMayorCutscene(); return; }
     if (g.vickyCutscene.active) { advanceVickyCutscene(); return; }
     if (g.xCutscene.active) { advanceXCutscene(); return; }
+    if (g.upper1Cutscene.active) { advanceUpper1Cutscene(); return; }
     if (g.sleeping) { wakeUp(); return; }
     if (g.photo.active) { closePhoto(); return; }
     if (g.subwayMap.active) { closeSubwayMap(); return; }
@@ -3163,7 +3193,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -3186,6 +3216,7 @@
       if (scooterNear()) acts.push({ id: "scooter", label: "Ride the scooter", run: mountScooter });
       if (subwayMapNear()) acts.push({ id: "subwaymap", label: "Look at the map", run: openSubwayMap });
       if (ticketBoothNear()) acts.push({ id: "ticket", label: "Ticket machine", run: openTicket });
+      if (halluKissNear()) acts.push({ id: "hallukiss", label: "Kiss", run: tryHalluKiss });
       var pr = propNear();
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
       if (pinballNear()) acts.push({ id: "pinball", label: "Play pinball", run: openPinball });
@@ -3221,7 +3252,7 @@
   // never moves her sideways or through a door.
   var JUMP_DUR = 28;
   function tryJump() {
-    if (g.jumpT > 0 || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.scooter.riding || g.embrace.active) return;
+    if (g.jumpT > 0 || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.scooter.riding || g.embrace.active) return;
     g.jumpT = 1;
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
@@ -3808,6 +3839,7 @@
       subwayUnlocked: g.subwayUnlocked, dungeonCleared: g.dungeonCleared,
       xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
       subwayPuzzlesDone: g.subwayPuzzlesDone,
+      upper1CutsceneDone: g.upper1CutsceneDone, halluDone: g.halluDone,
       crystals: g.crystals.slice(), crystalCount: g.crystalCount, quarryMissionDone: g.quarryMissionDone,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
@@ -3908,6 +3940,7 @@
     g.xCutsceneDone = !!s.xCutsceneDone;
     g.arcadeMinigameDone = !!s.arcadeMinigameDone;
     g.subwayPuzzlesDone = !!s.subwayPuzzlesDone;
+    g.upper1CutsceneDone = !!s.upper1CutsceneDone; g.halluDone = !!s.halluDone;
     g.crystals = Array.isArray(s.crystals) ? s.crystals.slice() : [0, 1, 2, 3, 4];
     g.crystalCount = s.crystalCount || 0;
     g.quarryMissionDone = !!s.quarryMissionDone;
@@ -4462,7 +4495,7 @@
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
     if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
-    if (g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active) return;
+    if (g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
     g.proposal.step = 0;
@@ -4494,7 +4527,7 @@
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
     if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
-    if (g.proposal.active || g.rescue.active || g.vickyCutscene.active || g.xCutscene.active) return;
+    if (g.proposal.active || g.rescue.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.mayorCutscene.active = true;
     g.mayorCutscene.step = 0;
@@ -4526,7 +4559,7 @@
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
     if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
-    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.xCutscene.active) return;
+    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.vickyCutscene.active = true;
     g.vickyCutscene.step = 0;
@@ -4582,13 +4615,116 @@
     completeMission("x");
     saveGame();
   }
+  // Upper Level 1: the Mayor blocks them at the top of the stairs
+  // and X argues with him. One time only, the first time she walks
+  // into Upper Level 1. After it the way back down is sealed.
+  var UPPER1_MAYOR_X = 650, UPPER1_X_X = 800;
+  function startUpper1Cutscene() {
+    if (g.upper1CutsceneDone || g.upper1Cutscene.active) return;
+    if (g.sleeping || g.kiss.active || g.embrace.active) return;
+    if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active) return;
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
+    g.upper1Cutscene.active = true;
+    g.upper1Cutscene.step = 0;
+    g.upper1Cutscene.t = 0;
+    g.sylviaSurprisedT = 9999;
+    g.facing = 1;
+    g.ray.dir = 1;
+    g.ray.pause = 9999;
+  }
+  function advanceUpper1Cutscene() {
+    if (!g.upper1Cutscene.active) return;
+    g.upper1Cutscene.step += 1;
+    g.upper1Cutscene.t = 0;
+    if (g.upper1Cutscene.step >= UPPER1_CUTSCENE_LINES.length) endUpper1Cutscene();
+  }
+  function endUpper1Cutscene() {
+    g.upper1Cutscene.active = false;
+    g.upper1CutsceneDone = true;
+    g.sylviaSurprisedT = 90;
+    g.ray.pause = 0;
+    showDungeonMsg("The way back is sealed. You can only go on.");
+    saveGame();
+  }
+  // Upper Level 3: the smoke. Ray is gone and, after three seconds,
+  // every grown man appears as a hallucination. Kiss the real Ray
+  // and the way out opens. Kiss the wrong one and the smoke stings:
+  // half her health, and that face dissolves.
+  var HALLU_MEN = [
+    { who: "ray", img: rayIdleImg },
+    { who: "diego", img: diegoIdleImg },
+    { who: "kian", img: kianIdleImg },
+    { who: "yuto", img: yutoIdleImg },
+    { who: "adler", img: adlerIdleImg },
+    { who: "gunner", img: gunnerIdleImg },
+    { who: "mikey", img: mikeyIdleImg }
+  ];
+  function startHallu() {
+    if (g.halluDone || g.hallu.active) return;
+    if (g.sleeping || g.kiss.active || g.embrace.active) return;
+    if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
+    if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active) return;
+    if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
+    g.hallu.active = true;
+    g.hallu.t = 0;
+    g.hallu.spawned = false;
+    g.halluMen = [];
+    g.ray.pause = 9999;
+    showDungeonMsg("The smoke thickens. Ray is gone.");
+  }
+  function spawnHalluMen() {
+    var xs = [300, 600, 900, 1200, 1500, 1800, 2050];
+    g.halluMen = HALLU_MEN.map(function (m, i) {
+      return { who: m.who, img: m.img, x: xs[i] || 300 + i * 300, depth: 0 };
+    });
+    g.hallu.spawned = true;
+    showDungeonMsg("The smoke shifts. Familiar faces swim into view.");
+  }
+  function clearHallu() {
+    g.hallu.active = false;
+    g.hallu.t = 0;
+    g.hallu.spawned = false;
+    g.halluMen = [];
+    g.ray.pause = 0;
+    g.ray.x = Math.max(roomMinX(), g.px - 70);
+    g.ray.dir = 1;
+  }
+  function halluKissNear() {
+    if (!g.hallu.active || !g.hallu.spawned) return null;
+    var best = null, bestD = 130;
+    for (var i = 0; i < g.halluMen.length; i++) {
+      var d = Math.abs(g.halluMen[i].x - g.px);
+      if (d < bestD) { bestD = d; best = g.halluMen[i]; }
+    }
+    return best;
+  }
+  function tryHalluKiss() {
+    var man = halluKissNear();
+    if (!man) return;
+    if (man.who === "ray") {
+      g.halluDone = true;
+      clearHallu();
+      showDungeonMsg("It was Ray all along. The smoke clears, and the way out is open.");
+      saveGame();
+      return;
+    }
+    g.hp = Math.max(0, g.hp - 50);
+    g.halluMen = g.halluMen.filter(function (m) { return m !== man; });
+    showDungeonMsg("That wasn't Ray. The smoke stings.");
+  }
   function startRescue() {
     if (g.rescue.active) return;
-    if (g.sleeping || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
+    if (g.sleeping || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.upper1Cutscene.active || g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.kiss.active || g.embrace.active || g.mirror.active || g.map.active || g.missionsOpen || g.photo.active || g.subwayMap.active || g.dungeonControls.open) return;
     if (g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.chestOpen) return;
     if (g.portal.active) return;
     g.rescue.active = true;
+    if (g.hallu.active) clearHallu();
     g.rescue.phase = "carry";
     g.rescue.t = 0;
     g.rescue.line = 0;
@@ -4799,6 +4935,59 @@
     if (!g.xCutscene.active) return;
     drawStoryBubble("X", X_CUTSCENE_LINES[g.xCutscene.step], "#5a4a8a");
   }
+  function drawUpper1CutsceneBubble() {
+    if (!g.upper1Cutscene.active) return;
+    var line = UPPER1_CUTSCENE_LINES[g.upper1Cutscene.step];
+    if (!line) return;
+    drawStoryBubble(line.n, line.t, line.n === "X" ? "#5a4a8a" : "#7a5fd0");
+  }
+  function drawCutsceneFigure(img, x) {
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    var t = (0 + depthRange()) / depthRange();
+    var h = rayH() * (0.92 + 0.08 * t);
+    var w = h * (img.naturalWidth / img.naturalHeight);
+    var feetY = groundY() - 6;
+    var sx = x * scale() - g.camX;
+    shadow(sx, feetY, w);
+    ctx.save();
+    ctx.translate(sx, feetY - h / 2);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  function drawUpper1CutsceneFigures() {
+    if (!g.upper1Cutscene.active || g.room !== "upper1") return;
+    var line = UPPER1_CUTSCENE_LINES[g.upper1Cutscene.step];
+    var mayorTalking = line && line.n === "MAYOR ADLER";
+    var xTalking = line && line.n === "X";
+    drawCutsceneFigure(mayorTalking ? adlerTalkImg : adlerIdleImg, UPPER1_MAYOR_X);
+    drawCutsceneFigure(xTalking ? xTalkImg : xIdleImg, UPPER1_X_X);
+  }
+  function drawHalluMen() {
+    if (!g.hallu.active || !g.hallu.spawned || g.room !== "upper3") return;
+    for (var i = 0; i < g.halluMen.length; i++) {
+      var m = g.halluMen[i];
+      var img = m.img;
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var t = (m.depth + depthRange()) / depthRange();
+      var h = rayH() * (0.92 + 0.08 * t);
+      var w = h * (img.naturalWidth / img.naturalHeight);
+      var feetY = groundY() + m.depth - 6;
+      var x = m.x * scale() - g.camX;
+      shadow(x, feetY, w);
+      ctx.save();
+      ctx.globalAlpha = 0.65;
+      ctx.translate(x, feetY - h / 2);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+  }
+  function drawHalluSmoke() {
+    if (!g.hallu.active || g.room !== "upper3") return;
+    ctx.save();
+    ctx.fillStyle = "rgba(200, 200, 210, 0.16)";
+    ctx.fillRect(0, 0, g.w, g.h);
+    ctx.restore();
+  }
   function drawProposal() {
     // One picture per beat now: step 0 Ray slowly gets down on one
     // knee over six frames, then holds out the ring (silent until the
@@ -4911,6 +5100,7 @@
     var r = g.ray;
     if (r.inBed) return; // under the covers with her
     if (g.climb.active && g.climb.rayHidden) return;
+    if (g.hallu.active) return; // gone in the smoke
     if (g.inspect.active) {
       // Inspecting the secret spot: he crouches down beside her.
       // Once they jump, he is in the descent art, not on the floor.
@@ -6478,8 +6668,11 @@
     drawAdler();
     drawMika();
     drawStranger();
+    drawUpper1CutsceneFigures();
+    drawHalluMen();
     drawMonsters();
     if (!g.scooter.riding && !g.sleeping) drawSylvia();
+    drawHalluSmoke();
     drawTalk();
     drawOwnerTalk();
     drawKidTalk();
@@ -6497,6 +6690,7 @@
     drawVickyCutsceneBubble();
     drawMayorCutsceneBubble();
     drawXCutsceneBubble();
+    drawUpper1CutsceneBubble();
     drawRayTalk();
     drawFountainMsg();
     drawChestMsg();
@@ -6788,6 +6982,13 @@
       // X's appearance in the Court: his lines play, and nothing else
       // moves until it is done.
       g.xCutscene.t += 1;
+      draw();
+      return;
+    }
+    if (g.upper1Cutscene.active) {
+      // The argument on Upper Level 1: the Mayor and X, and nothing
+      // else moves until it is done.
+      g.upper1Cutscene.t += 1;
       draw();
       return;
     }
@@ -7192,7 +7393,16 @@
     // himself in the Court, it is a cutscene: they are both shocked
     // and turn to face him, and he tells them the subway is open.
     if (!g.xCutsceneDone && g.room === "dungeon4" && dungeonCleared() && dungeonAllCleared()) startXCutscene();
-    if (g.sylviaSurprisedT > 0 && !g.xCutscene.active) g.sylviaSurprisedT -= 1;
+    if (!g.upper1CutsceneDone && g.room === "upper1" && !g.climb.active) startUpper1Cutscene();
+    // Upper Level 3: the smoke. Ray is gone and the men appear as
+    // hallucinations after three seconds, until she kisses Ray.
+    if (!g.halluDone && g.room === "upper3" && !g.climb.active) startHallu();
+    if (g.hallu.active && g.room !== "upper3") clearHallu();
+    if (g.hallu.active) {
+      g.hallu.t += 1;
+      if (g.hallu.t === 180 && !g.hallu.spawned) spawnHalluMen();
+    }
+    if (g.sylviaSurprisedT > 0 && !g.xCutscene.active && !g.upper1Cutscene.active) g.sylviaSurprisedT -= 1;
     // When she is standing still and he wanders up right behind
     // her, he holds her for a few seconds, then wanders off again.
     if (g.embrace.cooldown > 0) g.embrace.cooldown -= 1;
@@ -7234,7 +7444,7 @@
       if (e.code === "Escape") { closePinball(); return; }
       return;
     }
-    if (e.code === "KeyK") { tryKiss(); return; }
+    if (e.code === "KeyK") { if (g.hallu.active && g.hallu.spawned) tryHalluKiss(); else tryKiss(); return; }
     if (e.code === "KeyH") { tryAttack(); return; }
     if (e.code === "KeyJ") { tryJump(); return; }
     if (e.code === "KeyE") { if (g.proposal.active) { advanceProposal(); return; } tryEnter(); return; }
@@ -7301,6 +7511,7 @@
     if (g.mayorCutscene.active) { advanceMayorCutscene(); pointerDownAt = 0; return; }
     if (g.vickyCutscene.active) { advanceVickyCutscene(); pointerDownAt = 0; return; }
     if (g.xCutscene.active) { advanceXCutscene(); pointerDownAt = 0; return; }
+    if (g.upper1Cutscene.active) { advanceUpper1Cutscene(); pointerDownAt = 0; return; }
         tryAttack();
       }
     }
@@ -7449,6 +7660,8 @@
       g.xCutsceneDone = false;
       g.arcadeMinigameDone = false;
       g.subwayPuzzlesDone = false;
+      g.upper1CutsceneDone = false; g.halluDone = false;
+      g.hallu = { active: false, t: 0, spawned: false }; g.halluMen = [];
       g.crystals = [0, 1, 2, 3, 4];
       g.crystalCount = 0;
       g.quarryMissionDone = false;
