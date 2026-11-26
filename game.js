@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=101" forces a fresh download: missions, the Vicky drink
+  // "?v=102" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=101"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=102"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -477,8 +477,6 @@
     quarry: [],
     tunnels: [
       { img: propKeyImg, x: 300, d: 0.6, h: 44, name: "Old key", text: "An old key. It does not fit any door you know." },
-      { img: propCassetteImg, x: 650, d: 0.8, h: 50, name: "Cracked cassette", text: "A cracked cassette tape. The music is gone, but the ribbon remembers." },
-      { img: propTokenImg, x: 1000, d: 0.5, h: 44, name: "Arcade token", text: "An arcade token. It has a little machine stamped on it. Worthless up there, priceless down here." },
       { img: propBootImg, x: 1250, d: 0.7, h: 48, name: "Worn boot", text: "A worn boot with a hole in it. Someone walked a long way in this." },
       { img: propGlassImg, x: 1700, d: 0.6, h: 32, name: "Broken glass", text: "Broken green glass. Careful where you step." },
       { img: propBundleImg, x: 1950, d: 0.8, h: 52, name: "Bundle of papers", text: "A bundle of papers tied with string. It is just a shopping list. Milk, bread, candles, rope. The rope is underlined three times." }
@@ -650,6 +648,8 @@
     // The quarry crystal mission: five glowing crystals in the
     // Crystal Quarry. Gather them all and the iron door opens.
     crystals: [0, 1, 2, 3, 4], crystalCount: 0, quarryMissionDone: false,
+    // Fetch quests: the items Sylvia is carrying to someone.
+    carried: [],
     jumpT: 0,
     visited: { chamber: true, shopping: true },
     fountainSecret: null, secretOpen: false, ticketOpen: false,
@@ -856,6 +856,7 @@
   ];
   function eveNear() { return g.room === "shopping" && Math.abs(g.px - g.eve.x) < 150; }
   function eveTalkLine() {
+    completeMission("eve");
     var first = !g.eveTalk.open;
     var idx;
     do { idx = Math.floor(Math.random() * EVE_LINES.length); }
@@ -1117,6 +1118,7 @@
   ];
   function mikaNear() { return g.room === g.mika.room && Math.abs(g.px - g.mika.x) < 150; }
   function mikaTalkLine() {
+    completeMission("mika");
     var first = !g.mikaTalk.open;
     var idx;
     do { idx = Math.floor(Math.random() * MIKA_LINES.length); }
@@ -1835,7 +1837,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=101" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=102" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1891,7 +1893,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=101" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=102" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -3279,6 +3281,8 @@
       if (subwayMapNear()) acts.push({ id: "subwaymap", label: "Look at the map", run: openSubwayMap });
       if (ticketBoothNear()) acts.push({ id: "ticket", label: "Ticket machine", run: openTicket });
       if (g.room === "upper2" && !g.lvl2Choice && !g.lvl2Open) acts.push({ id: "lvl2", label: "The choice", run: openLvl2 });
+      if (mikaNear() && g.carried.indexOf("cassette") >= 0) acts.push({ id: "givecassette", label: "Give the cassette to Mika", run: function () { deliverFetch("cassette"); } });
+      if (kidNear() === "dino" && g.carried.indexOf("token") >= 0) acts.push({ id: "givetoken", label: "Give the token to Kush", run: function () { deliverFetch("token"); } });
       if (halluKissNear()) acts.push({ id: "hallukiss", label: "Kiss", run: tryHalluKiss });
       var pr = propNear();
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
@@ -3903,7 +3907,7 @@
       xCutsceneDone: g.xCutsceneDone, arcadeMinigameDone: g.arcadeMinigameDone,
       subwayPuzzlesDone: g.subwayPuzzlesDone,
       upper1CutsceneDone: g.upper1CutsceneDone, halluDone: g.halluDone,
-      lvl2Choice: g.lvl2Choice,
+      lvl2Choice: g.lvl2Choice, carried: g.carried.slice(),
       crystals: g.crystals.slice(), crystalCount: g.crystalCount, quarryMissionDone: g.quarryMissionDone,
       chestsOpened: Object.keys(g.chestsOpened),
       chestLayout: g.chestLayout, chestDay: g.chestDay,
@@ -4006,6 +4010,7 @@
     g.subwayPuzzlesDone = !!s.subwayPuzzlesDone;
     g.upper1CutsceneDone = !!s.upper1CutsceneDone; g.halluDone = !!s.halluDone;
     g.lvl2Choice = s.lvl2Choice || null;
+    g.carried = (s.carried || []).slice();
     g.crystals = Array.isArray(s.crystals) ? s.crystals.slice() : [0, 1, 2, 3, 4];
     g.crystalCount = s.crystalCount || 0;
     g.quarryMissionDone = !!s.quarryMissionDone;
@@ -4158,10 +4163,14 @@
   // the current one is simply the first not yet done.
   var MISSIONS = [
     { id: "vicky", title: "Talk to Vicky", hint: "Vicky has been pouring drinks at the bar forever. Go say hi.", room: "bar" },
+    { id: "eve", title: "Talk to Eve", hint: "Eve is your best friend. She is always wandering the shopping district.", room: "shopping" },
     { id: "mayor", title: "Talk to the Mayor", hint: "The Mayor will be at the bar tomorrow. He knows things.", room: "bar" },
+    { id: "mika", title: "Talk to Mika", hint: "Mika sits alone by the water in the Flooded Cistern. She has no friends. Say hi.", room: "cistern" },
     { id: "garden", title: "Find the Secret Garden", hint: "Past the Flooded Cistern, past the shopping district. The Mayor let it slip.", room: "garden" },
     { id: "fountain", title: "Make a wish", hint: "The fountain in the garden grants one wish.", room: "garden" },
     { id: "arcade", title: "The arcade's secret", hint: "The arcade's arches hide a way down. Find the hint that opens them.", room: "arcade" },
+    { id: "cassette", title: "Mika's cassette", hint: "Mika lost her favorite cassette tape in the Old Service Tunnels. Find it and bring it back to her.", room: "tunnels" },
+    { id: "token", title: "A token for the arcade", hint: "Kush lost his arcade token in the Old Service Tunnels. Find it and bring it back to him.", room: "tunnels" },
     { id: "quarry", title: "Crystals in the quarry", hint: "The Crystal Quarry hums. Gather the five glowing crystals.", room: "quarry" },
     { id: "dungeon", title: "Clear the dungeon", hint: "Gather the quarry crystals to open the iron door, then clear every level.", room: "dungeon4" },
     { id: "x", title: "Meet X", hint: "Something waits at the bottom of the dungeon.", room: "dungeon4" },
@@ -4303,6 +4312,19 @@
         }
       }
     }
+    // Fetch quests: walk into a lost thing to pick it up.
+    if (g.room === "tunnels") {
+      var fkeys = ["cassette", "token"];
+      for (var fi = 0; fi < fkeys.length; fi++) {
+        var fk = fkeys[fi];
+        if (!fetchOnGround(fk)) continue;
+        if (fetchNear(fk)) {
+          g.carried.push(fk);
+          showDungeonMsg(FETCH_ITEMS[fk].foundMsg);
+          saveGame();
+        }
+      }
+    }
   }
   function hitMonsters(fromX, facing, fromDepth) {
     // Sylvia's kick or Ray's punch lands: any monster in front of the
@@ -4390,6 +4412,36 @@
     }
     return false;
   }
+  // Fetch quests: specific lost things, lying on the ground in the
+  // Old Service Tunnels. Walk into one to pick it up, then carry it
+  // to the person who lost it. The mission completes on delivery.
+  var FETCH_ITEMS = {
+    cassette: { room: "tunnels", x: 650, d: 0.8, img: propCassetteImg, name: "Cracked cassette", mission: "cassette", foundMsg: "You found the cracked cassette! It is Mika's favorite tape." },
+    token: { room: "tunnels", x: 1000, d: 0.5, img: propTokenImg, name: "Arcade token", mission: "token", foundMsg: "You found the arcade token! It has a little machine stamped on it." }
+  };
+  function fetchOnGround(key) {
+    var it = FETCH_ITEMS[key];
+    if (!it) return false;
+    if (g.missionsDone[it.mission]) return false;
+    if (g.carried.indexOf(key) >= 0) return false;
+    return true;
+  }
+  function fetchNear(key) {
+    var it = FETCH_ITEMS[key];
+    if (!it || g.room !== it.room || !fetchOnGround(key)) return false;
+    return Math.abs(it.x - g.px) < 70;
+  }
+  function deliverFetch(key) {
+    var it = FETCH_ITEMS[key];
+    if (!it) return;
+    if (g.carried.indexOf(key) < 0) return;
+    if (g.missionsDone[it.mission]) return;
+    g.carried = g.carried.filter(function (k) { return k !== key; });
+    completeMission(it.mission);
+    if (key === "cassette") showDungeonMsg("Mika's eyes light up. \"My tape! You found it! Thank you!\"");
+    if (key === "token") showDungeonMsg("Kush grins and hugs his dino. \"My token! You are the best!\"");
+    saveGame();
+  }
   function drawCrystals() {
     if (g.room !== "quarry" || g.quarryMissionDone) return;
     var dr = depthRange();
@@ -4411,6 +4463,37 @@
       // not just another pale thing on the floor.
       drawQuarryGlow(x, floatY - h / 2, w * 2.0, h * 1.5);
       drawQuarryGlow(x, floatY - h / 2, w * 2.0, h * 1.5);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.drawImage(img, x - w / 2, floatY - h, w, h);
+      ctx.restore();
+    }
+  }
+  function drawFetchItems() {
+    // Lost things, glowing softly on the ground so they read as
+    // worth picking up, not just more junk. Only in the tunnels,
+    // only while still on the ground.
+    if (g.room !== "tunnels") return;
+    var dr = depthRange();
+    var pulse = 0.65 + 0.3 * Math.sin(Date.now() / 400);
+    var keys = ["cassette", "token"];
+    for (var i = 0; i < keys.length; i++) {
+      var it = FETCH_ITEMS[keys[i]];
+      if (!it || !fetchOnGround(keys[i])) continue;
+      var img = it.img;
+      if (!img || !img.complete || img.naturalWidth === 0) continue;
+      var h = g.h * 0.09;
+      var w = h * (img.naturalWidth / img.naturalHeight);
+      var depth = -(1 - it.d) * dr;
+      var feetY = groundY() + depth;
+      var x = it.x * scale() - g.camX;
+      var floatY = feetY - 10 + Math.sin(Date.now() / 500 + i * 1.7) * 4;
+      shadow(x, feetY, w);
+      if (glowBlueImg && glowBlueImg.complete && glowBlueImg.naturalWidth !== 0) {
+        var gw = w * 2.0 * 2.2;
+        var gh = h * 1.5 * 1.3;
+        ctx.drawImage(glowBlueImg, x - gw / 2, (floatY - h / 2) - gh / 2, gw, gh);
+      }
       ctx.save();
       ctx.globalAlpha = pulse;
       ctx.drawImage(img, x - w / 2, floatY - h, w, h);
@@ -6717,6 +6800,7 @@
     drawChests();
     drawCoins();
     drawCrystals();
+    drawFetchItems();
     drawScooter();
     drawArchGlow();
     drawFountainGlow();
@@ -7794,6 +7878,7 @@
       g.subwayPuzzlesDone = false;
       g.upper1CutsceneDone = false; g.halluDone = false;
       g.lvl2Choice = null; g.lvl2Open = false;
+      g.carried = [];
       g.hallu = { active: false, t: 0, spawned: false }; g.halluMen = [];
       g.crystals = [0, 1, 2, 3, 4];
       g.crystalCount = 0;
