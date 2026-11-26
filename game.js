@@ -49,10 +49,10 @@
   var RAY_IDLE_SRC = "assets/ray-idle.png";
   var BG_SRCS = ["assets/bg-bar-01.jpg", "assets/bg-bar-02.jpg", "assets/bg-bar-03.jpg"];
 
-  // "?v=95" forces a fresh download: missions, the Vicky drink
+  // "?v=96" forces a fresh download: missions, the Vicky drink
   // cutscene and the Mayor cutscene art, and the Mayor appearing
   // from Day 2. A browser that cached ?v=83 picks it up.
-  function loadImg(src) { var img = new Image(); img.src = src + "?v=95"; return img; }
+  function loadImg(src) { var img = new Image(); img.src = src + "?v=96"; return img; }
 
   var canvas = document.getElementById("game");
   var wrap = document.getElementById("gameWrap");
@@ -638,7 +638,7 @@
     crystals: [0, 1, 2, 3, 4], crystalCount: 0, quarryMissionDone: false,
     jumpT: 0,
     visited: { chamber: true, shopping: true },
-    fountainSecret: null, secretOpen: false,
+    fountainSecret: null, secretOpen: false, ticketOpen: false,
     chestsOpened: {}, chestOpen: null, chestMsg: "", chestMsgT: 0,
     dungeonMsg: "", dungeonMsgT: 0,
     chestLayout: [], chestDay: 1,
@@ -1607,6 +1607,58 @@
     var pop = document.getElementById("subwayMapPopup");
     if (pop) pop.hidden = true;
   }
+  // The subway puzzle: the old ticket machine in the ticket booth.
+  // It will only print a ticket if she tells it which line climbs
+  // to the top of the transit map on the wall. The red line is the
+  // one that reaches the very top. Answer right and the stairs open.
+  var TICKET_BOOTH_X = 1680, TICKET_BOOTH_RANGE = 110;
+  function ticketBoothNear() { return g.room === "subway" && Math.abs(g.px - TICKET_BOOTH_X) < TICKET_BOOTH_RANGE; }
+  function openTicket() {
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.mirror.active || g.photo.active || g.subwayMap.active || g.ticketOpen) return;
+    if (!ticketBoothNear()) return;
+    g.talk.open = false; g.ownerTalk.open = false;
+    g.ticketOpen = true;
+    refreshTicketPanel();
+    var p = document.getElementById("ticketPanel");
+    if (p) p.hidden = false;
+  }
+  function closeTicket() {
+    g.ticketOpen = false;
+    var p = document.getElementById("ticketPanel");
+    if (p) p.hidden = true;
+  }
+  function refreshTicketPanel() {
+    var a1 = document.getElementById("ticketA1");
+    var a2 = document.getElementById("ticketA2");
+    var a3 = document.getElementById("ticketA3");
+    var txt = document.getElementById("ticketText");
+    var note = document.getElementById("ticketNote");
+    var closeBtn = document.getElementById("ticketCloseBtn");
+    var qs = document.getElementById("ticketAnswers");
+    if (!a1 || !txt || !note || !closeBtn || !qs) return;
+    if (g.subwayPuzzlesDone) {
+      qs.hidden = true;
+      txt.textContent = "The machine has already printed your ticket. The stairs are open.";
+      note.textContent = "";
+      closeBtn.textContent = "Close";
+      return;
+    }
+    qs.hidden = false;
+    txt.textContent = "The old ticket machine rattles. It will only print a ticket if you tell it which line climbs to the top of the map. Look at the map on the wall.";
+    note.textContent = "";
+    closeBtn.textContent = "Step away";
+  }
+  function answerTicket(line) {
+    if (!g.ticketOpen) return;
+    if (line === "red") {
+      closeTicket();
+      setSubwayPuzzlesDone();
+      showDungeonMsg("That's the one. The machine clunks and prints a ticket. The stairs are open now.");
+      return;
+    }
+    var note = document.getElementById("ticketNote");
+    if (note) note.textContent = "That line doesn't climb to the top. Look at the map on the wall and try again.";
+  }
   // The dungeon controls card: the first time she walks into any
   // dungeon room in a session, a card pops up with the fight
   // controls, and the world waits until she closes it.
@@ -1675,7 +1727,7 @@
   // price, and a button. The button's data-id and data-act are
   // handled by the panel click listener set up at the bottom.
   function shopRowHTML(it, btnLabel, btnDisabled) {
-    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=95" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
+    return '<div class="fashionItem"><img src="' + itemPreview(it) + '?v=96" alt="' + it.name + '"><div><div class="shopCardName">' + it.name + '</div><div class="shopCardText">' + it.desc + '</div><div class="shopCardPrice">' + it.price + ' coins</div><button class="shopBuyBtn" type="button" data-id="' + it.id + '" data-act="shop"' + (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button></div></div>';
   }
   function refreshFashionPanel() {
     var box = document.getElementById("fashionItems");
@@ -1731,7 +1783,7 @@
       var worn = id ? isWearing(id) : isDefaultWorn(who, kind);
       var label = worn ? "Wearing" : "Wear";
       var dis = worn;
-      return '<div class="fashionItem"><img src="' + img + '?v=95" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
+      return '<div class="fashionItem"><img src="' + img + '?v=96" alt="' + name + '"><div><div class="shopCardName">' + name + '</div><div class="shopCardText">' + desc + '</div><button class="shopBuyBtn" type="button" data-id="' + (id || ("default-" + who + "-" + kind)) + '" data-act="closet"' + (dis ? ' disabled' : '') + '>' + label + '</button></div></div>';
     }
     var html = "";
     html += '<div class="shopCardName">Sylvia</div>';
@@ -2295,7 +2347,7 @@
   }
   function openPinball() {
     if (pinball.active) return;
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
     if (!pinballNear()) return;
     keys.left = keys.right = keys.up = keys.down = keys.fast = false;
     var pop = document.getElementById("pinballPopup");
@@ -3056,6 +3108,7 @@
     if (shop) { enterShop(shop); return; }
     if (scooterNear()) { mountScooter(); return; }
     if (subwayMapNear()) { openSubwayMap(); return; }
+    if (ticketBoothNear()) { openTicket(); return; }
     if (tunnelsHomeNear()) { goHomeFromTunnels(); return; }
     var prop = propNear();
     if (prop) { readProp(prop); return; }
@@ -3110,7 +3163,7 @@
   function updateActionList() {
     var list = document.getElementById("actionList");
     if (!list) return;
-    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
+    if (g.climb.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.kiss.active || pinball.active) { list.hidden = true; lastActionIds = ""; return; }
     var acts = [];
     if (g.sleeping) {
       acts.push({ id: "wake", label: "Get up", run: wakeUp });
@@ -3132,6 +3185,7 @@
       if (sh) acts.push({ id: "shop", label: SHOPS[sh].btn, run: function () { enterShop(sh); } });
       if (scooterNear()) acts.push({ id: "scooter", label: "Ride the scooter", run: mountScooter });
       if (subwayMapNear()) acts.push({ id: "subwaymap", label: "Look at the map", run: openSubwayMap });
+      if (ticketBoothNear()) acts.push({ id: "ticket", label: "Ticket machine", run: openTicket });
       var pr = propNear();
       if (pr) acts.push({ id: "prop", label: "Inspect", run: function () { readProp(pr); } });
       if (pinballNear()) acts.push({ id: "pinball", label: "Play pinball", run: openPinball });
@@ -3167,7 +3221,7 @@
   // never moves her sideways or through a door.
   var JUMP_DUR = 28;
   function tryJump() {
-    if (g.jumpT > 0 || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen || g.scooter.riding || g.embrace.active) return;
+    if (g.jumpT > 0 || g.sleeping || g.kiss.active || g.climb.active || g.inspect.active || g.portal.active || g.homeWalk.active || g.proposal.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active || g.mirror.active || g.map.active || g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen || g.scooter.riding || g.embrace.active) return;
     g.jumpT = 1;
   }
   function kissNear() { return Math.abs(g.px - g.ray.x) < 130; }
@@ -3292,7 +3346,7 @@
     return g.room === "garden" && Math.abs(g.px - FOUNTAIN_X) < FOUNTAIN_RANGE;
   }
   function makeWish() {
-    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.secretOpen) return;
+    if (g.sleeping || g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.embrace.active || g.climb.active || g.portal.active || g.scooter.riding || g.propRead.open || g.secretOpen || g.ticketOpen) return;
     // First wish: the garden gives 100 coins. After that, the fountain
     // offers one secret, for 100 coins, one question, once ever.
     if (!g.fountainWished) {
@@ -3390,7 +3444,7 @@
     ctx.restore();
   }
   function drawFountainPrompt() {
-    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding || g.secretOpen) return;
+    if (g.kiss.active || g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open || g.climb.active || g.portal.active || g.scooter.riding || g.secretOpen || g.ticketOpen) return;
     if (!fountainNear() || g.fountainSecret) return;
     var x = g.px * scale() - g.camX;
     var y = groundY() - sylviaH() - 34;
@@ -4406,7 +4460,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
     if (g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.proposal.active = true;
@@ -4438,7 +4492,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.vickyCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.mayorCutscene.active = true;
@@ -4470,7 +4524,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.xCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.vickyCutscene.active = true;
@@ -4500,7 +4554,7 @@
     if (g.sleeping || g.kiss.active || g.embrace.active) return;
     if (g.climb.active || g.inspect.active || g.homeWalk.active) return;
     if (g.scooter.riding || g.propRead.open || g.mirror.active) return;
-    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.chestOpen) return;
+    if (g.photo.active || g.subwayMap.active || g.dungeonControls.open || g.map.active || g.missionsOpen || g.shopOpen || g.fashionOpen || g.salonOpen || g.closetOpen || g.sleepConfirmOpen || g.secretOpen || g.ticketOpen || g.chestOpen) return;
     if (g.proposal.active || g.rescue.active || g.mayorCutscene.active || g.vickyCutscene.active) return;
     if (g.talk.open || g.ownerTalk.open || g.kidTalk.open || g.eveTalk.open || g.alexisTalk.open || g.priyaTalk.open || g.diegoTalk.open || g.kianTalk.open || g.yutoTalk.open || g.adlerTalk.open || g.mikaTalk.open || g.strangerTalk.open || g.rayTalk.open) return;
     g.xCutscene.active = true;
@@ -6573,6 +6627,20 @@
       draw();
       return;
     }
+    if (g.ticketOpen) {
+      // The ticket machine panel is open: the panel is over the
+      // game. Nothing moves until she answers or steps away.
+      var eBtnTicket = document.getElementById("actionList");
+      if (eBtnTicket) eBtnTicket.hidden = true;
+      var aBtnTicket = document.getElementById("attackBtn");
+      if (aBtnTicket) aBtnTicket.hidden = true;
+      var sBtnTicket = document.getElementById("shopBtn");
+      if (sBtnTicket) sBtnTicket.hidden = true;
+      var fBtnTicket = document.getElementById("fashionBtn");
+      if (fBtnTicket) fBtnTicket.hidden = true;
+      draw();
+      return;
+    }
     if (pinball.active) {
       // The pinball machine is open: the world waits behind the
       // popup while the ball, flippers and bumpers run.
@@ -7178,7 +7246,7 @@
         return;
       }
     }
-    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.subwayMap.active) { closeSubwayMap(); return; } if (g.dungeonControls.open) { closeDungeonControls(); return; } if (g.map.active) { closeMap(); return; } if (g.missionsOpen) { closeMissions(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.secretOpen) { closeSecret(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
+    if (e.code === "Escape") { if (g.mirror.active) { exitMirror(); return; } if (g.photo.active) { closePhoto(); return; } if (g.subwayMap.active) { closeSubwayMap(); return; } if (g.dungeonControls.open) { closeDungeonControls(); return; } if (g.map.active) { closeMap(); return; } if (g.missionsOpen) { closeMissions(); return; } if (g.sleepConfirmOpen) { closeSleepConfirm(); return; } if (g.secretOpen) { closeSecret(); return; } if (g.ticketOpen) { closeTicket(); return; } if (g.propRead.open) { closePropRead(); g.inspect.active = false; return; } if (g.inspect.active && g.inspect.phase === "look") { g.inspect.active = false; return; } if (g.rayTalk.open) { closeRayTalk(); return; } g.talk.open = false; g.ownerTalk.open = false; g.kidTalk.open = false; g.eveTalk.open = false; g.alexisTalk.open = false; g.priyaTalk.open = false; return; }
     if (g.mirror.active) return;
     if (g.photo.active || g.subwayMap.active) return;
     if (g.dungeonControls.open) return;
@@ -7331,6 +7399,14 @@
   if (secretQ3) secretQ3.addEventListener("click", function (e) { e.stopPropagation(); askSecret("how"); });
   var secretCloseBtn = document.getElementById("secretCloseBtn");
   if (secretCloseBtn) secretCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeSecret(); });
+  var ticketA1 = document.getElementById("ticketA1");
+  if (ticketA1) ticketA1.addEventListener("click", function (e) { e.stopPropagation(); answerTicket("red"); });
+  var ticketA2 = document.getElementById("ticketA2");
+  if (ticketA2) ticketA2.addEventListener("click", function (e) { e.stopPropagation(); answerTicket("teal"); });
+  var ticketA3 = document.getElementById("ticketA3");
+  if (ticketA3) ticketA3.addEventListener("click", function (e) { e.stopPropagation(); answerTicket("grey"); });
+  var ticketCloseBtn = document.getElementById("ticketCloseBtn");
+  if (ticketCloseBtn) ticketCloseBtn.addEventListener("click", function (e) { e.stopPropagation(); closeTicket(); });
   // The title screen: Continue when a save exists, New Game always.
   // The world waits behind it until she picks one.
   var titleScreen = document.getElementById("titleScreen");
